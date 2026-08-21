@@ -1,0 +1,137 @@
+/**
+ * Frontière d'accès aux données M1. Les écrans dépendent de ces interfaces,
+ * pas d'une implémentation : l'adaptateur mock (dev/test) sera remplacé par
+ * l'adaptateur Supabase (RLS + Edge Functions) sans toucher l'UI.
+ */
+import type {
+  CreateOperationInput,
+  Operation,
+  OperationPatch,
+  OperationStatus,
+  OpType,
+  Phase,
+  ProgramCategory,
+  ProgramItem,
+  ProgramItemDraft,
+  Role,
+} from '../domain/m1/types';
+import type { TransitionContext } from '../domain/m1/stateMachine';
+import type { BilanSummary } from '../domain/finance/bilan';
+import type { Money } from '../domain/money/Money';
+import type { Stakeholder, StakeholderInput, StakeholderPatch } from '../domain/m2/types';
+import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
+import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
+import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
+
+export interface Session {
+  userId: string;
+  tenantId: string;
+  role: Role;
+  /** null = toutes les opérations du tenant (réf memberships.operation_scope). */
+  operationScope: string[] | null;
+}
+
+export interface OperationFilter {
+  phase?: Phase;
+  opType?: OpType;
+  countryCode?: string;
+  status?: OperationStatus;
+  search?: string;
+}
+
+export interface OperationsRepo {
+  list(filter?: OperationFilter): Promise<Operation[]>;
+  get(id: string): Promise<Operation | null>;
+  /** Noms existants du tenant (pour l'unicité RG-M1-02), hors id exclu. */
+  existingNames(excludeId?: string): Promise<string[]>;
+  create(input: CreateOperationInput): Promise<Operation>;
+  update(id: string, patch: OperationPatch): Promise<Operation>;
+  setStatus(id: string, status: OperationStatus): Promise<Operation>;
+  /** Contexte de garde (alimenté par M4/M8/M11 — ici simulé). */
+  getTransitionContext(id: string): Promise<TransitionContext>;
+  /** Persiste la phase (frontière Edge Function transition-phase). */
+  setPhase(id: string, to: Phase): Promise<Operation>;
+}
+
+export interface BilanView {
+  summary: BilanSummary;
+  tri: number | null;
+  bac: Money;
+}
+
+export interface BilanLineRecord {
+  id: string;
+  operationId: string;
+  kind: 'cost' | 'revenue';
+  poste: string;
+  amountPlanned: number;
+  amountActual: number;
+}
+
+export interface BilanLineInput {
+  kind: 'cost' | 'revenue';
+  poste: string;
+  amountPlanned: number;
+  amountActual?: number;
+}
+
+export type BilanLinePatch = Partial<Pick<BilanLineRecord, 'poste' | 'amountPlanned' | 'amountActual'>>;
+
+export interface BilanRepo {
+  /** Synthèse bilan d'une opération (coût/recettes/marge/taux + BAC + TRI). */
+  summary(operationId: string): Promise<BilanView | null>;
+  /** Lignes de bilan détaillées (M4 CRUD). */
+  lines(operationId: string): Promise<BilanLineRecord[]>;
+  addLine(operationId: string, input: BilanLineInput): Promise<BilanLineRecord>;
+  updateLine(id: string, patch: BilanLinePatch): Promise<BilanLineRecord>;
+  removeLine(id: string): Promise<void>;
+}
+
+export type ProgramItemPatch = Partial<Pick<ProgramItem, 'label' | 'targetValue' | 'unit' | 'category'>>;
+
+export interface StakeholdersRepo {
+  list(operationId: string): Promise<Stakeholder[]>;
+  add(operationId: string, input: StakeholderInput): Promise<Stakeholder>;
+  update(id: string, patch: StakeholderPatch): Promise<Stakeholder>;
+  remove(id: string): Promise<void>;
+}
+
+export interface TendersRepo {
+  list(operationId: string): Promise<Tender[]>;
+  add(operationId: string, input: TenderInput): Promise<Tender>;
+  setStatus(id: string, status: TenderStatus): Promise<Tender>;
+  setAwardedTo(id: string, stakeholderId: string | null): Promise<Tender>;
+  remove(id: string): Promise<void>;
+}
+
+export interface PlanningRepo {
+  list(operationId: string): Promise<Task[]>;
+  add(operationId: string, input: TaskInput): Promise<Task>;
+  update(id: string, patch: TaskPatch): Promise<Task>;
+  remove(id: string): Promise<void>;
+}
+
+export interface PaymentsRepo {
+  contracts(operationId: string): Promise<Contract[]>;
+  addContract(operationId: string, input: ContractInput): Promise<Contract>;
+  removeContract(id: string): Promise<void>;
+  decomptes(operationId: string): Promise<Decompte[]>;
+  addDecompte(operationId: string, input: DecompteInput): Promise<Decompte>;
+  setDecompteStatus(id: string, status: DecompteStatus): Promise<Decompte>;
+  removeDecompte(id: string): Promise<void>;
+}
+
+export interface ProgramRepo {
+  /** Items d'une version (défaut : version de travail courante). */
+  list(operationId: string, version?: number): Promise<ProgramItem[]>;
+  /** Numéros de versions validées (snapshots consultables). */
+  versions(operationId: string): Promise<number[]>;
+  currentVersion(operationId: string): Promise<number>;
+  add(operationId: string, draft: ProgramItemDraft): Promise<ProgramItem>;
+  update(id: string, patch: ProgramItemPatch): Promise<ProgramItem>;
+  remove(id: string): Promise<void>;
+  /** RG-M1-11 — fige la version courante et ouvre la suivante. Renvoie le n° figé. */
+  validateVersion(operationId: string): Promise<number>;
+}
+
+export type { ProgramCategory };

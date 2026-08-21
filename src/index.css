@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&family=Exo+2:wght@200;300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Base — fond clair lumineux + nappe aurora (direction « Glass & Aurora »).
+   Toutes les couleurs proviennent des variables --ax-* (cf. tokens.ts).
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root { color-scheme: light; }
+  html, body, #root { height: 100%; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: var(--ax-font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--ax-text);
+    background-color: var(--ax-bg);
+    background-image:
+      radial-gradient(60% 50% at 0% 0%, color-mix(in srgb, var(--ax-aurora-a) 32%, transparent), transparent 60%),
+      radial-gradient(55% 45% at 100% 4%, color-mix(in srgb, var(--ax-aurora-b) 30%, transparent), transparent 60%),
+      radial-gradient(60% 55% at 85% 100%, color-mix(in srgb, var(--ax-aurora-c) 28%, transparent), transparent 62%),
+      radial-gradient(50% 45% at 8% 96%, color-mix(in srgb, var(--ax-aurora-d) 22%, transparent), transparent 60%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: color-mix(in srgb, var(--ax-accent) 35%, transparent); }
+  h1, h2, h3, h4 { margin: 0; font-weight: 500; color: var(--ax-text); letter-spacing: -0.01em; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Composants — « look » du design system (verre, boutons, badges, etc.).
+   Les TSX appliquent ces classes ; la mise en page passe par Tailwind.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Surfaces verre */
+  .ax-glass {
+    background: var(--ax-glass);
+    border: 1px solid var(--ax-glass-border);
+    backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+  }
+  .ax-card {
+    background: var(--ax-glass);
+    border: 1px solid var(--ax-glass-border);
+    border-radius: var(--ax-radius-lg);
+    box-shadow: var(--ax-shadow);
+    backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+  }
+  .ax-card--strong { background: var(--ax-glass-strong); }
+  .ax-card--subtle { background: var(--ax-glass-subtle); box-shadow: var(--ax-shadow-sm); }
+
+  /* Boutons */
+  .ax-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: var(--ax-font-sans); font-size: 14px; font-weight: 500; line-height: 1;
+    height: 40px; padding: 0 16px;
+    border-radius: var(--ax-radius-md); border: 1px solid transparent;
+    cursor: pointer; white-space: nowrap; user-select: none;
+    transition: transform var(--ax-dur-fast) var(--ax-ease),
+                background var(--ax-dur) var(--ax-ease),
+                box-shadow var(--ax-dur) var(--ax-ease),
+                color var(--ax-dur) var(--ax-ease);
+  }
+  .ax-btn:active { transform: scale(0.98); }
+  .ax-btn:focus-visible { outline: none; box-shadow: var(--ax-ring); }
+  .ax-btn--primary { background: var(--ax-accent); color: var(--ax-on-accent); box-shadow: var(--ax-shadow-sm); }
+  .ax-btn--primary:hover { background: var(--ax-accent-strong); color: #fff; }
+  .ax-btn--glass {
+    background: var(--ax-glass); color: var(--ax-text); border-color: var(--ax-glass-border);
+    backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+  }
+  .ax-btn--glass:hover { background: var(--ax-glass-strong); }
+  .ax-btn--ghost { background: transparent; color: var(--ax-text-2); }
+  .ax-btn--ghost:hover { background: color-mix(in srgb, var(--ax-text) 6%, transparent); color: var(--ax-text); }
+  .ax-btn--sm { height: 32px; font-size: 13px; padding: 0 12px; }
+  .ax-btn--icon { width: 40px; padding: 0; }
+  .ax-btn--icon.ax-btn--sm { width: 32px; }
+
+  /* Badges / chips */
+  .ax-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+    padding: 4px 10px; border-radius: var(--ax-radius-pill);
+    background: var(--ax-glass-strong); color: var(--ax-text-2);
+    border: 1px solid var(--ax-glass-border);
+  }
+  .ax-badge--accent  { background: var(--ax-accent-soft);  color: var(--ax-on-accent); border-color: transparent; }
+  .ax-badge--success { background: var(--ax-success-soft); color: var(--ax-success);   border-color: transparent; }
+  .ax-badge--danger  { background: var(--ax-danger-soft);  color: var(--ax-danger);    border-color: transparent; }
+  .ax-badge--info    { background: var(--ax-info-soft);    color: var(--ax-info);      border-color: transparent; }
+  .ax-badge--warning { background: var(--ax-warning-soft); color: var(--ax-warning);   border-color: transparent; }
+  .ax-badge .ax-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+  /* Champs */
+  .ax-field { display: flex; flex-direction: column; gap: 6px; }
+  .ax-label { font-size: 12px; font-weight: 500; color: var(--ax-text-2); }
+  .ax-input {
+    width: 100%; height: 40px; padding: 0 12px;
+    font-family: var(--ax-font-sans); font-size: 14px; color: var(--ax-text);
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border);
+    border-radius: var(--ax-radius-md); outline: none;
+    backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+    transition: box-shadow var(--ax-dur) var(--ax-ease), border-color var(--ax-dur) var(--ax-ease);
+  }
+  .ax-input::placeholder { color: var(--ax-text-3); }
+  .ax-input:focus { border-color: color-mix(in srgb, var(--ax-accent) 60%, transparent); box-shadow: var(--ax-ring); }
+
+  /* Progression */
+  .ax-progress { height: 8px; border-radius: 999px; overflow: hidden;
+    background: color-mix(in srgb, var(--ax-text) 8%, transparent); }
+  .ax-progress__bar { height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--ax-accent), var(--ax-aurora-b));
+    transition: width var(--ax-dur-slow) var(--ax-ease); }
+
+  /* Divers */
+  .ax-divider { height: 1px; background: var(--ax-border); border: 0; }
+  .mono { font-family: var(--ax-font-mono); font-variant-numeric: tabular-nums; }
+  .ax-brand { font-family: var(--ax-font-brand); font-weight: 400; line-height: 1; }
+
+  /* Aurora animée (blobs flous) */
+  .ax-aurora-layer { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+  .ax-blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.42; mix-blend-mode: multiply; }
+  .ax-blob--a { width: 520px; height: 520px; background: var(--ax-aurora-a); top: -160px; left: -120px;
+    animation: ax-float-a 19s var(--ax-ease) infinite alternate; }
+  .ax-blob--b { width: 480px; height: 480px; background: var(--ax-aurora-b); top: -120px; right: -140px;
+    animation: ax-float-b 23s var(--ax-ease) infinite alternate; }
+  .ax-blob--c { width: 560px; height: 560px; background: var(--ax-aurora-c); bottom: -240px; right: 8%;
+    animation: ax-float-c 27s var(--ax-ease) infinite alternate; }
+  @keyframes ax-float-a { to { transform: translate(80px, 60px) scale(1.10); } }
+  @keyframes ax-float-b { to { transform: translate(-70px, 90px) scale(1.06); } }
+  @keyframes ax-float-c { to { transform: translate(50px, -70px) scale(1.12); } }
+}
+
+/* Scrollbar discrète */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--ax-glass-border); border-radius: 999px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Accessibilité — mouvement réduit (réf CLAUDE.md §4) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important; }
+  .ax-blob { animation: none !important; }
+  .ax-btn:active { transform: none; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Primitives M1 (sélecteurs, modale, bannières, skeleton, toasts, tableau).
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .ax-input--select { appearance: none; -webkit-appearance: none; padding-right: 34px; cursor: pointer; }
+  .ax-textarea {
+    width: 100%; min-height: 84px; padding: 10px 12px; resize: vertical;
+    font-family: var(--ax-font-sans); font-size: 14px; line-height: 1.5; color: var(--ax-text);
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border);
+    border-radius: var(--ax-radius-md); outline: none;
+    backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur-sm)) saturate(140%);
+    transition: box-shadow var(--ax-dur) var(--ax-ease), border-color var(--ax-dur) var(--ax-ease);
+  }
+  .ax-textarea::placeholder { color: var(--ax-text-3); }
+  .ax-textarea:focus { border-color: color-mix(in srgb, var(--ax-accent) 60%, transparent); box-shadow: var(--ax-ring); }
+
+  .ax-modal-overlay {
+    position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: var(--ax-overlay);
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    animation: ax-fade var(--ax-dur) var(--ax-ease);
+  }
+  .ax-modal {
+    width: 100%; max-width: 520px; max-height: 90vh; overflow: auto;
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border);
+    border-radius: var(--ax-radius-lg); box-shadow: var(--ax-shadow-lg);
+    backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    -webkit-backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    animation: ax-pop var(--ax-dur) var(--ax-ease);
+  }
+  @keyframes ax-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes ax-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+  .ax-banner {
+    display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px;
+    border-radius: var(--ax-radius-md); font-size: 13px;
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border); color: var(--ax-text-2);
+  }
+  .ax-banner--danger  { background: var(--ax-danger-soft);  color: var(--ax-danger);  border-color: transparent; }
+  .ax-banner--info    { background: var(--ax-info-soft);    color: var(--ax-info);    border-color: transparent; }
+  .ax-banner--success { background: var(--ax-success-soft); color: var(--ax-success); border-color: transparent; }
+  .ax-banner--warning { background: var(--ax-warning-soft); color: var(--ax-warning); border-color: transparent; }
+
+  .ax-skeleton { position: relative; overflow: hidden; border-radius: var(--ax-radius-sm);
+    background: color-mix(in srgb, var(--ax-text) 8%, transparent); }
+  .ax-skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, #fff 55%, transparent), transparent);
+    animation: ax-shimmer 1.4s infinite; }
+  @keyframes ax-shimmer { to { transform: translateX(100%); } }
+
+  .ax-toast-wrap { position: fixed; z-index: 300; bottom: 16px; right: 16px;
+    display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
+  .ax-toast { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px;
+    border-radius: var(--ax-radius-md); font-size: 13px;
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border); box-shadow: var(--ax-shadow);
+    backdrop-filter: blur(var(--ax-blur)) saturate(140%); -webkit-backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    animation: ax-pop var(--ax-dur) var(--ax-ease); }
+
+  .ax-th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ax-text-3);
+    font-weight: 500; text-align: left; padding: 10px 12px; white-space: nowrap; }
+  .ax-td { padding: 12px; font-size: 13px; border-top: 1px solid var(--ax-border); vertical-align: middle; }
+  .ax-tr { transition: background var(--ax-dur) var(--ax-ease); }
+  .ax-tr:hover { background: var(--ax-glass-subtle); cursor: pointer; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Navigation — sidebar fixe, items, menu utilisateur (disposition retenue).
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .ax-nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 8px 10px; border-radius: var(--ax-radius-md); border: 0; background: transparent;
+    font-family: var(--ax-font-sans); font-size: 14px; color: var(--ax-text-2); cursor: pointer;
+    transition: background var(--ax-dur) var(--ax-ease), color var(--ax-dur) var(--ax-ease);
+  }
+  .ax-nav-item:hover { background: var(--ax-glass-subtle); color: var(--ax-text); }
+  .ax-nav-item.is-active { background: var(--ax-glass-strong); color: var(--ax-text); font-weight: 500; }
+  .ax-nav-item:disabled { opacity: 0.55; cursor: default; }
+  .ax-nav-item:disabled:hover { background: transparent; color: var(--ax-text-2); }
+  .ax-nav-group { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ax-text-3); padding: 14px 10px 4px; }
+  .ax-soon { margin-left: auto; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--ax-warning); background: var(--ax-warning-soft); padding: 2px 6px; border-radius: 6px; }
+
+  .ax-menu {
+    position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; z-index: 60; padding: 6px;
+    background: var(--ax-glass-strong); border: 1px solid var(--ax-glass-border);
+    border-radius: var(--ax-radius-lg); box-shadow: var(--ax-shadow-lg);
+    backdrop-filter: blur(var(--ax-blur)) saturate(140%); -webkit-backdrop-filter: blur(var(--ax-blur)) saturate(140%);
+    animation: ax-pop var(--ax-dur) var(--ax-ease);
+  }
+  .ax-menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 8px 10px; border-radius: var(--ax-radius-md); border: 0; background: transparent;
+    font-size: 13px; color: var(--ax-text-2); cursor: pointer;
+  }
+  .ax-menu-item:hover { background: var(--ax-glass-subtle); color: var(--ax-text); }
+}
