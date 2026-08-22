@@ -30,6 +30,7 @@ import type {
   TitleDocStatus,
 } from '../domain/m2/foncier';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
+import type { ReportSnapshot, ReportInput } from '../domain/m21/reporting';
 import type {
   Unit,
   UnitInput,
@@ -140,6 +141,13 @@ export interface CommercialisationRepo {
   addReceipt(saleId: string, input: ReceiptInput): Promise<Receipt>;
   setReceiptStatus(id: string, status: ReceiptStatus): Promise<Receipt>;
   removeReceipt(id: string): Promise<void>;
+}
+
+/** Reporting (M21) : snapshots datés & conservés. */
+export interface ReportingRepo {
+  list(operationId: string): Promise<ReportSnapshot[]>;
+  generate(operationId: string, input: ReportInput): Promise<ReportSnapshot>;
+  remove(id: string): Promise<void>;
 }
 
 /** Financement (M5) : sources & tranches de déblocage. */

@@ -31,6 +31,7 @@ import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, Receipt, ReceiptInput, ReceiptStatus } from '../domain/m6/types';
 import { recettesEncaissees } from '../domain/m6/commercialisation';
+import type { ReportSnapshot, ReportInput } from '../domain/m21/reporting';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -55,6 +56,7 @@ import type {
   ComplianceRepo,
   FinancingRepo,
   CommercialisationRepo,
+  ReportingRepo,
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
@@ -91,6 +93,7 @@ export interface MockDb {
   units: Unit[];
   sales: Sale[];
   receipts: Receipt[];
+  reportSnapshots: ReportSnapshot[];
 }
 
 interface Deps {
@@ -319,7 +322,9 @@ export function createMockDb(): MockDb {
     { id: 're-p3', tenantId: T, saleId: 'sa-p2', amount: Money.of(2_750_000, 'XOF'), method: 'mobile_money', status: 'pending', reference: null },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts };
+  const reportSnapshots: ReportSnapshot[] = [];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -819,6 +824,31 @@ export function createCommercialisationRepo(db: MockDb, session: Session, deps: 
     async removeReceipt(rid) {
       const i = db.receipts.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
       if (i >= 0) db.receipts.splice(i, 1);
+    },
+  };
+}
+
+export function createReportingRepo(db: MockDb, session: Session, deps: Deps): ReportingRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  return {
+    async list(opId) {
+      return db.reportSnapshots
+        .filter((r) => r.operationId === opId && r.tenantId === session.tenantId)
+        .map((r) => ({ ...r }))
+        .sort((a, b) => (a.generatedAt < b.generatedAt ? 1 : -1));
+    },
+    async generate(opId, input: ReportInput) {
+      const snap: ReportSnapshot = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        type: input.type, period: input.period, data: input.data, generatedAt: now(),
+      };
+      db.reportSnapshots.push(snap);
+      return { ...snap };
+    },
+    async remove(rid) {
+      const i = db.reportSnapshots.findIndex((r) => r.id === rid && r.tenantId === session.tenantId);
+      if (i >= 0) db.reportSnapshots.splice(i, 1);
     },
   };
 }

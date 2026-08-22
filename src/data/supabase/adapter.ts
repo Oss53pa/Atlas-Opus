@@ -32,6 +32,7 @@ import type {
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
 import { recettesEncaissees } from '../../domain/m6/commercialisation';
+import type { ReportSnapshot, ReportInput, ReportType, ReportData } from '../../domain/m21/reporting';
 import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
@@ -54,7 +55,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1077,6 +1078,41 @@ export function createSupabaseCommercialisationRepo(client: SupabaseClient, sess
     },
     async removeReceipt(id) {
       const { error } = await client.from(RE).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Reporting (M21) ──────────────────────────────────────────────────────────
+interface ReportSnapshotRow {
+  id: string; tenant_id: string; operation_id: string;
+  type: string; period: string; data: ReportData; generated_at: string;
+}
+function toReportSnapshot(r: ReportSnapshotRow): ReportSnapshot {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    type: r.type as ReportType, period: r.period, data: r.data, generatedAt: r.generated_at,
+  };
+}
+
+export function createSupabaseReportingRepo(client: SupabaseClient, session: Session): ReportingRepo {
+  const RS = 'ao_report_snapshots';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(RS).select('*').eq('operation_id', opId).order('generated_at', { ascending: false })) as ReportSnapshotRow[];
+      return rows.map(toReportSnapshot);
+    },
+    async generate(opId, input: ReportInput) {
+      const row = unwrap(
+        await client.from(RS).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          type: input.type, period: input.period, data: input.data,
+        }).select('*').single(),
+      ) as ReportSnapshotRow;
+      return toReportSnapshot(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(RS).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
