@@ -27,12 +27,13 @@ import type {
   TitleDocStatus,
 } from '../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
+import { canAssignAccountable } from '../domain/m7/validation';
 import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, Receipt, ReceiptInput, ReceiptStatus } from '../domain/m6/types';
 import { recettesEncaissees } from '../domain/m6/commercialisation';
 import type { ReportSnapshot, ReportInput } from '../domain/m21/reporting';
-import type { Insurance, InsuranceInput } from '../domain/m7/types';
+import type { Insurance, InsuranceInput, RaciAssignment, RaciInput, Decision, DecisionInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
@@ -60,6 +61,7 @@ import type {
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
+  GovernanceRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -94,6 +96,8 @@ export interface MockDb {
   sales: Sale[];
   receipts: Receipt[];
   reportSnapshots: ReportSnapshot[];
+  raciAssignments: RaciAssignment[];
+  decisions: Decision[];
 }
 
 interface Deps {
@@ -324,7 +328,21 @@ export function createMockDb(): MockDb {
 
   const reportSnapshots: ReportSnapshot[] = [];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots };
+  // Gouvernance (M7) — Palmiers : matrice RACI de démonstration (un A par activité)
+  // et quelques décisions actées (registre append-only).
+  const raciAssignments: RaciAssignment[] = [
+    { id: 'ra-p1', tenantId: T, operationId: 'op-palmiers', activity: 'Conception', stakeholderId: 'st-p1', raci: 'A' },
+    { id: 'ra-p2', tenantId: T, operationId: 'op-palmiers', activity: 'Conception', stakeholderId: 'st-p2', raci: 'R' },
+    { id: 'ra-p3', tenantId: T, operationId: 'op-palmiers', activity: 'Exécution travaux', stakeholderId: 'st-p3', raci: 'R' },
+    { id: 'ra-p4', tenantId: T, operationId: 'op-palmiers', activity: 'Exécution travaux', stakeholderId: 'st-p1', raci: 'A' },
+    { id: 'ra-p5', tenantId: T, operationId: 'op-palmiers', activity: 'Exécution travaux', stakeholderId: 'st-p2', raci: 'C' },
+  ];
+  const decisions: Decision[] = [
+    { id: 'de-p1', tenantId: T, operationId: 'op-palmiers', kind: 'decision', reference: 'DEC-2026-001', date: '2026-03-15', summary: 'Validation de l’APD et lancement de la consultation gros œuvre', decidedBy: 'MOA — Direction', createdAt: '2026-03-15T09:00:00.000Z' },
+    { id: 'de-p2', tenantId: T, operationId: 'op-palmiers', kind: 'OS', reference: 'OS-2026-012', date: '2026-05-20', summary: 'Ordre de service de démarrage — lot 1 gros œuvre', decidedBy: 'MOA — Direction', createdAt: '2026-05-20T09:00:00.000Z' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -986,6 +1004,55 @@ export function createPlanningRepo(db: MockDb, session: Session, deps: Deps): Pl
     },
     async remove(tid) {
       db.tasks = db.tasks.filter((tk) => !(tk.id === tid && tk.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): GovernanceRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+
+  return {
+    async raci(opId) {
+      return mine(db.raciAssignments).filter((r) => r.operationId === opId).map((r) => ({ ...r }));
+    },
+    async addRaci(opId, input: RaciInput) {
+      const activity = input.activity.trim();
+      // RG-M7-07 — au plus un « A » par activité.
+      if (input.raci === 'A') {
+        const existing = db.raciAssignments.filter(
+          (r) => r.tenantId === session.tenantId && r.operationId === opId && r.activity === activity,
+        );
+        if (!canAssignAccountable(existing)) throw new Error('raci_duplicate_accountable');
+      }
+      const r: RaciAssignment = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        activity, stakeholderId: input.stakeholderId, raci: input.raci,
+      };
+      db.raciAssignments.push(r);
+      return { ...r };
+    },
+    async removeRaci(rid) {
+      const i = db.raciAssignments.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.raciAssignments.splice(i, 1);
+    },
+
+    async decisions(opId) {
+      return mine(db.decisions)
+        .filter((d) => d.operationId === opId)
+        .map((d) => ({ ...d }))
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.createdAt < b.createdAt ? 1 : -1));
+    },
+    async addDecision(opId, input: DecisionInput) {
+      // RG-M7-08 — le registre est append-only : uniquement une insertion.
+      const d: Decision = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        kind: input.kind, reference: input.reference.trim(), date: input.date,
+        summary: input.summary?.trim() || null, decidedBy: input.decidedBy.trim(), createdAt: now(),
+      };
+      db.decisions.push(d);
+      return { ...d };
     },
   };
 }

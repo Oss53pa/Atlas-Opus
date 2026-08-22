@@ -12,6 +12,7 @@ import {
   createPaymentsRepo,
   createPlanningRepo,
   createTendersRepo,
+  createGovernanceRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -29,6 +30,7 @@ import type {
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
+  GovernanceRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -37,7 +39,7 @@ import type { LandParcel, TitleDocument } from '../domain/m2/foncier';
 import type { Financing, Drawdown } from '../domain/m5/types';
 import type { Unit, Sale, Receipt } from '../domain/m6/types';
 import type { ReportSnapshot } from '../domain/m21/reporting';
-import type { Insurance } from '../domain/m7/types';
+import type { Insurance, RaciAssignment, Decision } from '../domain/m7/types';
 import type { Contract, Decompte } from '../domain/payments/types';
 import type { Task } from '../domain/m12/types';
 import type { Tender } from '../domain/m8/types';
@@ -60,6 +62,7 @@ import {
   createSupabasePaymentsRepo,
   createSupabasePlanningRepo,
   createSupabaseTendersRepo,
+  createSupabaseGovernanceRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -77,6 +80,7 @@ interface DataApi {
   payments: PaymentsRepo;
   planning: PlanningRepo;
   tenders: TendersRepo;
+  governance: GovernanceRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -106,6 +110,7 @@ function buildMockApi(): DataApi {
     payments: createPaymentsRepo(db, session, { telemetry }),
     planning: createPlanningRepo(db, session, { telemetry }),
     tenders: createTendersRepo(db, session, { telemetry }),
+    governance: createGovernanceRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -155,6 +160,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           payments: createSupabasePaymentsRepo(supabase, session),
           planning: createSupabasePlanningRepo(supabase, session),
           tenders: createSupabaseTendersRepo(supabase, session),
+          governance: createSupabaseGovernanceRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -307,6 +313,16 @@ export function useTasks(operationId: string): AsyncState<Task[]> {
 export function useTenders(operationId: string): AsyncState<Tender[]> {
   const { tenders } = useData();
   return useAsync(() => tenders.list(operationId), [tenders, operationId]);
+}
+
+export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {
+  const { governance } = useData();
+  return useAsync(() => governance.raci(operationId), [governance, operationId]);
+}
+
+export function useDecisions(operationId: string): AsyncState<Decision[]> {
+  const { governance } = useData();
+  return useAsync(() => governance.decisions(operationId), [governance, operationId]);
 }
 
 /** Marge agrégée du portefeuille, par devise (somme exacte via Money). */
