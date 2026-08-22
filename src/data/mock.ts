@@ -28,7 +28,7 @@ import type {
 } from '../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
-import type { Financing, Drawdown } from '../domain/m5/types';
+import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -51,6 +51,7 @@ import type {
   Session,
   StakeholdersRepo,
   ComplianceRepo,
+  FinancingRepo,
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
@@ -713,6 +714,58 @@ export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): 
     async removeTitle(tid) {
       const i = db.titleDocuments.findIndex((x) => x.id === tid && x.tenantId === session.tenantId);
       if (i >= 0) db.titleDocuments.splice(i, 1);
+    },
+  };
+}
+
+export function createFinancingRepo(db: MockDb, session: Session, deps: Deps): FinancingRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+
+  return {
+    async list(opId) {
+      return mine(db.financings).filter((f) => f.operationId === opId).map((f) => ({ ...f }));
+    },
+    async add(opId, input: FinancingInput) {
+      const f: Financing = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        source: input.source, amount: input.amount, rate: input.rate, status: 'negocie',
+      };
+      db.financings.push(f);
+      return { ...f };
+    },
+    async setStatus(fid, status: FinancingStatus) {
+      const f = db.financings.find((x) => x.id === fid && x.tenantId === session.tenantId);
+      if (!f) throw new Error('not_found');
+      f.status = status;
+      return { ...f };
+    },
+    async remove(fid) {
+      const i = db.financings.findIndex((x) => x.id === fid && x.tenantId === session.tenantId);
+      if (i >= 0) db.financings.splice(i, 1);
+      db.drawdowns = db.drawdowns.filter((d) => d.financingId !== fid);
+    },
+    async drawdowns(financingId) {
+      return mine(db.drawdowns).filter((d) => d.financingId === financingId).map((d) => ({ ...d }));
+    },
+    async addDrawdown(financingId, input: DrawdownInput) {
+      const d: Drawdown = {
+        id: id(), tenantId: session.tenantId, financingId,
+        amount: input.amount, condition: input.condition, status: 'planifie', date: null,
+      };
+      db.drawdowns.push(d);
+      return { ...d };
+    },
+    async setDrawdownStatus(did, status: DrawdownStatus, date?: string | null) {
+      const d = db.drawdowns.find((x) => x.id === did && x.tenantId === session.tenantId);
+      if (!d) throw new Error('not_found');
+      d.status = status;
+      if (status === 'debloque') d.date = date ?? (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
+      return { ...d };
+    },
+    async removeDrawdown(did) {
+      const i = db.drawdowns.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
+      if (i >= 0) db.drawdowns.splice(i, 1);
     },
   };
 }

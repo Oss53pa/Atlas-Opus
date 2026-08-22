@@ -30,6 +30,14 @@ import type {
   TitleDocStatus,
 } from '../domain/m2/foncier';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
+import type {
+  Financing,
+  FinancingInput,
+  FinancingStatus,
+  Drawdown,
+  DrawdownInput,
+  DrawdownStatus,
+} from '../domain/m5/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
@@ -105,6 +113,18 @@ export interface StakeholdersRepo {
   add(operationId: string, input: StakeholderInput): Promise<Stakeholder>;
   update(id: string, patch: StakeholderPatch): Promise<Stakeholder>;
   remove(id: string): Promise<void>;
+}
+
+/** Financement (M5) : sources & tranches de déblocage. */
+export interface FinancingRepo {
+  list(operationId: string): Promise<Financing[]>;
+  add(operationId: string, input: FinancingInput): Promise<Financing>;
+  setStatus(id: string, status: FinancingStatus): Promise<Financing>;
+  remove(id: string): Promise<void>;
+  drawdowns(financingId: string): Promise<Drawdown[]>;
+  addDrawdown(financingId: string, input: DrawdownInput): Promise<Drawdown>;
+  setDrawdownStatus(id: string, status: DrawdownStatus, date?: string | null): Promise<Drawdown>;
+  removeDrawdown(id: string): Promise<void>;
 }
 
 /** Conformité & gardes M1 : autorisations (M2), assurances (M7), due diligence (M2). */
