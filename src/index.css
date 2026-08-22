@@ -220,4 +220,36 @@
     font-size: 13px; color: var(--ax-text-2); cursor: pointer;
   }
   .ax-menu-item:hover { background: var(--ax-surface-total); color: var(--ax-text); }
+
+  /* Carte de contexte (sidebar) */
+  .ax-ctx { border: 1px solid var(--ax-border); background: var(--ax-glass); padding: 10px 12px; margin: 4px 0 10px; }
+  .ax-ctx__name { font-size: 13px; font-weight: 600; color: var(--ax-text); line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ax-ctx__sub { font-size: 11px; color: var(--ax-text-3); margin-top: 3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Champ de recherche (palette ⌘K) */
+  .ax-search { display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; margin-bottom: 6px;
+    border: 1px solid var(--ax-border-strong); background: var(--ax-surface-input); cursor: text; }
+
+  /* Familles de modules (dépliables) */
+  .ax-fam { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px;
+    border: 0; background: transparent; cursor: pointer;
+    font-family: var(--ax-font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ax-text-faint); }
+  .ax-fam:hover { color: var(--ax-text-secondary); }
+  .ax-fam__chev { transition: transform var(--ax-dur) var(--ax-ease); flex: none; }
+  .ax-fam__chev.is-open { transform: rotate(90deg); }
+  .ax-nav-item--child { padding-left: 28px; font-size: 13px; }
+  .ax-nav-item--child.is-active { padding-left: 26px; }
+
+  /* Carte utilisateur (bas de sidebar) */
+  .ax-usercard { position: relative; border-top: 1px solid var(--ax-border); padding-top: 8px; margin-top: 6px; }
+  .ax-usercard__btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px;
+    border: 0; background: transparent; cursor: pointer; }
+  .ax-usercard__btn:hover { background: var(--ax-surface-total); }
+  .ax-avatar { display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 30px; height: 30px; border-radius: 999px;
+    background: var(--ax-accent); color: var(--ax-on-accent);
+    font-family: var(--ax-font-mono); font-size: 11px; font-weight: 500; }
 }
