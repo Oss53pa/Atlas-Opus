@@ -6,6 +6,7 @@ import type { StakeholderType } from '../../domain/m2/types';
 import type { AuthorizationType, AuthorizationStatus } from '../../domain/m2/authorizations';
 import type { DueDiligenceCategory, DueDiligenceSeverity, DueDiligenceStatus } from '../../domain/m2/dueDiligence';
 import type { InsuranceType, InsuranceStatus } from '../../domain/m7/types';
+import type { TenureType, AcquisitionStatus, TitleDocType, TitleDocStatus } from '../../domain/m2/foncier';
 import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
 
@@ -187,3 +188,41 @@ const DD_STATUS_KEY: Record<DueDiligenceStatus, MessageKey> = {
 export const ddCategoryLabel = (c: DueDiligenceCategory) => t(DD_CAT_KEY[c]);
 export const ddSeverityLabel = (s: DueDiligenceSeverity) => t(DD_SEV_KEY[s]);
 export const ddStatusLabel = (s: DueDiligenceStatus) => t(DD_STATUS_KEY[s]);
+
+// ── Foncier (M2 dossier foncier) ─────────────────────────────────────────────
+const TENURE_KEY: Record<TenureType, MessageKey> = {
+  titre_foncier: 'parcel.tenure.titre_foncier',
+  bail_emphyteotique: 'parcel.tenure.bail_emphyteotique',
+  droit_coutumier: 'parcel.tenure.droit_coutumier',
+  concession: 'parcel.tenure.concession',
+};
+const ACQ_KEY: Record<AcquisitionStatus, MessageKey> = {
+  prospection: 'parcel.acq.prospection',
+  sous_promesse: 'parcel.acq.sous_promesse',
+  conditions_levees: 'parcel.acq.conditions_levees',
+  acquis: 'parcel.acq.acquis',
+};
+export const ACQ_TONE: Record<AcquisitionStatus, BadgeTone> = {
+  prospection: 'neutral',
+  sous_promesse: 'info',
+  conditions_levees: 'warning',
+  acquis: 'success',
+};
+const TITLE_TYPE_KEY: Record<TitleDocType, MessageKey> = {
+  titre_foncier: 'title.type.titre_foncier',
+  acte_notarie: 'title.type.acte_notarie',
+  certificat: 'title.type.certificat',
+  bornage: 'title.type.bornage',
+};
+const TITLE_STATUS_KEY: Record<TitleDocStatus, MessageKey> = {
+  pending: 'title.status.pending',
+  verified: 'title.status.verified',
+};
+export const TITLE_STATUS_TONE: Record<TitleDocStatus, BadgeTone> = {
+  pending: 'neutral',
+  verified: 'success',
+};
+export const tenureLabel = (tdoc: TenureType) => t(TENURE_KEY[tdoc]);
+export const acquisitionStatusLabel = (s: AcquisitionStatus) => t(ACQ_KEY[s]);
+export const titleDocTypeLabel = (tdoc: TitleDocType) => t(TITLE_TYPE_KEY[tdoc]);
+export const titleStatusLabel = (s: TitleDocStatus) => t(TITLE_STATUS_KEY[s]);
