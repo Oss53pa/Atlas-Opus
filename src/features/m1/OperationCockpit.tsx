@@ -18,12 +18,35 @@ import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
 import { nextPhase } from '../../domain/m1/stateMachine';
+import { consolidateAlerts, countBySeverity, type AlertSeverity, type ConsolidatedAlert } from '../../domain/m21';
+import type { BilanView } from '../../data/repo';
+import type { Operation } from '../../domain/m1/types';
 
-const ALERTS = [
-  { key: 'alerts.guarantee', icon: ShieldCheck, tone: 'warning' },
-  { key: 'alerts.decompte', icon: Clock, tone: 'info' },
-  { key: 'alerts.insurance', icon: AlertTriangle, tone: 'danger' },
-] as const;
+/** Rendu (icône + tonalité) par sévérité d'alerte consolidée. */
+const SEVERITY_STYLE: Record<AlertSeverity, { tone: string; icon: typeof AlertTriangle }> = {
+  danger: { tone: 'danger', icon: AlertTriangle },
+  echeance: { tone: 'warning', icon: Clock },
+  info: { tone: 'info', icon: ShieldCheck },
+};
+
+/**
+ * Agrège les alertes de l'opération à partir des indicateurs déjà calculés
+ * par les modules (RG-M21-01 : aucun recalcul financier ici).
+ */
+function deriveAlerts(op: Operation, bilan: BilanView | null, today: string): ConsolidatedAlert[] {
+  const alerts: ConsolidatedAlert[] = [];
+  if (bilan) {
+    if (bilan.summary.marge.isNegative()) alerts.push({ source: 'm4', severity: 'danger', labelKey: 'alerts.marginNegative' });
+    if (bilan.summary.coutTotal.gt(bilan.bac) && !bilan.bac.isZero())
+      alerts.push({ source: 'm4', severity: 'danger', labelKey: 'alerts.budgetOverrun' });
+    const revenueExpected = op.phase === 'realisation' || op.phase === 'reception' || op.phase === 'exploitation';
+    if (revenueExpected && bilan.summary.recettesRealisees.isZero())
+      alerts.push({ source: 'm6', severity: 'echeance', labelKey: 'alerts.noRevenue' });
+  }
+  if (op.endDate && op.endDate < today && op.status === 'active')
+    alerts.push({ source: 'm12', severity: 'echeance', labelKey: 'alerts.deadlinePassed' });
+  return consolidateAlerts(alerts);
+}
 
 export function OperationCockpit({ id }: { id: string }) {
   const { data: op, loading, error, refetch } = useOperation(id);
@@ -54,6 +77,7 @@ export function OperationCockpit({ id }: { id: string }) {
   }
 
   const target = nextPhase(op.phase);
+  const alerts = deriveAlerts(op, bilan, new Date().toISOString().slice(0, 10));
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,19 +164,40 @@ export function OperationCockpit({ id }: { id: string }) {
           </div>
         </Card>
 
-        {/* Alertes de risque */}
+        {/* Alertes consolidées & priorisées (RG-M21-02) */}
         <Card>
-          <h2 className="text-[16px] font-medium">{t('cockpit.risks')}</h2>
-          <ul className="mt-4 flex flex-col gap-2">
-            {ALERTS.map(({ key, icon: Icon, tone }) => (
-              <li key={key} className="flex items-start gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
-                <span style={{ color: `var(--ax-${tone})`, marginTop: 1 }}>
-                  <Icon size={16} />
-                </span>
-                <span className="text-[13px] text-ink-2">{t(key)}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[16px] font-medium">{t('cockpit.risks')}</h2>
+            {alerts.length > 0 && (
+              <span className="text-[11px] text-ink-3">
+                {t('cockpit.alerts.count', {
+                  danger: countBySeverity(alerts, 'danger'),
+                  echeance: countBySeverity(alerts, 'echeance'),
+                  info: countBySeverity(alerts, 'info'),
+                })}
+              </span>
+            )}
+          </div>
+          {alerts.length === 0 ? (
+            <div className="mt-4 flex items-center gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
+              <span style={{ color: 'var(--ax-success)', marginTop: 1 }}><ShieldCheck size={16} /></span>
+              <span className="text-[13px] text-ink-2">{t('alerts.none')}</span>
+            </div>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-2">
+              {alerts.map((al, i) => {
+                const { tone, icon: Icon } = SEVERITY_STYLE[al.severity];
+                return (
+                  <li key={`${al.source}-${i}`} className="flex items-start gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
+                    <span style={{ color: `var(--ax-${tone})`, marginTop: 1 }}>
+                      <Icon size={16} />
+                    </span>
+                    <span className="text-[13px] text-ink-2">{t(al.labelKey)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
       </div>
 

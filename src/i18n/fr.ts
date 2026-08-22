@@ -169,6 +169,12 @@ export const fr = {
   'alerts.guarantee': 'Caution bonne exécution expire dans 12 jours',
   'alerts.decompte': 'Décompte n°4 en attente de validation',
   'alerts.insurance': 'Assurance décennale à renouveler',
+  'alerts.marginNegative': 'Marge prévisionnelle négative (M4)',
+  'alerts.budgetOverrun': 'Dépassement du budget à terminaison (BAC)',
+  'alerts.noRevenue': 'Aucune recette encaissée à ce stade',
+  'alerts.deadlinePassed': 'Date de livraison dépassée',
+  'alerts.none': 'Aucune alerte — situation nominale',
+  'cockpit.alerts.count': '{danger} danger · {echeance} échéance · {info} info',
 
   // ── Transition de phase (modale) ────────────────────────────────────────
   'transition.title': 'Changer de phase',
