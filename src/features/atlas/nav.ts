@@ -12,8 +12,31 @@ export type ScreenId =
   // Modules (contexte opération)
   | 'm1' | 'm2' | 'm3' | 'm4' | 'm5' | 'm6' | 'm7' | 'm8' | 'm9' | 'm10' | 'm11' | 'm12'
   | 'm13' | 'm14' | 'm15' | 'm16' | 'm17' | 'm18' | 'm19' | 'm20' | 'm21' | 'm22' | 'm23'
-  // Écrans de détail
-  | 'poste-bilan' | 'marche' | 'situation' | 'journal';
+  // Écrans de détail (34–50)
+  | 'create-wizard' | 'poste-bilan' | 'plan-tresorerie' | 'arretes' | 'intervenant'
+  | 'assurances' | 'risques-raci' | 'simulateur' | 'jalons' | 'marche' | 'situation'
+  | 'offre' | 'rfi' | 'visa' | 'cr-chantier' | 'reserves' | 'journal';
+
+/** Écrans de détail : titre, fil de contexte et code de rattachement. */
+export const detailMeta: Record<string, { title: string; context: string; code: string }> = {
+  'create-wizard': { title: 'Nouvelle opération', context: 'étape 3 sur 5 · brouillon enregistré à 15 h 04', code: 'M1' },
+  'poste-bilan': { title: 'Travaux', context: 'poste 3 sur 8 · 2 940 M prévus · dernière écriture il y a 12 min', code: 'M4' },
+  'plan-tresorerie': { title: 'Plan de trésorerie', context: 'cumulé · 36 mois · point bas −418 M en nov. 2026', code: 'M4' },
+  'arretes': { title: 'Arrêtés de bilan', context: 'snapshots scellés · irréversibles', code: 'M4' },
+  'intervenant': { title: 'EGCI Bâtiment', context: 'entreprise · gros œuvre lot 02 · 1 conformité expirée', code: 'M7' },
+  'assurances': { title: 'Tableau des assurances', context: '9 polices · 1 échéance dépassée', code: 'M7' },
+  'risques-raci': { title: 'Registre des risques & RACI', context: '11 risques · tri par criticité', code: 'M20' },
+  'simulateur': { title: 'Simulateur d’impact', context: 'avenant n° 1 — lot 02 · simulation non engageante', code: 'M15' },
+  'jalons': { title: 'Jalons & baseline', context: 'baseline v2 figée le 11.06.2026 · 7 jalons contractuels', code: 'M13' },
+  'marche': { title: 'Marché lot 02 — gros œuvre', context: 'EGCI Bâtiment · notifié le 11.03.2026 · 1 282 M engagés', code: 'M8' },
+  'situation': { title: 'Situation n° 7', context: 'gros œuvre lot 02 · 184 M · mise en paiement suspendue', code: 'M16' },
+  'offre': { title: 'Offre — Clima CI', context: 'lot 03 · CVC / plomberie · rang 1 sur 4', code: 'M9' },
+  'rfi': { title: 'RFI-042', context: 'réservation de gaine / voile porteur · ouverte le 12.08.2026', code: 'M12' },
+  'visa': { title: 'Visa — STR-EXE-118', context: 'indice C · voile porteur R+2 · visa A bloqué', code: 'M11' },
+  'cr-chantier': { title: 'Compte rendu n° 31', context: 'réunion du 19.08.2026 · 17 actions ouvertes', code: 'M14' },
+  'reserves': { title: 'Réserves & levées', context: 'réception non prononcée · GPA à venir', code: 'M19' },
+  'journal': { title: 'Journal d’audit', context: '2 418 écritures · rétention 10 ans · non modifiable', code: 'M23' },
+};
 
 export interface ModuleEntry {
   code: string; // « M4 »

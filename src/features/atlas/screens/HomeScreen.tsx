@@ -50,7 +50,7 @@ export function HomeScreen() {
             <h1 className="ao-page-title">Bonjour {session.user.firstName}</h1>
             <p className="ao-page-sub">Trois décisions vous attendent. Deux gardes bloquent une transition de phase.</p>
           </div>
-          <Button variant="primary" onClick={() => navigate('menu')}>Nouvelle opération</Button>
+          <Button variant="primary" onClick={() => navigate('create-wizard')}>Nouvelle opération</Button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>

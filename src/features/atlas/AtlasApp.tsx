@@ -12,9 +12,11 @@ import { NotificationsScreen } from './screens/NotificationsScreen';
 import { MembersScreen } from './screens/MembersScreen';
 import { StatesScreen } from './screens/StatesScreen';
 import { ModuleScreen } from './screens/ModuleScreen';
+import { DetailScreen, isDetail } from './screens/details';
 import type { ScreenId } from './nav';
 
 function InnerScreen({ screen }: { screen: ScreenId }) {
+  if (isDetail(screen)) return <DetailScreen id={screen} />;
   switch (screen) {
     case 'm1': return <OperationScreen />;
     case 'm4': return <BilanScreen />;

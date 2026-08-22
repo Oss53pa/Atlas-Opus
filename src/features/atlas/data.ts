@@ -222,6 +222,8 @@ export interface ModuleData {
   context: string; // fil de contexte de la barre supérieure
   primary?: string; // action primaire (une seule)
   secondary?: string;
+  rowLink?: ScreenId; // clic sur une ligne du tableau → écran de détail
+  rowLinkHint?: string; // libellé « ouvrir le détail »
   kpis: Kpi[];
   table: { title: string; meta?: string; cols: TableCol[]; rows: TableCell[][] };
   facts: { title: string; meta?: string; items: FactItem[] };
@@ -354,6 +356,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'parties prenantes · 1 conformité expirée',
     primary: 'Ajouter un intervenant',
     secondary: 'Tableau des assurances',
+    rowLink: 'intervenant', rowLinkHint: 'ouvrir la fiche',
     kpis: [
       { label: 'Intervenants', value: '23', sub: '9 contrats actifs' },
       { label: 'Contrats', value: '9', sub: '3,42 Md engagés' },
@@ -386,6 +389,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: '7 marchés · routage par seuil',
     primary: 'Lancer une consultation',
     secondary: 'Registre des marchés',
+    rowLink: 'marche', rowLinkHint: 'ouvrir le marché',
     kpis: [
       { label: 'Marchés', value: '7', sub: '2 en passation' },
       { label: 'Montant attribué', value: '3,42 Md', sub: 'sur 9 lots' },
@@ -416,6 +420,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'analyse des offres · lot 03',
     primary: 'Ouvrir le rapport',
     secondary: 'Grille de notation',
+    rowLink: 'offre', rowLinkHint: 'ouvrir l’offre',
     kpis: [
       { label: 'Offres', value: '4', sub: 'lot 03 · CVC' },
       { label: 'Estimation', value: '640 M', sub: 'MOE' },
@@ -476,6 +481,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'conception & GED · indice C',
     primary: 'Déposer un document',
     secondary: 'Circuit de visa',
+    rowLink: 'visa', rowLinkHint: 'ouvrir le visa',
     kpis: [
       { label: 'Documents', value: '412', sub: '38 en visa' },
       { label: 'Indice courant', value: 'C', sub: 'lot structure' },
@@ -506,6 +512,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'RFI & collaboration · 1 bloquante',
     primary: 'Ouvrir une RFI',
     secondary: 'Registre RFI',
+    rowLink: 'rfi', rowLinkHint: 'ouvrir la RFI',
     kpis: [
       { label: 'RFI ouvertes', value: '11', sub: '1 bloquante', accent: true },
       { label: 'Délai moyen', value: '3,8 j', sub: 'réponse' },
@@ -536,6 +543,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'planning · chemin critique +16 j',
     primary: 'Publier une baseline',
     secondary: 'Diagramme de jalons',
+    rowLink: 'jalons', rowLinkHint: 'ouvrir les jalons',
     kpis: [
       { label: 'Avancement', value: '58 %', sub: 'physique' },
       { label: 'Chemin critique', value: '+16 j', sub: 'dérive gros œuvre', accent: true },
@@ -598,6 +606,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'maîtrise des modifications · 1 avenant',
     primary: 'Simuler l’impact',
     secondary: 'Registre des avenants',
+    rowLink: 'simulateur', rowLinkHint: 'simuler l’impact',
     kpis: [
       { label: 'Modifications', value: '6', sub: '1 en arbitrage', accent: true },
       { label: 'Impact coût', value: '+42 M', sub: 'avenant n° 1' },
@@ -629,6 +638,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'chaîne de paiement · 1 suspension',
     primary: 'Mettre en paiement',
     secondary: 'Registre des décomptes',
+    rowLink: 'situation', rowLinkHint: 'ouvrir la situation',
     kpis: [
       { label: 'Décomptes', value: '7', sub: '1 suspendu', accent: true },
       { label: 'Payé cumulé', value: '2,65 Md', sub: 'réalisé' },
@@ -720,6 +730,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'réception & GPA · réserves',
     primary: 'Prononcer la réception',
     secondary: 'Registre des réserves',
+    rowLink: 'reserves', rowLinkHint: 'ouvrir les réserves',
     kpis: [
       { label: 'Réserves', value: '—', sub: 'réception non prononcée' },
       { label: 'Avancement', value: '58 %', sub: 'avant OPR' },
@@ -750,6 +761,7 @@ export const moduleContent: Partial<Record<ScreenId, ModuleData>> = {
     context: 'risques & HSSE · registre RACI',
     primary: 'Déclarer un risque',
     secondary: 'Matrice RACI',
+    rowLink: 'risques-raci', rowLinkHint: 'ouvrir le registre',
     kpis: [
       { label: 'Risques ouverts', value: '11', sub: '2 majeurs', accent: true },
       { label: 'Criticité max', value: 'R-11', sub: 'conformité décennale' },

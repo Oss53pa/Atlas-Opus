@@ -1,5 +1,6 @@
 import { Topbar } from '../Shell';
 import { Card, Kpis, FactList } from '../kit';
+import { useNav } from '../router';
 import { bilanPostes, bilanTotal, bilanAlerts } from '../data';
 import { millions, signedMoney, EMDASH } from '../format';
 
@@ -19,6 +20,7 @@ function num(v: number | null) {
 }
 
 export function BilanScreen() {
+  const { navigate } = useNav();
   const kpis = [
     { label: 'Coût prévu', value: '4,85 Md', sub: 'BAC' },
     { label: 'Engagé', value: '3,42 Md', sub: 'reste à engager 1,43 Md' },
@@ -31,8 +33,8 @@ export function BilanScreen() {
       <Topbar
         title="Bilan d’opération"
         context="prévisionnel vivant · recalculé il y a 4 min"
-        secondary={{ label: 'Comparer un arrêté' }}
-        primary={{ label: 'Arrêter le bilan' }}
+        secondary={{ label: 'Comparer un arrêté', onClick: () => navigate('arretes') }}
+        primary={{ label: 'Arrêter le bilan', onClick: () => navigate('arretes') }}
       />
       <div className="ao-content">
         <Kpis items={kpis} />
@@ -47,7 +49,7 @@ export function BilanScreen() {
                 <div className="ao-th ao-th--num">Écart</div>
               </div>
               {bilanPostes.map((p) => (
-                <div className="ao-row" key={p.poste}>
+                <button className="ao-row" key={p.poste} onClick={() => navigate('poste-bilan')}>
                   <div className="ao-cell__title">{p.poste}</div>
                   <div className="ao-cell--num">{millions(p.prevu)}</div>
                   <div className="ao-cell--num ao-cell--num-muted">{num(p.engage)}</div>
@@ -55,7 +57,7 @@ export function BilanScreen() {
                   <div className={`ao-cell--num ${p.ecart && p.ecart !== 0 ? (p.ecart > 0 ? 'ao-cell--num-accent' : '') : 'ao-cell--num-muted'}`}>
                     {p.ecart ? signedMoney(p.ecart) : EMDASH}
                   </div>
-                </div>
+                </button>
               ))}
               <div className="ao-row ao-row--total" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr 0.8fr' }}>
                 <div className="ao-cell--strong">Total coûts</div>
@@ -68,7 +70,7 @@ export function BilanScreen() {
           </Card>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card title="Plan de trésorerie" meta="cumulé, 36 mois">
+            <Card title="Plan de trésorerie" right={<button className="ao-card__meta" style={{ background: 'none', border: 0, cursor: 'pointer', color: 'var(--ao-accent)' }} onClick={() => navigate('plan-tresorerie')}>voir le détail →</button>}>
               <div className="ao-treso">
                 {treso.map((t, i) => (
                   <div className="ao-treso__group" key={i} title={`${t.m}`}>

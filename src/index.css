@@ -203,6 +203,16 @@
 
   /* ── Squelette de chargement (dimensions réelles, pas de spinner) ────── */
   .ao-skel { background: var(--ao-active); height: 12px; }
+
+  /* ── Stepper (assistant de création) ────────────────────────────────── */
+  .ao-stepper { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .ao-step { padding: 14px 16px; border-left: 1px solid var(--ao-border); }
+  .ao-step:first-child { border-left: 0; }
+  .ao-step.is-current { background: var(--ao-active); }
+  .ao-step__num { font-family: var(--ao-font-mono); font-size: 10px; letter-spacing: 0.12em; color: var(--ao-faint); }
+  .ao-step__title { font-size: 15px; color: var(--ao-primary); margin-top: 8px; }
+  .ao-step.is-todo .ao-step__title { color: var(--ao-disabled); }
+  .ao-step__state { font-size: 12px; color: var(--ao-muted); margin-top: 3px; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

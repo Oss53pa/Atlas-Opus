@@ -138,6 +138,15 @@ function CommandPalette() {
       { id: 'approvals', label: 'Boîte d’approbations', code: 'F7' },
       { id: 'notifications', label: 'Centre de notifications', code: 'F4' },
       { id: 'members', label: 'Membres & rôles', code: 'F1' },
+      { id: 'create-wizard', label: 'Nouvelle opération (assistant)', code: 'M1' },
+      { id: 'plan-tresorerie', label: 'Plan de trésorerie', code: 'M4' },
+      { id: 'arretes', label: 'Arrêtés de bilan', code: 'M4' },
+      { id: 'assurances', label: 'Tableau des assurances', code: 'M7' },
+      { id: 'jalons', label: 'Jalons & baseline', code: 'M13' },
+      { id: 'simulateur', label: 'Simulateur d’impact', code: 'M15' },
+      { id: 'risques-raci', label: 'Registre des risques & RACI', code: 'M20' },
+      { id: 'journal', label: 'Journal d’audit', code: 'M23' },
+      { id: 'states', label: 'États globaux', code: '' },
     ];
     const all = [...extras, ...mods];
     const needle = q.trim().toLowerCase();

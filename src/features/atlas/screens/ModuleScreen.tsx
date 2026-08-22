@@ -7,8 +7,10 @@ import { Topbar } from '../Shell';
 import { Card, DataTable, FactList, Kpis, StateBlock } from '../kit';
 import { findModule, type ScreenId } from '../nav';
 import { moduleContent } from '../data';
+import { useNav } from '../router';
 
 export function ModuleScreen({ id }: { id: ScreenId }) {
+  const { navigate } = useNav();
   const meta = findModule(id);
   const data = moduleContent[id];
   const title = meta?.module.title ?? 'Module';
@@ -35,8 +37,8 @@ export function ModuleScreen({ id }: { id: ScreenId }) {
       <div className="ao-content">
         <Kpis items={data.kpis} />
         <div className="ao-split">
-          <Card title={data.table.title} meta={data.table.meta}>
-            <DataTable cols={data.table.cols} rows={data.table.rows} />
+          <Card title={data.table.title} meta={data.rowLink ? data.rowLinkHint ?? 'ouvrir le détail' : data.table.meta}>
+            <DataTable cols={data.table.cols} rows={data.table.rows} onRow={data.rowLink ? () => navigate(data.rowLink!) : undefined} />
           </Card>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Card title={data.facts.title} meta={data.facts.meta}>
