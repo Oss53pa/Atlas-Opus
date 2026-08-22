@@ -153,6 +153,7 @@ export const fr = {
   'cockpit.bilan.subtitle': 'Synthèse coûts / recettes',
   'bilan.cost': 'Coût total',
   'bilan.revenue': 'Recettes',
+  'bilan.revenueRealized': 'réalisé {amount}',
   'bilan.margin': 'Marge',
   'bilan.marginRate': 'Taux de marge',
   'bilan.tri': 'TRI',

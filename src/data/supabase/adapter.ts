@@ -31,6 +31,7 @@ import type {
 } from '../../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
+import { recettesEncaissees } from '../../domain/m6/commercialisation';
 import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
@@ -436,8 +437,19 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
         .filter((r) => !(r.kind === 'cost' && DERIVED_POSTES.includes(r.poste)))
         .map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
       for (const d of await derivedCostLines(opId, currency)) lines.push({ kind: 'cost', amount: d.amount });
+      // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
+      const { data: saleRows } = await client.from('ao_sales').select('id').eq('operation_id', opId);
+      const saleIds = (saleRows ?? []).map((s: { id: string }) => s.id);
+      let realized = Money.zero(currency);
+      if (saleIds.length > 0) {
+        const { data: recRows } = await client.from('ao_receipts').select('amount, status').in('sale_id', saleIds);
+        realized = recettesEncaissees(
+          (recRows ?? []).map((r: { amount: number | string; status: 'pending' | 'settled' }) => ({ amount: Money.of(Number(r.amount), currency), status: r.status })),
+          currency,
+        );
+      }
       return {
-        summary: bilanSummary(lines, currency),
+        summary: bilanSummary(lines, currency, realized),
         tri: null,
         bac: Money.of(Number((op as { budget_bac: number | string }).budget_bac), currency),
       };

@@ -33,6 +33,10 @@ describe('Bilan §6', () => {
   it('taux nul si coût nul', () => {
     expect(bilanSummary([{ kind: 'revenue', amount: m('10') }], X).tauxMarge).toBe(0);
   });
+  it('recettes réalisées (M6) : 0 par défaut, sinon la valeur fournie', () => {
+    expect(bilanSummary(lines, X).recettesRealisees.isZero()).toBe(true);
+    expect(bilanSummary(lines, X, m('750')).recettesRealisees.equals(m('750'))).toBe(true);
+  });
 });
 
 describe('EVM §6', () => {
