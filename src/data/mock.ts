@@ -75,6 +75,8 @@ const defaultCtx = (over: Partial<TransitionContext> = {}): TransitionContext =>
   bilanInitialized: false,
   marketsToLaunch: 0,
   marketsNotified: 0,
+  permitGranted: false,
+  doInsuranceValid: false,
   globalProgress: 0,
   receptionDeclaredByDirector: false,
   receptionPvIssued: false,
@@ -154,7 +156,7 @@ export function createMockDb(): MockDb {
   ];
 
   const ctx: Record<string, TransitionContext> = {
-    'op-palmiers': defaultCtx({ marketsToLaunch: 4, marketsNotified: 4, globalProgress: 0.62 }),
+    'op-palmiers': defaultCtx({ marketsToLaunch: 4, marketsNotified: 4, permitGranted: true, doInsuranceValid: true, globalProgress: 0.62 }),
     'op-cosmos': defaultCtx({ marketsToLaunch: 0 }),
     'op-riviera': defaultCtx({}),
     'op-atlantique': defaultCtx({ marketsToLaunch: 2, marketsNotified: 1 }),

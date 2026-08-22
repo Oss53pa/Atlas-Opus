@@ -187,6 +187,8 @@ export const fr = {
   'op.transition.cond.bilanInitialized': 'Bilan prévisionnel initialisé (M4)',
   'op.transition.cond.dceReady': 'Au moins un marché à lancer défini (M8)',
   'op.transition.cond.marketNotified': 'Au moins un marché notifié (M8)',
+  'op.transition.cond.permitGranted': 'Permis de construire accordé (M2)',
+  'op.transition.cond.doInsurance': 'Police Dommages-Ouvrage (DO) valide (M7)',
   'op.transition.cond.progressComplete': 'Avancement à 100 % ou réception déclarée',
   'op.transition.cond.receptionPv': 'PV de réception prononcé (M11/M18)',
   'op.transition.cond.reservesLifted': 'Réserves majeures levées (M11/M18)',

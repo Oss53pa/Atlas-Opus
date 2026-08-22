@@ -6,12 +6,14 @@
  */
 import { PHASES, type Phase, type Role } from './types';
 
-/** Contexte de garde — fourni par les autres modules (M4/M8/M11/M18). */
+/** Contexte de garde — fourni par les autres modules (M2/M4/M7/M8/M11/M18). */
 export interface TransitionContext {
   validatedProgramItems: number; // M1/program
   bilanInitialized: boolean; // M4
   marketsToLaunch: number; // M8 (DCE prêt)
   marketsNotified: number; // M8
+  permitGranted: boolean; // M2 — permis de construire « granted » (RG-M2-07)
+  doInsuranceValid: boolean; // M7 — police DO couvrante (RG-M7-04, via doGate)
   globalProgress: number; // 0..1 (M12/travaux)
   receptionDeclaredByDirector: boolean; // M1 (moa_director)
   receptionPvIssued: boolean; // M11/M18
@@ -39,7 +41,11 @@ const FORWARD: Partial<Record<Phase, { to: Phase; conditions: Condition[] }>> = 
   },
   passation: {
     to: 'realisation',
-    conditions: [{ key: 'op.transition.cond.marketNotified', ok: (c) => c.marketsNotified >= 1 }],
+    conditions: [
+      { key: 'op.transition.cond.marketNotified', ok: (c) => c.marketsNotified >= 1 },
+      { key: 'op.transition.cond.permitGranted', ok: (c) => c.permitGranted }, // M2 (RG-M2-07)
+      { key: 'op.transition.cond.doInsurance', ok: (c) => c.doInsuranceValid }, // M7 (RG-M7-04)
+    ],
   },
   realisation: {
     to: 'reception',

@@ -54,6 +54,8 @@ const emptyCtx = (over: Partial<TransitionContext> = {}): TransitionContext => (
   bilanInitialized: false,
   marketsToLaunch: 0,
   marketsNotified: 0,
+  permitGranted: false,
+  doInsuranceValid: false,
   globalProgress: 0,
   receptionDeclaredByDirector: false,
   receptionPvIssued: false,
