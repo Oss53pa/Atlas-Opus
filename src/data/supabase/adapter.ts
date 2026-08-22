@@ -30,6 +30,8 @@ import type {
   TitleDocStatus,
 } from '../../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
+import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
+import type { DrawdownStatus } from '../../domain/m5/types';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
@@ -382,6 +384,9 @@ function toBilanRecord(r: BilanLineRow): BilanLineRecord {
 
 /** Bilan (M4) depuis ao_bilan_lines. TRI null tant que les cash-flows ne sont pas en base. */
 export function createSupabaseBilanRepo(client: SupabaseClient, session: Session): BilanRepo {
+  const DERIVED_POSTES = ['honoraires', 'frais_financiers'];
+  const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+
   // RG-M7-09 — honoraires dérivés des intervenants (source de vérité M7).
   const honorairesFor = async (opId: string, currency: string): Promise<Money> => {
     const { data } = await client.from(ST).select('type, fee_amount').eq('operation_id', opId);
@@ -390,6 +395,30 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
       feeAmount: Number(r.fee_amount),
     }));
     return honorairesFromStakeholders(items, currency);
+  };
+
+  // RG-M5-02 — frais financiers dérivés des tranches débloquées (source de vérité M5).
+  const fraisFinanciersFor = async (opId: string, currency: string): Promise<Money> => {
+    const { data: fins } = await client.from('ao_financing').select('id, rate').eq('operation_id', opId);
+    const finList = (fins ?? []) as { id: string; rate: number | string }[];
+    if (finList.length === 0) return Money.zero(currency);
+    const rateById = new Map(finList.map((f) => [f.id, Number(f.rate)]));
+    const { data: dws } = await client.from('ao_drawdowns').select('financing_id, amount, status, date').in('financing_id', finList.map((f) => f.id));
+    const items = (dws ?? []).map((d: { financing_id: string; amount: number | string; status: DrawdownStatus; date: string | null }) => ({
+      amount: Money.of(Number(d.amount), currency),
+      rate: rateById.get(d.financing_id) ?? 0,
+      date: d.date,
+      status: d.status,
+    }));
+    return fraisFinanciersFromDrawdowns(items, todayIsoDate(), currency);
+  };
+
+  const derivedCostLines = async (opId: string, currency: string): Promise<{ poste: string; amount: Money }[]> => {
+    const [hono, ff] = await Promise.all([honorairesFor(opId, currency), fraisFinanciersFor(opId, currency)]);
+    return [
+      { poste: 'honoraires', amount: hono },
+      { poste: 'frais_financiers', amount: ff },
+    ].filter((l) => !l.amount.isZero());
   };
 
   return {
@@ -403,10 +432,9 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
         amount_planned: number | string;
       }[];
       const lines: BilanLine[] = rows
-        .filter((r) => !(r.kind === 'cost' && r.poste === 'honoraires'))
+        .filter((r) => !(r.kind === 'cost' && DERIVED_POSTES.includes(r.poste)))
         .map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
-      const hono = await honorairesFor(opId, currency);
-      if (!hono.isZero()) lines.push({ kind: 'cost', amount: hono });
+      for (const d of await derivedCostLines(opId, currency)) lines.push({ kind: 'cost', amount: d.amount });
       return {
         summary: bilanSummary(lines, currency),
         tri: null,
@@ -418,11 +446,10 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
       const { data: op } = await client.from(OPS).select('currency').eq('id', opId).maybeSingle();
       const currency = op ? (op as { currency: string }).currency : 'XOF';
       const rows = unwrap(await client.from(BL).select('*').eq('operation_id', opId).order('created_at')) as BilanLineRow[];
-      const records = rows.filter((r) => !(r.kind === 'cost' && r.poste === 'honoraires')).map(toBilanRecord);
-      const hono = await honorairesFor(opId, currency);
-      if (!hono.isZero()) {
-        const amount = hono.toMajorNumber();
-        records.push({ id: `honoraires-m7-${opId}`, operationId: opId, kind: 'cost', poste: 'honoraires', amountPlanned: amount, amountActual: amount });
+      const records = rows.filter((r) => !(r.kind === 'cost' && DERIVED_POSTES.includes(r.poste))).map(toBilanRecord);
+      for (const d of await derivedCostLines(opId, currency)) {
+        const amount = d.amount.toMajorNumber();
+        records.push({ id: `${d.poste}-derived-${opId}`, operationId: opId, kind: 'cost', poste: d.poste, amountPlanned: amount, amountActual: amount });
       }
       return records;
     },

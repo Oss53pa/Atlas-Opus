@@ -222,6 +222,17 @@ describe('Couche données mock — Gherkin §12', () => {
     expect(await other.landParcels('op-palmiers')).toEqual([]);
   });
 
+  it('Financement M5 → bilan M4 : frais_financiers dérivés des tranches débloquées (RG-M5-02)', async () => {
+    const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const lines = await bilan.lines('op-palmiers');
+    const ff = lines.filter((l) => l.kind === 'cost' && l.poste === 'frais_financiers');
+    // Une seule ligne dérivée, > 0 (tranche dw-p1 débloquée ; dw-p2 « demande » ignorée).
+    expect(ff).toHaveLength(1);
+    expect(ff[0].amountPlanned).toBeGreaterThan(0);
+    // La ligne frais_financiers seedée manuellement (bl-p5) est supersédée (pas de doublon).
+    expect(lines.filter((l) => l.poste === 'frais_financiers')).toHaveLength(1);
+  });
+
   it('Honoraires M7 → bilan M4 : poste honoraires dérivé des intervenants (RG-M7-09)', async () => {
     const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
     // Palmiers : MOE 180M + BET 60M = 240M honoraires ; entreprise 1450M exclue (travaux).
