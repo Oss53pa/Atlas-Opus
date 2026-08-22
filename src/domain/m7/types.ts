@@ -70,13 +70,34 @@ export interface Decision {
   kind: DecisionKind;
   reference: string;
   date: string;
+  summary: string | null;
+  decidedBy: string;
+  createdAt: string;
+}
+
+/** Saisie d'une décision (registre append-only, RG-M7-08). */
+export interface DecisionInput {
+  kind: DecisionKind;
+  reference: string;
+  date: string;
+  summary?: string | null;
   decidedBy: string;
 }
 
 /** Matrice RACI (§3). Exactement un « A » par activité (RG-M7-07). */
-export type Raci = 'R' | 'A' | 'C' | 'I';
+export const RACI_VALUES = ['R', 'A', 'C', 'I'] as const;
+export type Raci = (typeof RACI_VALUES)[number];
 export interface RaciAssignment {
   id: string;
+  tenantId: string;
+  operationId: string;
+  activity: string;
+  stakeholderId: string;
+  raci: Raci;
+}
+
+/** Saisie d'une assignation RACI. */
+export interface RaciInput {
   activity: string;
   stakeholderId: string;
   raci: Raci;

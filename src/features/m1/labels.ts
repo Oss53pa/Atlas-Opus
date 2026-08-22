@@ -5,7 +5,7 @@ import type { OpType, OperationStatus, Phase, ProgramCategory } from '../../doma
 import type { StakeholderType } from '../../domain/m2/types';
 import type { AuthorizationType, AuthorizationStatus } from '../../domain/m2/authorizations';
 import type { DueDiligenceCategory, DueDiligenceSeverity, DueDiligenceStatus } from '../../domain/m2/dueDiligence';
-import type { InsuranceType, InsuranceStatus } from '../../domain/m7/types';
+import type { InsuranceType, InsuranceStatus, Raci, DecisionKind } from '../../domain/m7/types';
 import type { TenureType, AcquisitionStatus, TitleDocType, TitleDocStatus } from '../../domain/m2/foncier';
 import type { FinancingSource, FinancingStatus, DrawdownStatus } from '../../domain/m5/types';
 import type { UnitStatus, SaleKind, SaleStatus, ReceiptStatus } from '../../domain/m6/types';
@@ -82,6 +82,29 @@ const STK_KEY: Record<StakeholderType, MessageKey> = {
   admin: 'stk.type.admin',
 };
 export const stakeholderTypeLabel = (s: StakeholderType) => t(STK_KEY[s]);
+
+// ── Gouvernance M7 : RACI & registre des décisions ───────────────────────────
+const RACI_KEY: Record<Raci, MessageKey> = {
+  R: 'raci.R',
+  A: 'raci.A',
+  C: 'raci.C',
+  I: 'raci.I',
+};
+export const RACI_TONE: Record<Raci, BadgeTone> = {
+  R: 'info',
+  A: 'accent',
+  C: 'neutral',
+  I: 'neutral',
+};
+export const raciLabel = (r: Raci) => t(RACI_KEY[r]);
+
+const DECISION_KIND_KEY: Record<DecisionKind, MessageKey> = {
+  decision: 'decision.kind.decision',
+  courrier: 'decision.kind.courrier',
+  OS: 'decision.kind.OS',
+  CR_reunion: 'decision.kind.CR_reunion',
+};
+export const decisionKindLabel = (k: DecisionKind) => t(DECISION_KIND_KEY[k]);
 
 const DECOMPTE_KEY: Record<DecompteStatus, MessageKey> = {
   draft: 'decompte.status.draft',

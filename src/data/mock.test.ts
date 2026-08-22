@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, createGovernanceRepo, type MockDb } from './mock';
 import { Money } from '../domain/money/Money';
 import { recettesEncaissees } from '../domain/m6';
 import type { Session } from './repo';
@@ -320,5 +320,36 @@ describe('Couche données mock — Gherkin §12', () => {
     const lines = await bilan.lines('op-palmiers');
     const hono = lines.find((l) => l.kind === 'cost' && l.poste === 'honoraires')!;
     expect(hono.amountPlanned).toBe(280_000_000); // 240M + 40M
+  });
+
+  it('Gouvernance M7 : RACI refuse un second « A » sur une même activité (RG-M7-07)', async () => {
+    const gov = createGovernanceRepo(db, sessionFor('tenant-demo'), deps(tel));
+    await gov.addRaci('op-cosmos', { activity: 'Conception', stakeholderId: 'st-c1', raci: 'A' });
+    await gov.addRaci('op-cosmos', { activity: 'Conception', stakeholderId: 'st-c2', raci: 'C' }); // autre rôle : OK
+    await expect(
+      gov.addRaci('op-cosmos', { activity: 'Conception', stakeholderId: 'st-c2', raci: 'A' }),
+    ).rejects.toThrow('raci_duplicate_accountable');
+    // Un « A » sur une autre activité reste autorisé.
+    const other = await gov.addRaci('op-cosmos', { activity: 'Passation', stakeholderId: 'st-c1', raci: 'A' });
+    expect(other.raci).toBe('A');
+  });
+
+  it('Gouvernance M7 : registre append-only, ordre antéchronologique, isolation tenant (RG-M7-08)', async () => {
+    const gov = createGovernanceRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const before = await gov.decisions('op-palmiers');
+    expect(before.length).toBeGreaterThan(0);
+    const rec = await gov.addDecision('op-palmiers', {
+      kind: 'courrier', reference: 'C-2026-099', date: '2026-07-01', decidedBy: 'MOA', summary: 'Notification',
+    });
+    const after = await gov.decisions('op-palmiers');
+    expect(after).toHaveLength(before.length + 1);
+    expect(after[0].id).toBe(rec.id); // le plus récent en tête
+    // GovernanceRepo n'expose aucune méthode d'édition/suppression de décision.
+    expect('updateDecision' in gov).toBe(false);
+    expect('removeDecision' in gov).toBe(false);
+    // Isolation tenant.
+    const other = createGovernanceRepo(db, sessionFor('tenant-other'), deps(tel));
+    expect(await other.decisions('op-palmiers')).toEqual([]);
+    expect(await other.raci('op-palmiers')).toEqual([]);
   });
 });

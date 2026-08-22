@@ -29,7 +29,14 @@ import type {
   TitleDocumentInput,
   TitleDocStatus,
 } from '../domain/m2/foncier';
-import type { Insurance, InsuranceInput } from '../domain/m7/types';
+import type {
+  Insurance,
+  InsuranceInput,
+  RaciAssignment,
+  RaciInput,
+  Decision,
+  DecisionInput,
+} from '../domain/m7/types';
 import type { ReportSnapshot, ReportInput } from '../domain/m21/reporting';
 import type {
   Unit,
@@ -186,6 +193,18 @@ export interface ComplianceRepo {
   addTitle(parcelId: string, input: TitleDocumentInput): Promise<TitleDocument>;
   setTitleStatus(id: string, status: TitleDocStatus): Promise<TitleDocument>;
   removeTitle(id: string): Promise<void>;
+}
+
+/**
+ * Gouvernance (M7) : matrice RACI (RG-M7-07) & registre des décisions
+ * (append-only, RG-M7-08 — d'où l'absence de méthode d'édition sur les décisions).
+ */
+export interface GovernanceRepo {
+  raci(operationId: string): Promise<RaciAssignment[]>;
+  addRaci(operationId: string, input: RaciInput): Promise<RaciAssignment>;
+  removeRaci(id: string): Promise<void>;
+  decisions(operationId: string): Promise<Decision[]>;
+  addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
 }
 
 export interface TendersRepo {

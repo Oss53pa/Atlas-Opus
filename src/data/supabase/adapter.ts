@@ -35,7 +35,8 @@ import { recettesEncaissees } from '../../domain/m6/commercialisation';
 import type { ReportSnapshot, ReportInput, ReportType, ReportData } from '../../domain/m21/reporting';
 import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
-import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
+import type { Insurance, InsuranceInput, InsuranceType, RaciAssignment, RaciInput, Raci, Decision, DecisionInput, DecisionKind } from '../../domain/m7/types';
+import { canAssignAccountable } from '../../domain/m7/validation';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
 import type {
@@ -55,7 +56,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo } from '../repo';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1115,6 +1116,72 @@ export function createSupabaseReportingRepo(client: SupabaseClient, session: Ses
     async remove(id) {
       const { error } = await client.from(RS).delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Gouvernance (M7) : RACI & registre des décisions ─────────────────────────
+interface RaciAssignmentRow {
+  id: string; tenant_id: string; operation_id: string; activity: string; stakeholder_id: string; raci: string;
+}
+function toRaciAssignment(r: RaciAssignmentRow): RaciAssignment {
+  return { id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, activity: r.activity, stakeholderId: r.stakeholder_id, raci: r.raci as Raci };
+}
+interface DecisionRow {
+  id: string; tenant_id: string; operation_id: string; kind: string; reference: string; date: string; summary: string | null; decided_by: string; created_at: string;
+}
+function toDecision(r: DecisionRow): Decision {
+  return { id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, kind: r.kind as DecisionKind, reference: r.reference, date: r.date, summary: r.summary, decidedBy: r.decided_by, createdAt: r.created_at };
+}
+
+export function createSupabaseGovernanceRepo(client: SupabaseClient, session: Session): GovernanceRepo {
+  const RA = 'ao_raci_assignments';
+  const DE = 'ao_decisions';
+  return {
+    async raci(opId) {
+      const rows = unwrap(await client.from(RA).select('*').eq('operation_id', opId).order('activity')) as RaciAssignmentRow[];
+      return rows.map(toRaciAssignment);
+    },
+    async addRaci(opId, input: RaciInput) {
+      const activity = input.activity.trim();
+      // RG-M7-07 — au plus un « A » par activité (revérifié en base par index unique + garde applicative).
+      if (input.raci === 'A') {
+        const existing = unwrap(
+          await client.from(RA).select('raci').eq('operation_id', opId).eq('activity', activity),
+        ) as { raci: string }[];
+        if (!canAssignAccountable(existing.map((e) => ({ raci: e.raci as Raci })))) {
+          throw new Error('raci_duplicate_accountable');
+        }
+      }
+      const row = unwrap(
+        await client.from(RA).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          activity, stakeholder_id: input.stakeholderId, raci: input.raci,
+        }).select('*').single(),
+      ) as RaciAssignmentRow;
+      return toRaciAssignment(row);
+    },
+    async removeRaci(id) {
+      const { error } = await client.from(RA).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async decisions(opId) {
+      const rows = unwrap(
+        await client.from(DE).select('*').eq('operation_id', opId).order('date', { ascending: false }).order('created_at', { ascending: false }),
+      ) as DecisionRow[];
+      return rows.map(toDecision);
+    },
+    async addDecision(opId, input: DecisionInput) {
+      // RG-M7-08 — append-only : uniquement une insertion (aucune policy UPDATE en base).
+      const row = unwrap(
+        await client.from(DE).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          kind: input.kind, reference: input.reference.trim(), date: input.date,
+          summary: input.summary?.trim() || null, decided_by: input.decidedBy.trim(),
+        }).select('*').single(),
+      ) as DecisionRow;
+      return toDecision(row);
     },
   };
 }
