@@ -16,10 +16,10 @@ import type {
 import type { TransitionContext } from '../domain/m1/stateMachine';
 import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
-import { permitGate, type Authorization } from '../domain/m2/authorizations';
-import { ddGate, type DueDiligenceItem } from '../domain/m2/dueDiligence';
+import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationStatus } from '../domain/m2/authorizations';
+import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus } from '../domain/m2/dueDiligence';
 import { doGate } from '../domain/m7/rules';
-import type { InsuranceType } from '../domain/m7/types';
+import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
@@ -40,6 +40,7 @@ import type {
   ProgramItemPatch,
   Session,
   StakeholdersRepo,
+  ComplianceRepo,
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
@@ -67,17 +68,8 @@ export interface MockDb {
   tasks: Task[];
   tenders: Tender[];
   authorizations: Authorization[];
-  insurances: MockInsurance[];
+  insurances: Insurance[];
   dueDiligence: DueDiligenceItem[];
-}
-
-/** Assurance simplifiée pour la garde DO (M7) : le statut est dérivé de valid_to. */
-export interface MockInsurance {
-  id: string;
-  tenantId: string;
-  operationId: string;
-  type: InsuranceType;
-  validTo: string | null;
 }
 
 interface Deps {
@@ -255,9 +247,9 @@ export function createMockDb(): MockDb {
     { id: 'au-c1', tenantId: T, operationId: 'op-cosmos', type: 'permis_construire', authority: 'Mairie de Cocody', status: 'submitted', validity: null },
   ];
   // Assurances (M7) — Palmiers : DO couvrante (garde levée). Cosmos : aucune DO.
-  const insurances: MockInsurance[] = [
-    { id: 'in-p1', tenantId: T, operationId: 'op-palmiers', type: 'DO', validTo: '2030-12-31' },
-    { id: 'in-p2', tenantId: T, operationId: 'op-palmiers', type: 'decennale', validTo: '2030-12-31' },
+  const insurances: Insurance[] = [
+    { id: 'in-p1', tenantId: T, operationId: 'op-palmiers', stakeholderId: 'st-p4', type: 'DO', insurer: 'NSIA Assurances', validFrom: '2026-02-01', validTo: '2030-12-31', attestationRef: 'DO-2026-0142' },
+    { id: 'in-p2', tenantId: T, operationId: 'op-palmiers', stakeholderId: 'st-p3', type: 'decennale', insurer: 'NSIA Assurances', validFrom: '2026-02-01', validTo: '2030-12-31', attestationRef: 'DEC-2026-0143' },
   ];
   // Due diligence (M2) — Riviera : litige « critical » ouvert (bloque conception, RG-M2-03).
   // Palmiers : réserve « high » levée → non bloquante.
@@ -542,6 +534,74 @@ export function createStakeholdersRepo(db: MockDb, session: Session, deps: Deps)
     async remove(sid) {
       const idx = db.stakeholders.findIndex((s) => s.id === sid && s.tenantId === session.tenantId);
       if (idx >= 0) db.stakeholders.splice(idx, 1);
+    },
+  };
+}
+
+export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): ComplianceRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+
+  return {
+    async authorizations(opId) {
+      return mine(db.authorizations).filter((a) => a.operationId === opId).map((a) => ({ ...a }));
+    },
+    async addAuthorization(opId, input: AuthorizationInput) {
+      const a: Authorization = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        type: input.type, authority: input.authority.trim(), status: 'draft', validity: input.validity ?? null,
+      };
+      db.authorizations.push(a);
+      return { ...a };
+    },
+    async setAuthorizationStatus(aid, status: AuthorizationStatus) {
+      const a = db.authorizations.find((x) => x.id === aid && x.tenantId === session.tenantId);
+      if (!a) throw new Error('not_found');
+      a.status = status;
+      return { ...a };
+    },
+    async removeAuthorization(aid) {
+      const i = db.authorizations.findIndex((x) => x.id === aid && x.tenantId === session.tenantId);
+      if (i >= 0) db.authorizations.splice(i, 1);
+    },
+
+    async insurances(opId) {
+      return mine(db.insurances).filter((x) => x.operationId === opId).map((x) => ({ ...x }));
+    },
+    async addInsurance(opId, input: InsuranceInput) {
+      const ins: Insurance = {
+        id: id(), tenantId: session.tenantId, operationId: opId, stakeholderId: input.stakeholderId ?? null,
+        type: input.type, insurer: input.insurer.trim(), validFrom: input.validFrom,
+        validTo: input.validTo ?? null, attestationRef: input.attestationRef ?? null,
+      };
+      db.insurances.push(ins);
+      return { ...ins };
+    },
+    async removeInsurance(iid) {
+      const i = db.insurances.findIndex((x) => x.id === iid && x.tenantId === session.tenantId);
+      if (i >= 0) db.insurances.splice(i, 1);
+    },
+
+    async dueDiligence(opId) {
+      return mine(db.dueDiligence).filter((d) => d.operationId === opId).map((d) => ({ ...d }));
+    },
+    async addDueDiligence(opId, input: DueDiligenceInput) {
+      const d: DueDiligenceItem = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        category: input.category, finding: input.finding.trim(), severity: input.severity, status: 'open',
+      };
+      db.dueDiligence.push(d);
+      return { ...d };
+    },
+    async setDueDiligenceStatus(did, status: DueDiligenceStatus) {
+      const d = db.dueDiligence.find((x) => x.id === did && x.tenantId === session.tenantId);
+      if (!d) throw new Error('not_found');
+      d.status = status;
+      return { ...d };
+    },
+    async removeDueDiligence(did) {
+      const i = db.dueDiligence.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
+      if (i >= 0) db.dueDiligence.splice(i, 1);
     },
   };
 }

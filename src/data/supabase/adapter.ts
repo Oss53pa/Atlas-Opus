@@ -17,10 +17,10 @@ import type {
   ProgramItemDraft,
 } from '../../domain/m1/types';
 import type { TransitionContext } from '../../domain/m1/stateMachine';
-import { permitGate, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
-import { ddGate, type DueDiligenceItem } from '../../domain/m2/dueDiligence';
+import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
+import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus, type DueDiligenceCategory, type DueDiligenceSeverity } from '../../domain/m2/dueDiligence';
 import { doGate } from '../../domain/m7/rules';
-import type { InsuranceType } from '../../domain/m7/types';
+import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
 import type {
@@ -40,7 +40,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -627,6 +627,112 @@ export function createSupabaseTendersRepo(client: SupabaseClient, session: Sessi
     },
     async remove(tid) {
       const { error } = await client.from(TD).delete().eq('id', tid);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Conformité & gardes M1 (M2 autorisations/DD, M7 assurances) ──────────────
+interface AuthorizationRow {
+  id: string; tenant_id: string; operation_id: string;
+  type: string; authority: string; status: string; validity: string | null;
+}
+interface InsuranceRow {
+  id: string; tenant_id: string; operation_id: string; stakeholder_id: string | null;
+  type: string; insurer: string; valid_from: string; valid_to: string | null; attestation_ref: string | null;
+}
+interface DueDiligenceRow {
+  id: string; tenant_id: string; operation_id: string;
+  category: string; finding: string; severity: string; status: string;
+}
+
+function toAuthorization(r: AuthorizationRow): Authorization {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    type: r.type as AuthorizationType, authority: r.authority,
+    status: r.status as AuthorizationStatus, validity: r.validity,
+  };
+}
+function toInsurance(r: InsuranceRow): Insurance {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, stakeholderId: r.stakeholder_id,
+    type: r.type as InsuranceType, insurer: r.insurer, validFrom: r.valid_from,
+    validTo: r.valid_to, attestationRef: r.attestation_ref,
+  };
+}
+function toDueDiligence(r: DueDiligenceRow): DueDiligenceItem {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    category: r.category as DueDiligenceCategory, finding: r.finding,
+    severity: r.severity as DueDiligenceSeverity, status: r.status as DueDiligenceStatus,
+  };
+}
+
+export function createSupabaseComplianceRepo(client: SupabaseClient, session: Session): ComplianceRepo {
+  const AUTHT = 'ao_authorizations';
+  const INST = 'ao_insurances';
+  const DDT = 'ao_due_diligence_items';
+  return {
+    async authorizations(opId) {
+      const rows = unwrap(await client.from(AUTHT).select('*').eq('operation_id', opId).order('created_at')) as AuthorizationRow[];
+      return rows.map(toAuthorization);
+    },
+    async addAuthorization(opId, input: AuthorizationInput) {
+      const row = unwrap(
+        await client.from(AUTHT).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          type: input.type, authority: input.authority, status: 'draft', validity: input.validity ?? null,
+        }).select('*').single(),
+      ) as AuthorizationRow;
+      return toAuthorization(row);
+    },
+    async setAuthorizationStatus(id, status: AuthorizationStatus) {
+      const row = unwrap(await client.from(AUTHT).update({ status }).eq('id', id).select('*').single()) as AuthorizationRow;
+      return toAuthorization(row);
+    },
+    async removeAuthorization(id) {
+      const { error } = await client.from(AUTHT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async insurances(opId) {
+      const rows = unwrap(await client.from(INST).select('*').eq('operation_id', opId).order('created_at')) as InsuranceRow[];
+      return rows.map(toInsurance);
+    },
+    async addInsurance(opId, input: InsuranceInput) {
+      const row = unwrap(
+        await client.from(INST).insert({
+          tenant_id: session.tenantId, operation_id: opId, stakeholder_id: input.stakeholderId ?? null,
+          type: input.type, insurer: input.insurer, valid_from: input.validFrom,
+          valid_to: input.validTo ?? null, attestation_ref: input.attestationRef ?? null,
+        }).select('*').single(),
+      ) as InsuranceRow;
+      return toInsurance(row);
+    },
+    async removeInsurance(id) {
+      const { error } = await client.from(INST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async dueDiligence(opId) {
+      const rows = unwrap(await client.from(DDT).select('*').eq('operation_id', opId).order('created_at')) as DueDiligenceRow[];
+      return rows.map(toDueDiligence);
+    },
+    async addDueDiligence(opId, input: DueDiligenceInput) {
+      const row = unwrap(
+        await client.from(DDT).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          category: input.category, finding: input.finding, severity: input.severity, status: 'open',
+        }).select('*').single(),
+      ) as DueDiligenceRow;
+      return toDueDiligence(row);
+    },
+    async setDueDiligenceStatus(id, status: DueDiligenceStatus) {
+      const row = unwrap(await client.from(DDT).update({ status }).eq('id', id).select('*').single()) as DueDiligenceRow;
+      return toDueDiligence(row);
+    },
+    async removeDueDiligence(id) {
+      const { error } = await client.from(DDT).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };

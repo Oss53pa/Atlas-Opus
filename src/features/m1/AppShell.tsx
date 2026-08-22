@@ -13,6 +13,7 @@ import {
   Gavel,
   Banknote,
   Users,
+  ShieldCheck,
   Settings,
   CalendarDays,
 } from 'lucide-react';
@@ -73,6 +74,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           <button className={cx('ax-nav-item', route.name === 'stakeholders' && 'is-active')} onClick={() => go({ name: 'stakeholders', id: opId })}>
             <Users size={18} />
             {t('nav.stakeholders')}
+          </button>
+          <button className={cx('ax-nav-item', route.name === 'compliance' && 'is-active')} onClick={() => go({ name: 'compliance', id: opId })}>
+            <ShieldCheck size={18} />
+            {t('nav.compliance')}
           </button>
         </>
       )}

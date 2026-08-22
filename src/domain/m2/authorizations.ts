@@ -22,6 +22,13 @@ export interface Authorization {
   validity: string | null;
 }
 
+/** Saisie de création d'une autorisation (écran conformité). */
+export interface AuthorizationInput {
+  type: AuthorizationType;
+  authority: string;
+  validity?: string | null;
+}
+
 const TRANSITIONS: Record<AuthorizationStatus, AuthorizationStatus[]> = {
   draft: ['submitted'],
   submitted: ['granted', 'refused'],

@@ -19,6 +19,9 @@ import type { TransitionContext } from '../domain/m1/stateMachine';
 import type { BilanSummary } from '../domain/finance/bilan';
 import type { Money } from '../domain/money/Money';
 import type { Stakeholder, StakeholderInput, StakeholderPatch } from '../domain/m2/types';
+import type { Authorization, AuthorizationInput, AuthorizationStatus } from '../domain/m2/authorizations';
+import type { DueDiligenceItem, DueDiligenceInput, DueDiligenceStatus } from '../domain/m2/dueDiligence';
+import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
@@ -94,6 +97,21 @@ export interface StakeholdersRepo {
   add(operationId: string, input: StakeholderInput): Promise<Stakeholder>;
   update(id: string, patch: StakeholderPatch): Promise<Stakeholder>;
   remove(id: string): Promise<void>;
+}
+
+/** Conformité & gardes M1 : autorisations (M2), assurances (M7), due diligence (M2). */
+export interface ComplianceRepo {
+  authorizations(operationId: string): Promise<Authorization[]>;
+  addAuthorization(operationId: string, input: AuthorizationInput): Promise<Authorization>;
+  setAuthorizationStatus(id: string, status: AuthorizationStatus): Promise<Authorization>;
+  removeAuthorization(id: string): Promise<void>;
+  insurances(operationId: string): Promise<Insurance[]>;
+  addInsurance(operationId: string, input: InsuranceInput): Promise<Insurance>;
+  removeInsurance(id: string): Promise<void>;
+  dueDiligence(operationId: string): Promise<DueDiligenceItem[]>;
+  addDueDiligence(operationId: string, input: DueDiligenceInput): Promise<DueDiligenceItem>;
+  setDueDiligenceStatus(id: string, status: DueDiligenceStatus): Promise<DueDiligenceItem>;
+  removeDueDiligence(id: string): Promise<void>;
 }
 
 export interface TendersRepo {

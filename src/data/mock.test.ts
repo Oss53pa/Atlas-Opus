@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, type MockDb } from './mock';
 import type { Session } from './repo';
 import { createTelemetry, type Telemetry } from '../lib/telemetry';
 import { evaluateTransition } from '../domain/m1/stateMachine';
@@ -157,5 +157,38 @@ describe('Couche données mock — Gherkin §12', () => {
     } else {
       throw new Error('attendu guard_unmet');
     }
+  });
+
+  it('CRUD conformité : ajouter permis « granted » + DO lève les gardes de réalisation', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const compliance = createComplianceRepo(db, sessionFor('tenant-demo'), deps(tel));
+
+    let ctx = await ops.getTransitionContext('op-cosmos');
+    expect(ctx.permitGranted).toBe(false);
+    expect(ctx.doInsuranceValid).toBe(false);
+
+    const permit = await compliance.addAuthorization('op-cosmos', { type: 'permis_construire', authority: 'Mairie', validity: '2031-01-01' });
+    await compliance.setAuthorizationStatus(permit.id, 'granted');
+    await compliance.addInsurance('op-cosmos', { type: 'DO', insurer: 'NSIA', validFrom: '2026-01-01', validTo: '2031-01-01' });
+
+    ctx = await ops.getTransitionContext('op-cosmos');
+    expect(ctx.permitGranted).toBe(true);
+    expect(ctx.doInsuranceValid).toBe(true);
+  });
+
+  it('CRUD conformité : lever une DD critique débloque la garde conception', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const compliance = createComplianceRepo(db, sessionFor('tenant-demo'), deps(tel));
+
+    expect((await ops.getTransitionContext('op-riviera')).ddCleared).toBe(false);
+    const items = await compliance.dueDiligence('op-riviera');
+    const critical = items.find((i) => i.severity === 'critical' && i.status === 'open')!;
+    await compliance.setDueDiligenceStatus(critical.id, 'cleared');
+    expect((await ops.getTransitionContext('op-riviera')).ddCleared).toBe(true);
+  });
+
+  it('CRUD conformité : isolation tenant sur les autorisations', async () => {
+    const other = createComplianceRepo(db, sessionFor('tenant-other'), deps(tel));
+    expect(await other.authorizations('op-palmiers')).toEqual([]);
   });
 });
