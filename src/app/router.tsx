@@ -9,6 +9,7 @@ export type Route =
   | { name: 'bilan'; id: string }
   | { name: 'stakeholders'; id: string }
   | { name: 'compliance'; id: string }
+  | { name: 'financing'; id: string }
   | { name: 'payments'; id: string }
   | { name: 'planning'; id: string }
   | { name: 'passation'; id: string };

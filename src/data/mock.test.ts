@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, type MockDb } from './mock';
+import { Money } from '../domain/money/Money';
 import type { Session } from './repo';
 import { createTelemetry, type Telemetry } from '../lib/telemetry';
 import { evaluateTransition } from '../domain/m1/stateMachine';
@@ -220,6 +221,31 @@ describe('Couche données mock — Gherkin §12', () => {
   it('Foncier : isolation tenant sur les parcelles', async () => {
     const other = createComplianceRepo(db, sessionFor('tenant-other'), deps(tel));
     expect(await other.landParcels('op-palmiers')).toEqual([]);
+  });
+
+  it('Financement CRUD : source négociée, tranche planifiée, déblocage gardé par l’avancement (RG-M5-01)', async () => {
+    const financing = createFinancingRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const f = await financing.add('op-cosmos', { source: 'bailleur', amount: Money.of(800_000_000, 'XOF'), rate: 0.06 });
+    expect(f.status).toBe('negocie');
+    const d = await financing.addDrawdown(f.id, { amount: Money.of(200_000_000, 'XOF'), condition: 0.3 });
+    expect(d.status).toBe('planifie');
+
+    const demande = await financing.setDrawdownStatus(d.id, 'demande');
+    expect(demande.status).toBe('demande');
+    // Déblocage effectif : la garde RG-M5-01 est évaluée côté écran (evaluateDrawdown) ;
+    // le repo persiste le statut + la date de déblocage.
+    const released = await financing.setDrawdownStatus(d.id, 'debloque', '2026-06-01');
+    expect(released.status).toBe('debloque');
+    expect(released.date).toBe('2026-06-01');
+
+    await financing.remove(f.id);
+    expect((await financing.list('op-cosmos')).some((x) => x.id === f.id)).toBe(false);
+    expect(await financing.drawdowns(f.id)).toHaveLength(0); // tranches en cascade
+  });
+
+  it('Financement : isolation tenant', async () => {
+    const other = createFinancingRepo(db, sessionFor('tenant-other'), deps(tel));
+    expect(await other.list('op-palmiers')).toEqual([]);
   });
 
   it('Financement M5 → bilan M4 : frais_financiers dérivés des tranches débloquées (RG-M5-02)', async () => {

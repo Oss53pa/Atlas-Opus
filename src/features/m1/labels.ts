@@ -7,6 +7,7 @@ import type { AuthorizationType, AuthorizationStatus } from '../../domain/m2/aut
 import type { DueDiligenceCategory, DueDiligenceSeverity, DueDiligenceStatus } from '../../domain/m2/dueDiligence';
 import type { InsuranceType, InsuranceStatus } from '../../domain/m7/types';
 import type { TenureType, AcquisitionStatus, TitleDocType, TitleDocStatus } from '../../domain/m2/foncier';
+import type { FinancingSource, FinancingStatus, DrawdownStatus } from '../../domain/m5/types';
 import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
 
@@ -226,3 +227,37 @@ export const tenureLabel = (tdoc: TenureType) => t(TENURE_KEY[tdoc]);
 export const acquisitionStatusLabel = (s: AcquisitionStatus) => t(ACQ_KEY[s]);
 export const titleDocTypeLabel = (tdoc: TitleDocType) => t(TITLE_TYPE_KEY[tdoc]);
 export const titleStatusLabel = (s: TitleDocStatus) => t(TITLE_STATUS_KEY[s]);
+
+// ── Financement (M5) ─────────────────────────────────────────────────────────
+const FIN_SOURCE_KEY: Record<FinancingSource, MessageKey> = {
+  credit_promoteur: 'fin.source.credit_promoteur',
+  bailleur: 'fin.source.bailleur',
+  fonds_propres: 'fin.source.fonds_propres',
+};
+const FIN_STATUS_KEY: Record<FinancingStatus, MessageKey> = {
+  negocie: 'fin.status.negocie',
+  accorde: 'fin.status.accorde',
+  en_cours: 'fin.status.en_cours',
+  solde: 'fin.status.solde',
+};
+export const FIN_STATUS_TONE: Record<FinancingStatus, BadgeTone> = {
+  negocie: 'neutral',
+  accorde: 'info',
+  en_cours: 'accent',
+  solde: 'success',
+};
+const DRAWDOWN_STATUS_KEY: Record<DrawdownStatus, MessageKey> = {
+  planifie: 'draw.status.planifie',
+  demande: 'draw.status.demande',
+  debloque: 'draw.status.debloque',
+  refuse: 'draw.status.refuse',
+};
+export const DRAWDOWN_STATUS_TONE: Record<DrawdownStatus, BadgeTone> = {
+  planifie: 'neutral',
+  demande: 'info',
+  debloque: 'success',
+  refuse: 'danger',
+};
+export const financingSourceLabel = (s: FinancingSource) => t(FIN_SOURCE_KEY[s]);
+export const financingStatusLabel = (s: FinancingStatus) => t(FIN_STATUS_KEY[s]);
+export const drawdownStatusLabel = (s: DrawdownStatus) => t(DRAWDOWN_STATUS_KEY[s]);

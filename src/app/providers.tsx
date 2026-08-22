@@ -6,6 +6,7 @@ import {
   createBilanRepo,
   createStakeholdersRepo,
   createComplianceRepo,
+  createFinancingRepo,
   createPaymentsRepo,
   createPlanningRepo,
   createTendersRepo,
@@ -20,6 +21,7 @@ import type {
   Session,
   StakeholdersRepo,
   ComplianceRepo,
+  FinancingRepo,
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
@@ -28,6 +30,7 @@ import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
 import type { DueDiligenceItem } from '../domain/m2/dueDiligence';
 import type { LandParcel, TitleDocument } from '../domain/m2/foncier';
+import type { Financing, Drawdown } from '../domain/m5/types';
 import type { Insurance } from '../domain/m7/types';
 import type { Contract, Decompte } from '../domain/payments/types';
 import type { Task } from '../domain/m12/types';
@@ -43,6 +46,7 @@ import {
   createSupabaseProgramRepo,
   createSupabaseStakeholdersRepo,
   createSupabaseComplianceRepo,
+  createSupabaseFinancingRepo,
   createSupabasePaymentsRepo,
   createSupabasePlanningRepo,
   createSupabaseTendersRepo,
@@ -57,6 +61,7 @@ interface DataApi {
   bilan: BilanRepo;
   stakeholders: StakeholdersRepo;
   compliance: ComplianceRepo;
+  financing: FinancingRepo;
   payments: PaymentsRepo;
   planning: PlanningRepo;
   tenders: TendersRepo;
@@ -83,6 +88,7 @@ function buildMockApi(): DataApi {
     bilan: createBilanRepo(db, session, { telemetry }),
     stakeholders: createStakeholdersRepo(db, session, { telemetry }),
     compliance: createComplianceRepo(db, session, { telemetry }),
+    financing: createFinancingRepo(db, session, { telemetry }),
     payments: createPaymentsRepo(db, session, { telemetry }),
     planning: createPlanningRepo(db, session, { telemetry }),
     tenders: createTendersRepo(db, session, { telemetry }),
@@ -129,6 +135,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           bilan: createSupabaseBilanRepo(supabase, session),
           stakeholders: createSupabaseStakeholdersRepo(supabase, session),
           compliance: createSupabaseComplianceRepo(supabase, session),
+          financing: createSupabaseFinancingRepo(supabase, session),
           payments: createSupabasePaymentsRepo(supabase, session),
           planning: createSupabasePlanningRepo(supabase, session),
           tenders: createSupabaseTendersRepo(supabase, session),
@@ -234,6 +241,16 @@ export function useLandParcels(operationId: string): AsyncState<LandParcel[]> {
 export function useTitles(parcelId: string): AsyncState<TitleDocument[]> {
   const { compliance } = useData();
   return useAsync(() => compliance.titles(parcelId), [compliance, parcelId]);
+}
+
+export function useFinancings(operationId: string): AsyncState<Financing[]> {
+  const { financing } = useData();
+  return useAsync(() => financing.list(operationId), [financing, operationId]);
+}
+
+export function useDrawdowns(financingId: string): AsyncState<Drawdown[]> {
+  const { financing } = useData();
+  return useAsync(() => financing.drawdowns(financingId), [financing, financingId]);
 }
 
 export function useContracts(operationId: string): AsyncState<Contract[]> {

@@ -13,6 +13,7 @@ import { ProgramEditor } from './features/m1/ProgramEditor';
 import { BilanEditor } from './features/m1/BilanEditor';
 import { StakeholdersScreen } from './features/m1/StakeholdersScreen';
 import { ComplianceScreen } from './features/m1/ComplianceScreen';
+import { FinancingScreen } from './features/m1/FinancingScreen';
 import { PaymentsScreen } from './features/m1/PaymentsScreen';
 import { PlanningScreen } from './features/m1/PlanningScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
@@ -37,6 +38,8 @@ function RouteView() {
       return <StakeholdersScreen id={route.id} />;
     case 'compliance':
       return <ComplianceScreen id={route.id} />;
+    case 'financing':
+      return <FinancingScreen id={route.id} />;
     case 'payments':
       return <PaymentsScreen id={route.id} />;
     case 'planning':

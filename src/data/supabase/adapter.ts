@@ -31,7 +31,7 @@ import type {
 } from '../../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
-import type { DrawdownStatus } from '../../domain/m5/types';
+import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
@@ -52,7 +52,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -864,6 +864,94 @@ export function createSupabaseComplianceRepo(client: SupabaseClient, session: Se
     },
     async removeTitle(id) {
       const { error } = await client.from(TDT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Financement (M5) ─────────────────────────────────────────────────────────
+interface FinancingRow {
+  id: string; tenant_id: string; operation_id: string;
+  source: string; amount: number | string; rate: number | string; status: string;
+}
+interface DrawdownRow {
+  id: string; tenant_id: string; financing_id: string;
+  amount: number | string; condition: number | string; status: string; date: string | null;
+}
+function toFinancing(r: FinancingRow, currency: string): Financing {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    source: r.source as FinancingSource, amount: Money.of(Number(r.amount), currency),
+    rate: Number(r.rate), status: r.status as FinancingStatus,
+  };
+}
+function toDrawdown(r: DrawdownRow, currency: string): Drawdown {
+  return {
+    id: r.id, tenantId: r.tenant_id, financingId: r.financing_id,
+    amount: Money.of(Number(r.amount), currency), condition: Number(r.condition),
+    status: r.status as DrawdownStatus, date: r.date,
+  };
+}
+
+export function createSupabaseFinancingRepo(client: SupabaseClient, session: Session): FinancingRepo {
+  const FIN = 'ao_financing';
+  const DW = 'ao_drawdowns';
+  const currencyOfOperation = async (opId: string): Promise<string> => {
+    const { data } = await client.from(OPS).select('currency').eq('id', opId).maybeSingle();
+    return data ? (data as { currency: string }).currency : 'XOF';
+  };
+  const currencyOfFinancing = async (financingId: string): Promise<string> => {
+    const { data } = await client.from(FIN).select('operation_id').eq('id', financingId).maybeSingle();
+    return data ? currencyOfOperation((data as { operation_id: string }).operation_id) : 'XOF';
+  };
+
+  return {
+    async list(opId) {
+      const currency = await currencyOfOperation(opId);
+      const rows = unwrap(await client.from(FIN).select('*').eq('operation_id', opId).order('created_at')) as FinancingRow[];
+      return rows.map((r) => toFinancing(r, currency));
+    },
+    async add(opId, input: FinancingInput) {
+      const currency = await currencyOfOperation(opId);
+      const row = unwrap(
+        await client.from(FIN).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          source: input.source, amount: input.amount.toMajorNumber(), rate: input.rate, status: 'negocie',
+        }).select('*').single(),
+      ) as FinancingRow;
+      return toFinancing(row, currency);
+    },
+    async setStatus(id, status: FinancingStatus) {
+      const row = unwrap(await client.from(FIN).update({ status }).eq('id', id).select('*').single()) as FinancingRow;
+      return toFinancing(row, await currencyOfOperation(row.operation_id));
+    },
+    async remove(id) {
+      const { error } = await client.from(FIN).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async drawdowns(financingId) {
+      const currency = await currencyOfFinancing(financingId);
+      const rows = unwrap(await client.from(DW).select('*').eq('financing_id', financingId).order('created_at')) as DrawdownRow[];
+      return rows.map((r) => toDrawdown(r, currency));
+    },
+    async addDrawdown(financingId, input: DrawdownInput) {
+      const currency = await currencyOfFinancing(financingId);
+      const row = unwrap(
+        await client.from(DW).insert({
+          tenant_id: session.tenantId, financing_id: financingId,
+          amount: input.amount.toMajorNumber(), condition: input.condition, status: 'planifie', date: null,
+        }).select('*').single(),
+      ) as DrawdownRow;
+      return toDrawdown(row, currency);
+    },
+    async setDrawdownStatus(id, status: DrawdownStatus, date?: string | null) {
+      const upd: Record<string, unknown> = { status };
+      if (status === 'debloque') upd.date = date ?? new Date().toISOString().slice(0, 10);
+      const row = unwrap(await client.from(DW).update(upd).eq('id', id).select('*').single()) as DrawdownRow;
+      return toDrawdown(row, await currencyOfFinancing(row.financing_id));
+    },
+    async removeDrawdown(id) {
+      const { error } = await client.from(DW).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };

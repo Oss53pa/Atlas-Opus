@@ -20,6 +20,8 @@ export type Action =
   | 'stakeholder.edit'
   | 'payment.read'
   | 'payment.edit'
+  | 'financing.read'
+  | 'financing.edit'
   | 'planning.read'
   | 'planning.edit'
   | 'tender.read'
@@ -52,6 +54,8 @@ const MATRIX: Record<Action, Role[]> = {
   'stakeholder.edit': ['owner', 'moa_director', 'amo'],
   'payment.read': ALL_READ,
   'payment.edit': ['owner', 'moa_director', 'finance'],
+  'financing.read': ALL_READ,
+  'financing.edit': ['owner', 'moa_director', 'finance'],
   'planning.read': ALL_READ,
   'planning.edit': ['owner', 'moa_director', 'amo'],
   'tender.read': ALL_READ,
