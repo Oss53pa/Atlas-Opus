@@ -18,7 +18,7 @@ import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
 import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationStatus } from '../domain/m2/authorizations';
 import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus } from '../domain/m2/dueDiligence';
-import { doGate } from '../domain/m7/rules';
+import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -460,12 +460,23 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
     id: b.id, operationId: b.operationId, kind: b.kind, poste: b.poste,
     amountPlanned: b.amountPlanned, amountActual: b.amountActual,
   });
+  // RG-M7-09 — honoraires dérivés des intervenants (source de vérité M7),
+  // supersèdent toute ligne « honoraires » saisie manuellement.
+  const honoraires = (opId: string, currency: string) =>
+    honorairesFromStakeholders(
+      db.stakeholders.filter((s) => s.operationId === opId && s.tenantId === session.tenantId),
+      currency,
+    );
+  const nonHonorairesSeeds = (opId: string) =>
+    seeds(opId).filter((b) => !(b.kind === 'cost' && b.poste === 'honoraires'));
 
   return {
     async summary(opId): Promise<BilanView | null> {
       const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
       if (!op) return null;
-      const lines: BilanLine[] = seeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
+      const lines: BilanLine[] = nonHonorairesSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
+      const hono = honoraires(opId, op.currency);
+      if (!hono.isZero()) lines.push({ kind: 'cost', amount: hono });
       return {
         summary: bilanSummary(lines, op.currency),
         tri: tri(db.cashflows[opId] ?? []),
@@ -474,7 +485,15 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
     },
 
     async lines(opId) {
-      return seeds(opId).map(toRecord);
+      const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
+      const currency = op?.currency ?? 'XOF';
+      const records = nonHonorairesSeeds(opId).map(toRecord);
+      const hono = honoraires(opId, currency);
+      if (!hono.isZero()) {
+        const amount = hono.toMajorNumber();
+        records.push({ id: `honoraires-m7-${opId}`, operationId: opId, kind: 'cost', poste: 'honoraires', amountPlanned: amount, amountActual: amount });
+      }
+      return records;
     },
 
     async addLine(opId, input: BilanLineInput) {

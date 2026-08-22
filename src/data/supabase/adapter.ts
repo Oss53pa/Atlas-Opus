@@ -19,7 +19,7 @@ import type {
 import type { TransitionContext } from '../../domain/m1/stateMachine';
 import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
 import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus, type DueDiligenceCategory, type DueDiligenceSeverity } from '../../domain/m2/dueDiligence';
-import { doGate } from '../../domain/m7/rules';
+import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
@@ -372,16 +372,31 @@ function toBilanRecord(r: BilanLineRow): BilanLineRecord {
 
 /** Bilan (M4) depuis ao_bilan_lines. TRI null tant que les cash-flows ne sont pas en base. */
 export function createSupabaseBilanRepo(client: SupabaseClient, session: Session): BilanRepo {
+  // RG-M7-09 — honoraires dérivés des intervenants (source de vérité M7).
+  const honorairesFor = async (opId: string, currency: string): Promise<Money> => {
+    const { data } = await client.from(ST).select('type, fee_amount').eq('operation_id', opId);
+    const items = (data ?? []).map((r: { type: StakeholderType; fee_amount: number | string }) => ({
+      type: r.type,
+      feeAmount: Number(r.fee_amount),
+    }));
+    return honorairesFromStakeholders(items, currency);
+  };
+
   return {
     async summary(opId): Promise<BilanView | null> {
       const { data: op } = await client.from(OPS).select('currency, budget_bac').eq('id', opId).maybeSingle();
       if (!op) return null;
       const currency = (op as { currency: string }).currency;
-      const rows = unwrap(await client.from(BL).select('kind, amount_planned').eq('operation_id', opId)) as {
+      const rows = unwrap(await client.from(BL).select('kind, poste, amount_planned').eq('operation_id', opId)) as {
         kind: 'cost' | 'revenue';
+        poste: string;
         amount_planned: number | string;
       }[];
-      const lines: BilanLine[] = rows.map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
+      const lines: BilanLine[] = rows
+        .filter((r) => !(r.kind === 'cost' && r.poste === 'honoraires'))
+        .map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
+      const hono = await honorairesFor(opId, currency);
+      if (!hono.isZero()) lines.push({ kind: 'cost', amount: hono });
       return {
         summary: bilanSummary(lines, currency),
         tri: null,
@@ -390,8 +405,16 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
     },
 
     async lines(opId) {
+      const { data: op } = await client.from(OPS).select('currency').eq('id', opId).maybeSingle();
+      const currency = op ? (op as { currency: string }).currency : 'XOF';
       const rows = unwrap(await client.from(BL).select('*').eq('operation_id', opId).order('created_at')) as BilanLineRow[];
-      return rows.map(toBilanRecord);
+      const records = rows.filter((r) => !(r.kind === 'cost' && r.poste === 'honoraires')).map(toBilanRecord);
+      const hono = await honorairesFor(opId, currency);
+      if (!hono.isZero()) {
+        const amount = hono.toMajorNumber();
+        records.push({ id: `honoraires-m7-${opId}`, operationId: opId, kind: 'cost', poste: 'honoraires', amountPlanned: amount, amountActual: amount });
+      }
+      return records;
     },
 
     async addLine(opId, input: BilanLineInput) {

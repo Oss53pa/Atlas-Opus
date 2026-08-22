@@ -10,6 +10,8 @@ import {
   hasSingleAccountable,
   raciActivitiesInBreach,
   honorairesTotal,
+  honorairesFromStakeholders,
+  isHonorairesType,
   canModifyDecision,
   OPERATION_REQUIRED_INSURANCES,
 } from './rules';
@@ -140,6 +142,18 @@ describe('M7 — honoraires → M4 (RG-M7-09)', () => {
 
   it('aucun contrat actif → zéro', () => {
     expect(honorairesTotal([c('draft', '9000000')], XOF).isZero()).toBe(true);
+  });
+
+  it('honorairesFromStakeholders : services intellectuels comptés, travaux exclus', () => {
+    const stakeholders = [
+      { type: 'moe' as const, feeAmount: 180_000_000 },
+      { type: 'bet' as const, feeAmount: 60_000_000 },
+      { type: 'entreprise' as const, feeAmount: 1_450_000_000 }, // travaux → exclu
+      { type: 'banque' as const, feeAmount: 0 },
+    ];
+    expect(honorairesFromStakeholders(stakeholders, XOF).equals(m('240000000'))).toBe(true);
+    expect(isHonorairesType('moe')).toBe(true);
+    expect(isHonorairesType('entreprise')).toBe(false);
   });
 });
 
