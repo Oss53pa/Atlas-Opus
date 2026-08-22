@@ -1,10 +1,8 @@
-/** Nappe aurora animée (blobs flous) — décor de fond, derrière le contenu. */
+/**
+ * Décor de fond — neutralisé. La direction « Atlas Opus » est plate (crème,
+ * traits et rectangles) : aucune nappe aurora. Composant conservé pour
+ * compat d'import ; ne rend rien.
+ */
 export function Aurora() {
-  return (
-    <div className="ax-aurora-layer" aria-hidden="true">
-      <span className="ax-blob ax-blob--a" />
-      <span className="ax-blob ax-blob--b" />
-      <span className="ax-blob ax-blob--c" />
-    </div>
-  );
+  return null;
 }
