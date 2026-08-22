@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, type MockDb } from './mock';
 import { Money } from '../domain/money/Money';
+import { recettesEncaissees } from '../domain/m6';
 import type { Session } from './repo';
 import { createTelemetry, type Telemetry } from '../lib/telemetry';
 import { evaluateTransition } from '../domain/m1/stateMachine';
@@ -246,6 +247,36 @@ describe('Couche données mock — Gherkin §12', () => {
   it('Financement : isolation tenant', async () => {
     const other = createFinancingRepo(db, sessionFor('tenant-other'), deps(tel));
     expect(await other.list('op-palmiers')).toEqual([]);
+  });
+
+  it('Commercialisation CRUD : unité → réservation → encaissement (RG-M6-02)', async () => {
+    const com = createCommercialisationRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const u = await com.addUnit('op-cosmos', { typology: 'Cellule A', area: 120, price: Money.of(80_000_000, 'XOF') });
+    expect(u.status).toBe('disponible');
+    const s = await com.addSale('op-cosmos', { kind: 'reservation', unitId: u.id, counterpart: 'Enseigne X', amount: Money.of(80_000_000, 'XOF') });
+    expect(s.status).toBe('draft');
+
+    const r1 = await com.addReceipt(s.id, { amount: Money.of(4_000_000, 'XOF'), method: 'virement' });
+    await com.setReceiptStatus(r1.id, 'settled');
+    await com.addReceipt(s.id, { amount: Money.of(1_000_000, 'XOF'), method: 'mobile_money' }); // pending
+    const receipts = await com.receipts(s.id);
+    expect(recettesEncaissees(receipts, 'XOF').equals(Money.of(4_000_000, 'XOF'))).toBe(true);
+
+    await com.removeSale(s.id);
+    expect(await com.receipts(s.id)).toHaveLength(0); // encaissements en cascade
+  });
+
+  it('Commercialisation : parcours seed Palmiers (unité vendue, recettes settled)', async () => {
+    const com = createCommercialisationRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const units = await com.units('op-palmiers');
+    expect(units.some((u) => u.status === 'vendu')).toBe(true);
+    const receipts = await com.receipts('sa-p1');
+    expect(recettesEncaissees(receipts, 'XOF').gt(Money.zero('XOF'))).toBe(true);
+  });
+
+  it('Commercialisation : isolation tenant', async () => {
+    const other = createCommercialisationRepo(db, sessionFor('tenant-other'), deps(tel));
+    expect(await other.units('op-palmiers')).toEqual([]);
   });
 
   it('Financement M5 → bilan M4 : frais_financiers dérivés des tranches débloquées (RG-M5-02)', async () => {

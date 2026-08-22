@@ -29,6 +29,7 @@ import type {
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
+import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, Receipt, ReceiptInput, ReceiptStatus } from '../domain/m6/types';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -52,6 +53,7 @@ import type {
   StakeholdersRepo,
   ComplianceRepo,
   FinancingRepo,
+  CommercialisationRepo,
   PaymentsRepo,
   PlanningRepo,
   TendersRepo,
@@ -85,6 +87,9 @@ export interface MockDb {
   titleDocuments: TitleDocument[];
   financings: Financing[];
   drawdowns: Drawdown[];
+  units: Unit[];
+  sales: Sale[];
+  receipts: Receipt[];
 }
 
 interface Deps {
@@ -291,8 +296,29 @@ export function createMockDb(): MockDb {
     { id: 'dw-p1', tenantId: T, financingId: 'fin-p1', amount: Money.of(600_000_000, 'XOF'), condition: 0.2, status: 'debloque', date: '2026-03-01' },
     { id: 'dw-p2', tenantId: T, financingId: 'fin-p1', amount: Money.of(500_000_000, 'XOF'), condition: 0.5, status: 'demande', date: null },
   ];
+  // Commercialisation (M6) — Palmiers : quelques lots (dispo, réservé, vendu).
+  const VEFA_SCHEDULE = [
+    { key: 'reservation', pct: 0.05 },
+    { key: 'fondations', pct: 0.35 },
+    { key: 'hors_eau', pct: 0.7 },
+    { key: 'livraison', pct: 1.0 },
+  ];
+  const units: Unit[] = [
+    { id: 'un-p1', tenantId: T, operationId: 'op-palmiers', lotId: null, typology: 'T3', area: 78, price: Money.of(42_000_000, 'XOF'), status: 'vendu' },
+    { id: 'un-p2', tenantId: T, operationId: 'op-palmiers', lotId: null, typology: 'T4', area: 96, price: Money.of(55_000_000, 'XOF'), status: 'reserve' },
+    { id: 'un-p3', tenantId: T, operationId: 'op-palmiers', lotId: null, typology: 'T2', area: 54, price: Money.of(31_000_000, 'XOF'), status: 'disponible' },
+  ];
+  const sales: Sale[] = [
+    { id: 'sa-p1', tenantId: T, operationId: 'op-palmiers', kind: 'reservation', unitId: 'un-p1', counterpart: 'M. Traoré', amount: Money.of(42_000_000, 'XOF'), schedule: VEFA_SCHEDULE, status: 'active' },
+    { id: 'sa-p2', tenantId: T, operationId: 'op-palmiers', kind: 'reservation', unitId: 'un-p2', counterpart: 'Mme Bamba', amount: Money.of(55_000_000, 'XOF'), schedule: VEFA_SCHEDULE, status: 'active' },
+  ];
+  const receipts: Receipt[] = [
+    { id: 're-p1', tenantId: T, saleId: 'sa-p1', amount: Money.of(2_100_000, 'XOF'), method: 'virement', status: 'settled', reference: 'VIR-001' },
+    { id: 're-p2', tenantId: T, saleId: 'sa-p1', amount: Money.of(14_700_000, 'XOF'), method: 'virement', status: 'settled', reference: 'VIR-002' },
+    { id: 're-p3', tenantId: T, saleId: 'sa-p2', amount: Money.of(2_750_000, 'XOF'), method: 'mobile_money', status: 'pending', reference: null },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -714,6 +740,78 @@ export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): 
     async removeTitle(tid) {
       const i = db.titleDocuments.findIndex((x) => x.id === tid && x.tenantId === session.tenantId);
       if (i >= 0) db.titleDocuments.splice(i, 1);
+    },
+  };
+}
+
+export function createCommercialisationRepo(db: MockDb, session: Session, deps: Deps): CommercialisationRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <U extends { tenantId: string }>(rows: U[]) => rows.filter((r) => r.tenantId === session.tenantId);
+
+  return {
+    async units(opId) {
+      return mine(db.units).filter((u) => u.operationId === opId).map((u) => ({ ...u }));
+    },
+    async addUnit(opId, input: UnitInput) {
+      const u: Unit = {
+        id: id(), tenantId: session.tenantId, operationId: opId, lotId: input.lotId ?? null,
+        typology: input.typology.trim(), area: input.area, price: input.price, status: 'disponible',
+      };
+      db.units.push(u);
+      return { ...u };
+    },
+    async setUnitStatus(uid, status: UnitStatus) {
+      const u = db.units.find((x) => x.id === uid && x.tenantId === session.tenantId);
+      if (!u) throw new Error('not_found');
+      u.status = status;
+      return { ...u };
+    },
+    async removeUnit(uid) {
+      const i = db.units.findIndex((x) => x.id === uid && x.tenantId === session.tenantId);
+      if (i >= 0) db.units.splice(i, 1);
+    },
+    async sales(opId) {
+      return mine(db.sales).filter((s) => s.operationId === opId).map((s) => ({ ...s }));
+    },
+    async addSale(opId, input: SaleInput) {
+      const s: Sale = {
+        id: id(), tenantId: session.tenantId, operationId: opId, kind: input.kind, unitId: input.unitId ?? null,
+        counterpart: input.counterpart.trim(), amount: input.amount, schedule: input.schedule ?? [], status: 'draft',
+      };
+      db.sales.push(s);
+      return { ...s };
+    },
+    async setSaleStatus(sid, status: SaleStatus) {
+      const s = db.sales.find((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (!s) throw new Error('not_found');
+      s.status = status;
+      return { ...s };
+    },
+    async removeSale(sid) {
+      const i = db.sales.findIndex((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (i >= 0) db.sales.splice(i, 1);
+      db.receipts = db.receipts.filter((r) => r.saleId !== sid);
+    },
+    async receipts(saleId) {
+      return mine(db.receipts).filter((r) => r.saleId === saleId).map((r) => ({ ...r }));
+    },
+    async addReceipt(saleId, input: ReceiptInput) {
+      const r: Receipt = {
+        id: id(), tenantId: session.tenantId, saleId, amount: input.amount, method: input.method,
+        status: 'pending', reference: input.reference ?? null,
+      };
+      db.receipts.push(r);
+      return { ...r };
+    },
+    async setReceiptStatus(rid, status: ReceiptStatus) {
+      const r = db.receipts.find((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (!r) throw new Error('not_found');
+      r.status = status;
+      return { ...r };
+    },
+    async removeReceipt(rid) {
+      const i = db.receipts.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.receipts.splice(i, 1);
     },
   };
 }

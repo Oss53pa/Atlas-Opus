@@ -31,6 +31,17 @@ import type {
 } from '../domain/m2/foncier';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type {
+  Unit,
+  UnitInput,
+  UnitStatus,
+  Sale,
+  SaleInput,
+  SaleStatus,
+  Receipt,
+  ReceiptInput,
+  ReceiptStatus,
+} from '../domain/m6/types';
+import type {
   Financing,
   FinancingInput,
   FinancingStatus,
@@ -113,6 +124,22 @@ export interface StakeholdersRepo {
   add(operationId: string, input: StakeholderInput): Promise<Stakeholder>;
   update(id: string, patch: StakeholderPatch): Promise<Stakeholder>;
   remove(id: string): Promise<void>;
+}
+
+/** Commercialisation (M6) : unités, ventes/baux, encaissements. */
+export interface CommercialisationRepo {
+  units(operationId: string): Promise<Unit[]>;
+  addUnit(operationId: string, input: UnitInput): Promise<Unit>;
+  setUnitStatus(id: string, status: UnitStatus): Promise<Unit>;
+  removeUnit(id: string): Promise<void>;
+  sales(operationId: string): Promise<Sale[]>;
+  addSale(operationId: string, input: SaleInput): Promise<Sale>;
+  setSaleStatus(id: string, status: SaleStatus): Promise<Sale>;
+  removeSale(id: string): Promise<void>;
+  receipts(saleId: string): Promise<Receipt[]>;
+  addReceipt(saleId: string, input: ReceiptInput): Promise<Receipt>;
+  setReceiptStatus(id: string, status: ReceiptStatus): Promise<Receipt>;
+  removeReceipt(id: string): Promise<void>;
 }
 
 /** Financement (M5) : sources & tranches de déblocage. */

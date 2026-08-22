@@ -32,6 +32,7 @@ import type {
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
+import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
@@ -52,7 +53,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, PaymentsRepo, PlanningRepo, TendersRepo } from '../repo';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -952,6 +953,118 @@ export function createSupabaseFinancingRepo(client: SupabaseClient, session: Ses
     },
     async removeDrawdown(id) {
       const { error } = await client.from(DW).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Commercialisation (M6) ───────────────────────────────────────────────────
+interface UnitRow {
+  id: string; tenant_id: string; operation_id: string; lot_id: string | null;
+  typology: string; area: number | string; price: number | string; status: string;
+}
+interface SaleRow {
+  id: string; tenant_id: string; operation_id: string; kind: string; unit_id: string | null;
+  counterpart: string; amount: number | string; schedule: ScheduleStage[] | null; status: string;
+}
+interface ReceiptRow {
+  id: string; tenant_id: string; sale_id: string; amount: number | string;
+  method: string; status: string; reference: string | null;
+}
+function toUnit(r: UnitRow, currency: string): Unit {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, lotId: r.lot_id,
+    typology: r.typology, area: Number(r.area), price: Money.of(Number(r.price), currency), status: r.status as UnitStatus,
+  };
+}
+function toSale(r: SaleRow, currency: string): Sale {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, kind: r.kind as SaleKind, unitId: r.unit_id,
+    counterpart: r.counterpart, amount: Money.of(Number(r.amount), currency), schedule: r.schedule ?? [], status: r.status as SaleStatus,
+  };
+}
+function toReceipt(r: ReceiptRow, currency: string): Receipt {
+  return {
+    id: r.id, tenantId: r.tenant_id, saleId: r.sale_id, amount: Money.of(Number(r.amount), currency),
+    method: r.method as ReceiptMethod, status: r.status as ReceiptStatus, reference: r.reference,
+  };
+}
+
+export function createSupabaseCommercialisationRepo(client: SupabaseClient, session: Session): CommercialisationRepo {
+  const UN = 'ao_units';
+  const SA = 'ao_sales';
+  const RE = 'ao_receipts';
+  const currencyOfOperation = async (opId: string): Promise<string> => {
+    const { data } = await client.from(OPS).select('currency').eq('id', opId).maybeSingle();
+    return data ? (data as { currency: string }).currency : 'XOF';
+  };
+  const currencyOfSale = async (saleId: string): Promise<string> => {
+    const { data } = await client.from(SA).select('operation_id').eq('id', saleId).maybeSingle();
+    return data ? currencyOfOperation((data as { operation_id: string }).operation_id) : 'XOF';
+  };
+
+  return {
+    async units(opId) {
+      const currency = await currencyOfOperation(opId);
+      const rows = unwrap(await client.from(UN).select('*').eq('operation_id', opId).order('created_at')) as UnitRow[];
+      return rows.map((r) => toUnit(r, currency));
+    },
+    async addUnit(opId, input: UnitInput) {
+      const currency = await currencyOfOperation(opId);
+      const row = unwrap(await client.from(UN).insert({
+        tenant_id: session.tenantId, operation_id: opId, lot_id: input.lotId ?? null,
+        typology: input.typology, area: input.area, price: input.price.toMajorNumber(), status: 'disponible',
+      }).select('*').single()) as UnitRow;
+      return toUnit(row, currency);
+    },
+    async setUnitStatus(id, status: UnitStatus) {
+      const row = unwrap(await client.from(UN).update({ status }).eq('id', id).select('*').single()) as UnitRow;
+      return toUnit(row, await currencyOfOperation(row.operation_id));
+    },
+    async removeUnit(id) {
+      const { error } = await client.from(UN).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async sales(opId) {
+      const currency = await currencyOfOperation(opId);
+      const rows = unwrap(await client.from(SA).select('*').eq('operation_id', opId).order('created_at')) as SaleRow[];
+      return rows.map((r) => toSale(r, currency));
+    },
+    async addSale(opId, input: SaleInput) {
+      const currency = await currencyOfOperation(opId);
+      const row = unwrap(await client.from(SA).insert({
+        tenant_id: session.tenantId, operation_id: opId, kind: input.kind, unit_id: input.unitId ?? null,
+        counterpart: input.counterpart, amount: input.amount.toMajorNumber(), schedule: input.schedule ?? [], status: 'draft',
+      }).select('*').single()) as SaleRow;
+      return toSale(row, currency);
+    },
+    async setSaleStatus(id, status: SaleStatus) {
+      const row = unwrap(await client.from(SA).update({ status }).eq('id', id).select('*').single()) as SaleRow;
+      return toSale(row, await currencyOfOperation(row.operation_id));
+    },
+    async removeSale(id) {
+      const { error } = await client.from(SA).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async receipts(saleId) {
+      const currency = await currencyOfSale(saleId);
+      const rows = unwrap(await client.from(RE).select('*').eq('sale_id', saleId).order('created_at')) as ReceiptRow[];
+      return rows.map((r) => toReceipt(r, currency));
+    },
+    async addReceipt(saleId, input: ReceiptInput) {
+      const currency = await currencyOfSale(saleId);
+      const row = unwrap(await client.from(RE).insert({
+        tenant_id: session.tenantId, sale_id: saleId, amount: input.amount.toMajorNumber(),
+        method: input.method, status: 'pending', reference: input.reference ?? null,
+      }).select('*').single()) as ReceiptRow;
+      return toReceipt(row, currency);
+    },
+    async setReceiptStatus(id, status: ReceiptStatus) {
+      const row = unwrap(await client.from(RE).update({ status }).eq('id', id).select('*').single()) as ReceiptRow;
+      return toReceipt(row, await currencyOfSale(row.sale_id));
+    },
+    async removeReceipt(id) {
+      const { error } = await client.from(RE).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
