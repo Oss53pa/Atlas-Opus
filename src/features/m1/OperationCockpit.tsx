@@ -19,6 +19,8 @@ import { locale, t } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
 import { nextPhase } from '../../domain/m1/stateMachine';
 import { countBySeverity, deriveOperationAlerts, type AlertSeverity } from '../../domain/m21';
+import { planTresorerie } from '../../domain/finance/bilan';
+import { Money } from '../../domain/money/Money';
 import { bilanToAlertFacts } from './alerts';
 
 /** Rendu (icône + tonalité) par sévérité d'alerte consolidée. */
@@ -140,7 +142,11 @@ export function OperationCockpit({ id }: { id: string }) {
           </div>
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <PlaceholderWidget icon={<Activity size={16} />} title={t('cockpit.scurve')} />
-            <PlaceholderWidget icon={<Wallet size={16} />} title={t('cockpit.cashflow')} />
+            {bilan && bilan.cashflow.length > 0 ? (
+              <TreasuryWidget flows={bilan.cashflow} currency={op.currency} />
+            ) : (
+              <PlaceholderWidget icon={<Wallet size={16} />} title={t('cockpit.cashflow')} />
+            )}
           </div>
         </Card>
 
@@ -182,6 +188,41 @@ export function OperationCockpit({ id }: { id: string }) {
       </div>
 
       <TransitionDialog op={op} open={transitionOpen} onClose={() => setTransitionOpen(false)} onDone={refetch} />
+    </div>
+  );
+}
+
+/** Plan de trésorerie : courbe cumulée + point bas (besoin de financement). */
+function TreasuryWidget({ flows, currency }: { flows: number[]; currency: string }) {
+  const { cumule, besoinMax, pointBasIndex } = planTresorerie(flows);
+  const max = Math.max(...cumule.map((v) => Math.abs(v)), 1);
+  return (
+    <div className="rounded-md p-3" style={{ background: 'var(--ax-glass-subtle)' }}>
+      <div className="flex items-center justify-between gap-2 text-[13px] text-ink-2">
+        <span className="flex items-center gap-2"><Wallet size={16} className="text-ink-3" />{t('cockpit.cashflow')}</span>
+        <span className="text-[11px]" style={{ color: besoinMax < 0 ? 'var(--ax-danger)' : 'var(--ax-success)' }}>
+          {t('cockpit.treasury.need')} {Money.of(Math.abs(besoinMax), currency).format(locale)}
+        </span>
+      </div>
+      <div className="mt-3 flex items-end gap-1" style={{ height: 56 }} aria-hidden="true">
+        {cumule.map((v, i) => (
+          <span
+            key={i}
+            className="flex-1 rounded-sm"
+            title={Money.of(v, currency).format(locale)}
+            style={{
+              height: `${Math.max(6, (Math.abs(v) / max) * 100)}%`,
+              background:
+                i === pointBasIndex
+                  ? 'var(--ax-danger)'
+                  : v < 0
+                    ? 'color-mix(in srgb, var(--ax-danger) 45%, transparent)'
+                    : 'color-mix(in srgb, var(--ax-accent) 40%, transparent)',
+            }}
+          />
+        ))}
+      </div>
+      <div className="mt-2 text-[11px] text-ink-3">{t('cockpit.treasury.pointBas')}</div>
     </div>
   );
 }

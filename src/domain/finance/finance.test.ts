@@ -9,6 +9,7 @@ import {
   vac,
   amountNet,
   penaliteRetard,
+  planTresorerie,
   type BilanLine,
 } from './bilan';
 import { tri, npv } from './tri';
@@ -36,6 +37,20 @@ describe('Bilan §6', () => {
   it('recettes réalisées (M6) : 0 par défaut, sinon la valeur fournie', () => {
     expect(bilanSummary(lines, X).recettesRealisees.isZero()).toBe(true);
     expect(bilanSummary(lines, X, m('750')).recettesRealisees.equals(m('750'))).toBe(true);
+  });
+  it('plan de trésorerie : cumul + point bas (besoin max)', () => {
+    const { cumule, besoinMax, pointBasIndex } = planTresorerie([-1200, -1300, 1600, 1600, 720]);
+    expect(cumule).toEqual([-1200, -2500, -900, 700, 1420]);
+    expect(besoinMax).toBe(-2500);
+    expect(pointBasIndex).toBe(1);
+  });
+  it('plan de trésorerie : série vide → besoin nul', () => {
+    expect(planTresorerie([])).toEqual({ cumule: [], besoinMax: 0, pointBasIndex: -1 });
+  });
+  it('plan de trésorerie : toujours positive → point bas = premier cumul', () => {
+    const r = planTresorerie([100, 50, 30]);
+    expect(r.besoinMax).toBe(100);
+    expect(r.pointBasIndex).toBe(0);
   });
 });
 

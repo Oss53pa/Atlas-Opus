@@ -567,6 +567,7 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
         summary: bilanSummary(lines, op.currency, realized),
         tri: tri(db.cashflows[opId] ?? []),
         bac: Money.of(op.budgetBac, op.currency),
+        cashflow: db.cashflows[opId] ?? [],
       };
     },
 
