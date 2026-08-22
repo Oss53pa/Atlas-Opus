@@ -8,6 +8,7 @@ import type { DueDiligenceCategory, DueDiligenceSeverity, DueDiligenceStatus } f
 import type { InsuranceType, InsuranceStatus } from '../../domain/m7/types';
 import type { TenureType, AcquisitionStatus, TitleDocType, TitleDocStatus } from '../../domain/m2/foncier';
 import type { FinancingSource, FinancingStatus, DrawdownStatus } from '../../domain/m5/types';
+import type { UnitStatus, SaleKind, SaleStatus, ReceiptStatus } from '../../domain/m6/types';
 import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
 
@@ -261,3 +262,47 @@ export const DRAWDOWN_STATUS_TONE: Record<DrawdownStatus, BadgeTone> = {
 export const financingSourceLabel = (s: FinancingSource) => t(FIN_SOURCE_KEY[s]);
 export const financingStatusLabel = (s: FinancingStatus) => t(FIN_STATUS_KEY[s]);
 export const drawdownStatusLabel = (s: DrawdownStatus) => t(DRAWDOWN_STATUS_KEY[s]);
+
+// ── Commercialisation (M6) ───────────────────────────────────────────────────
+const UNIT_STATUS_KEY: Record<UnitStatus, MessageKey> = {
+  disponible: 'unit.status.disponible',
+  optionne: 'unit.status.optionne',
+  reserve: 'unit.status.reserve',
+  vendu: 'unit.status.vendu',
+  loue: 'unit.status.loue',
+};
+export const UNIT_STATUS_TONE: Record<UnitStatus, BadgeTone> = {
+  disponible: 'neutral',
+  optionne: 'info',
+  reserve: 'warning',
+  vendu: 'success',
+  loue: 'accent',
+};
+const SALE_KIND_KEY: Record<SaleKind, MessageKey> = {
+  reservation: 'sale.kind.reservation',
+  lease: 'sale.kind.lease',
+};
+const SALE_STATUS_KEY: Record<SaleStatus, MessageKey> = {
+  draft: 'sale.status.draft',
+  active: 'sale.status.active',
+  soldee: 'sale.status.soldee',
+  resiliee: 'sale.status.resiliee',
+};
+export const SALE_STATUS_TONE: Record<SaleStatus, BadgeTone> = {
+  draft: 'neutral',
+  active: 'accent',
+  soldee: 'success',
+  resiliee: 'danger',
+};
+const RECEIPT_STATUS_KEY: Record<ReceiptStatus, MessageKey> = {
+  pending: 'receipt.status.pending',
+  settled: 'receipt.status.settled',
+};
+export const RECEIPT_STATUS_TONE: Record<ReceiptStatus, BadgeTone> = {
+  pending: 'neutral',
+  settled: 'success',
+};
+export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
+export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);
+export const saleStatusLabel = (s: SaleStatus) => t(SALE_STATUS_KEY[s]);
+export const receiptStatusLabel = (s: ReceiptStatus) => t(RECEIPT_STATUS_KEY[s]);
