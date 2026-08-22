@@ -147,6 +147,31 @@ export function honorairesTotal(contracts: StakeholderContract[], currency: Curr
   );
 }
 
+/**
+ * Types d'intervenants dont la rémunération relève des honoraires (services
+ * intellectuels), par opposition aux marchés de travaux (entreprise → M8/M15).
+ */
+export const HONORAIRES_STAKEHOLDER_TYPES: StakeholderType[] = ['moe', 'amo', 'bet', 'ct', 'csps'];
+
+export function isHonorairesType(type: StakeholderType): boolean {
+  return HONORAIRES_STAKEHOLDER_TYPES.includes(type);
+}
+
+/**
+ * RG-M7-09 — Honoraires alimentant le poste « honoraires » du bilan (M4),
+ * dérivés des intervenants de services intellectuels (MVP : le montant porté
+ * par l'intervenant). Le montant de l'entreprise (travaux) est exclu.
+ */
+export function honorairesFromStakeholders(
+  items: { type: StakeholderType; feeAmount: number }[],
+  currency: Currency,
+): Money {
+  return sumMoney(
+    items.filter((s) => isHonorairesType(s.type)).map((s) => Money.of(s.feeAmount, currency)),
+    currency,
+  );
+}
+
 /** RG-M7-08 — Le registre est append-only : une décision actée n'est jamais modifiable. */
 export function canModifyDecision(): boolean {
   return false;

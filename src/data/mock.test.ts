@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, type MockDb } from './mock';
 import type { Session } from './repo';
 import { createTelemetry, type Telemetry } from '../lib/telemetry';
 import { evaluateTransition } from '../domain/m1/stateMachine';
@@ -190,5 +190,23 @@ describe('Couche données mock — Gherkin §12', () => {
   it('CRUD conformité : isolation tenant sur les autorisations', async () => {
     const other = createComplianceRepo(db, sessionFor('tenant-other'), deps(tel));
     expect(await other.authorizations('op-palmiers')).toEqual([]);
+  });
+
+  it('Honoraires M7 → bilan M4 : poste honoraires dérivé des intervenants (RG-M7-09)', async () => {
+    const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
+    // Palmiers : MOE 180M + BET 60M = 240M honoraires ; entreprise 1450M exclue (travaux).
+    const lines = await bilan.lines('op-palmiers');
+    const hono = lines.filter((l) => l.kind === 'cost' && l.poste === 'honoraires');
+    expect(hono).toHaveLength(1);
+    expect(hono[0].amountPlanned).toBe(240_000_000);
+  });
+
+  it('Honoraires M7 → bilan M4 : ajouter un intervenant met à jour le poste', async () => {
+    const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const stakeholders = createStakeholdersRepo(db, sessionFor('tenant-demo'), deps(tel));
+    await stakeholders.add('op-palmiers', { type: 'amo', name: 'AMO Conseil', feeAmount: 40_000_000 });
+    const lines = await bilan.lines('op-palmiers');
+    const hono = lines.find((l) => l.kind === 'cost' && l.poste === 'honoraires')!;
+    expect(hono.amountPlanned).toBe(280_000_000); // 240M + 40M
   });
 });
