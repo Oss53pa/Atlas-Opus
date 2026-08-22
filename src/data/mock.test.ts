@@ -192,6 +192,36 @@ describe('Couche données mock — Gherkin §12', () => {
     expect(await other.authorizations('op-palmiers')).toEqual([]);
   });
 
+  it('Foncier : ajout parcelle (prospection), titres, suppression cascade', async () => {
+    const compliance = createComplianceRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const p = await compliance.addLandParcel('op-cosmos', { reference: 'TF-NEW', area: 1000, tenureType: 'titre_foncier', price: 10_000_000 });
+    expect(p.acquisitionStatus).toBe('prospection');
+
+    const td = await compliance.addTitle(p.id, { docType: 'acte_notarie', reference: 'AN-1' });
+    expect(td.status).toBe('pending');
+    const verified = await compliance.setTitleStatus(td.id, 'verified');
+    expect(verified.status).toBe('verified');
+    expect(await compliance.titles(p.id)).toHaveLength(1);
+
+    await compliance.removeLandParcel(p.id);
+    expect((await compliance.landParcels('op-cosmos')).some((x) => x.id === p.id)).toBe(false);
+    expect(await compliance.titles(p.id)).toHaveLength(0); // titres en cascade
+  });
+
+  it('Foncier : parcelle Palmiers seedée « acquis » avec acte notarié vérifié', async () => {
+    const compliance = createComplianceRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const parcels = await compliance.landParcels('op-palmiers');
+    expect(parcels).toHaveLength(1);
+    expect(parcels[0].acquisitionStatus).toBe('acquis');
+    const titles = await compliance.titles(parcels[0].id);
+    expect(titles.some((td) => td.docType === 'acte_notarie' && td.status === 'verified')).toBe(true);
+  });
+
+  it('Foncier : isolation tenant sur les parcelles', async () => {
+    const other = createComplianceRepo(db, sessionFor('tenant-other'), deps(tel));
+    expect(await other.landParcels('op-palmiers')).toEqual([]);
+  });
+
   it('Honoraires M7 → bilan M4 : poste honoraires dérivé des intervenants (RG-M7-09)', async () => {
     const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
     // Palmiers : MOE 180M + BET 60M = 240M honoraires ; entreprise 1450M exclue (travaux).

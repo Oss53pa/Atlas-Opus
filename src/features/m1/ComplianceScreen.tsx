@@ -39,6 +39,7 @@ import {
 } from '../../domain/m2/dueDiligence';
 import { doGate, insuranceStatus } from '../../domain/m7/rules';
 import { INSURANCE_TYPES, type Insurance, type InsuranceType } from '../../domain/m7/types';
+import { FoncierSection } from './FoncierSection';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -161,6 +162,9 @@ export function ComplianceScreen({ id }: { id: string }) {
         <GateChip ok={permitOk} label={t('compliance.gate.permit')} />
         <GateChip ok={doOk} label={t('compliance.gate.do')} />
       </div>
+
+      {/* ── Dossier foncier ── */}
+      <FoncierSection operationId={id} currency={op?.currency ?? 'XOF'} canEdit={canEdit} />
 
       {/* ── Autorisations ── */}
       <Card tone="strong">

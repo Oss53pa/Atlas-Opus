@@ -21,6 +21,14 @@ import type { Money } from '../domain/money/Money';
 import type { Stakeholder, StakeholderInput, StakeholderPatch } from '../domain/m2/types';
 import type { Authorization, AuthorizationInput, AuthorizationStatus } from '../domain/m2/authorizations';
 import type { DueDiligenceItem, DueDiligenceInput, DueDiligenceStatus } from '../domain/m2/dueDiligence';
+import type {
+  LandParcel,
+  LandParcelInput,
+  AcquisitionStatus,
+  TitleDocument,
+  TitleDocumentInput,
+  TitleDocStatus,
+} from '../domain/m2/foncier';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
@@ -112,6 +120,15 @@ export interface ComplianceRepo {
   addDueDiligence(operationId: string, input: DueDiligenceInput): Promise<DueDiligenceItem>;
   setDueDiligenceStatus(id: string, status: DueDiligenceStatus): Promise<DueDiligenceItem>;
   removeDueDiligence(id: string): Promise<void>;
+  // Dossier foncier (M2) : parcelles + titres + machine d'acquisition.
+  landParcels(operationId: string): Promise<LandParcel[]>;
+  addLandParcel(operationId: string, input: LandParcelInput): Promise<LandParcel>;
+  setAcquisitionStatus(id: string, status: AcquisitionStatus): Promise<LandParcel>;
+  removeLandParcel(id: string): Promise<void>;
+  titles(parcelId: string): Promise<TitleDocument[]>;
+  addTitle(parcelId: string, input: TitleDocumentInput): Promise<TitleDocument>;
+  setTitleStatus(id: string, status: TitleDocStatus): Promise<TitleDocument>;
+  removeTitle(id: string): Promise<void>;
 }
 
 export interface TendersRepo {

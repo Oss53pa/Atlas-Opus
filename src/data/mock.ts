@@ -18,6 +18,14 @@ import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
 import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationStatus } from '../domain/m2/authorizations';
 import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus } from '../domain/m2/dueDiligence';
+import type {
+  LandParcel,
+  LandParcelInput,
+  AcquisitionStatus,
+  TitleDocument,
+  TitleDocumentInput,
+  TitleDocStatus,
+} from '../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
@@ -70,6 +78,8 @@ export interface MockDb {
   authorizations: Authorization[];
   insurances: Insurance[];
   dueDiligence: DueDiligenceItem[];
+  landParcels: LandParcel[];
+  titleDocuments: TitleDocument[];
 }
 
 interface Deps {
@@ -257,8 +267,18 @@ export function createMockDb(): MockDb {
     { id: 'dd-r1', tenantId: T, operationId: 'op-riviera', category: 'litige', finding: 'Litige de bornage avec parcelle voisine', severity: 'critical', status: 'open' },
     { id: 'dd-p1', tenantId: T, operationId: 'op-palmiers', category: 'servitude', finding: 'Servitude de passage régularisée', severity: 'high', status: 'cleared' },
   ];
+  // Dossier foncier (M2) — Palmiers : parcelle acquise avec acte notarié vérifié ;
+  // Cosmos : sous promesse avec condition suspensive restante.
+  const landParcels: LandParcel[] = [
+    { id: 'lp-p1', tenantId: T, operationId: 'op-palmiers', reference: 'TF 12345/PLATEAU', area: 4200, tenureType: 'titre_foncier', price: 520_000_000, acquisitionStatus: 'acquis', notary: 'Me Kouamé', suspensiveConditions: [] },
+    { id: 'lp-c1', tenantId: T, operationId: 'op-cosmos', reference: 'TF 78901/COCODY', area: 6800, tenureType: 'titre_foncier', price: 1_200_000_000, acquisitionStatus: 'sous_promesse', notary: 'Me Diabaté', suspensiveConditions: ['Purge des droits coutumiers'] },
+  ];
+  const titleDocuments: TitleDocument[] = [
+    { id: 'td-lp1a', tenantId: T, parcelId: 'lp-p1', docType: 'titre_foncier', reference: 'TF 12345', status: 'verified', fileRef: null },
+    { id: 'td-lp1b', tenantId: T, parcelId: 'lp-p1', docType: 'acte_notarie', reference: 'AN-2026-0087', status: 'verified', fileRef: null },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -621,6 +641,52 @@ export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): 
     async removeDueDiligence(did) {
       const i = db.dueDiligence.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
       if (i >= 0) db.dueDiligence.splice(i, 1);
+    },
+
+    async landParcels(opId) {
+      return mine(db.landParcels).filter((p) => p.operationId === opId).map((p) => ({ ...p }));
+    },
+    async addLandParcel(opId, input: LandParcelInput) {
+      const p: LandParcel = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        reference: input.reference.trim(), area: input.area, tenureType: input.tenureType, price: input.price,
+        acquisitionStatus: 'prospection', notary: input.notary ?? null, suspensiveConditions: input.suspensiveConditions ?? [],
+      };
+      db.landParcels.push(p);
+      return { ...p };
+    },
+    async setAcquisitionStatus(pid, status: AcquisitionStatus) {
+      const p = db.landParcels.find((x) => x.id === pid && x.tenantId === session.tenantId);
+      if (!p) throw new Error('not_found');
+      p.acquisitionStatus = status;
+      return { ...p };
+    },
+    async removeLandParcel(pid) {
+      const i = db.landParcels.findIndex((x) => x.id === pid && x.tenantId === session.tenantId);
+      if (i >= 0) db.landParcels.splice(i, 1);
+      // Titres orphelins supprimés en cascade (comme la FK on delete cascade).
+      db.titleDocuments = db.titleDocuments.filter((x) => x.parcelId !== pid);
+    },
+    async titles(parcelId) {
+      return mine(db.titleDocuments).filter((tdoc) => tdoc.parcelId === parcelId).map((tdoc) => ({ ...tdoc }));
+    },
+    async addTitle(parcelId, input: TitleDocumentInput) {
+      const tdoc: TitleDocument = {
+        id: id(), tenantId: session.tenantId, parcelId,
+        docType: input.docType, reference: input.reference.trim(), status: 'pending', fileRef: input.fileRef ?? null,
+      };
+      db.titleDocuments.push(tdoc);
+      return { ...tdoc };
+    },
+    async setTitleStatus(tid, status: TitleDocStatus) {
+      const tdoc = db.titleDocuments.find((x) => x.id === tid && x.tenantId === session.tenantId);
+      if (!tdoc) throw new Error('not_found');
+      tdoc.status = status;
+      return { ...tdoc };
+    },
+    async removeTitle(tid) {
+      const i = db.titleDocuments.findIndex((x) => x.id === tid && x.tenantId === session.tenantId);
+      if (i >= 0) db.titleDocuments.splice(i, 1);
     },
   };
 }

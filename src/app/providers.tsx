@@ -27,6 +27,7 @@ import type {
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
 import type { DueDiligenceItem } from '../domain/m2/dueDiligence';
+import type { LandParcel, TitleDocument } from '../domain/m2/foncier';
 import type { Insurance } from '../domain/m7/types';
 import type { Contract, Decompte } from '../domain/payments/types';
 import type { Task } from '../domain/m12/types';
@@ -223,6 +224,16 @@ export function useInsurances(operationId: string): AsyncState<Insurance[]> {
 export function useDueDiligence(operationId: string): AsyncState<DueDiligenceItem[]> {
   const { compliance } = useData();
   return useAsync(() => compliance.dueDiligence(operationId), [compliance, operationId]);
+}
+
+export function useLandParcels(operationId: string): AsyncState<LandParcel[]> {
+  const { compliance } = useData();
+  return useAsync(() => compliance.landParcels(operationId), [compliance, operationId]);
+}
+
+export function useTitles(parcelId: string): AsyncState<TitleDocument[]> {
+  const { compliance } = useData();
+  return useAsync(() => compliance.titles(parcelId), [compliance, parcelId]);
 }
 
 export function useContracts(operationId: string): AsyncState<Contract[]> {

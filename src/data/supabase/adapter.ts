@@ -19,6 +19,16 @@ import type {
 import type { TransitionContext } from '../../domain/m1/stateMachine';
 import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
 import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus, type DueDiligenceCategory, type DueDiligenceSeverity } from '../../domain/m2/dueDiligence';
+import type {
+  LandParcel,
+  LandParcelInput,
+  AcquisitionStatus,
+  TenureType,
+  TitleDocument,
+  TitleDocumentInput,
+  TitleDocType,
+  TitleDocStatus,
+} from '../../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import type { Insurance, InsuranceInput, InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
@@ -691,10 +701,36 @@ function toDueDiligence(r: DueDiligenceRow): DueDiligenceItem {
   };
 }
 
+interface LandParcelRow {
+  id: string; tenant_id: string; operation_id: string;
+  reference: string; area: number | string; tenure_type: string; price: number | string;
+  acquisition_status: string; notary: string | null; suspensive_conditions: string[] | null;
+}
+interface TitleDocumentRow {
+  id: string; tenant_id: string; parcel_id: string;
+  doc_type: string; reference: string; status: string; file_ref: string | null;
+}
+function toLandParcel(r: LandParcelRow): LandParcel {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    reference: r.reference, area: Number(r.area), tenureType: r.tenure_type as TenureType, price: Number(r.price),
+    acquisitionStatus: r.acquisition_status as AcquisitionStatus, notary: r.notary,
+    suspensiveConditions: r.suspensive_conditions ?? [],
+  };
+}
+function toTitleDocument(r: TitleDocumentRow): TitleDocument {
+  return {
+    id: r.id, tenantId: r.tenant_id, parcelId: r.parcel_id,
+    docType: r.doc_type as TitleDocType, reference: r.reference, status: r.status as TitleDocStatus, fileRef: r.file_ref,
+  };
+}
+
 export function createSupabaseComplianceRepo(client: SupabaseClient, session: Session): ComplianceRepo {
   const AUTHT = 'ao_authorizations';
   const INST = 'ao_insurances';
   const DDT = 'ao_due_diligence_items';
+  const LPT = 'ao_land_parcels';
+  const TDT = 'ao_title_documents';
   return {
     async authorizations(opId) {
       const rows = unwrap(await client.from(AUTHT).select('*').eq('operation_id', opId).order('created_at')) as AuthorizationRow[];
@@ -756,6 +792,51 @@ export function createSupabaseComplianceRepo(client: SupabaseClient, session: Se
     },
     async removeDueDiligence(id) {
       const { error } = await client.from(DDT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+
+    async landParcels(opId) {
+      const rows = unwrap(await client.from(LPT).select('*').eq('operation_id', opId).order('created_at')) as LandParcelRow[];
+      return rows.map(toLandParcel);
+    },
+    async addLandParcel(opId, input: LandParcelInput) {
+      const row = unwrap(
+        await client.from(LPT).insert({
+          tenant_id: session.tenantId, operation_id: opId,
+          reference: input.reference, area: input.area, tenure_type: input.tenureType, price: input.price,
+          acquisition_status: 'prospection', notary: input.notary ?? null,
+          suspensive_conditions: input.suspensiveConditions ?? [],
+        }).select('*').single(),
+      ) as LandParcelRow;
+      return toLandParcel(row);
+    },
+    async setAcquisitionStatus(id, status: AcquisitionStatus) {
+      const row = unwrap(await client.from(LPT).update({ acquisition_status: status }).eq('id', id).select('*').single()) as LandParcelRow;
+      return toLandParcel(row);
+    },
+    async removeLandParcel(id) {
+      const { error } = await client.from(LPT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async titles(parcelId) {
+      const rows = unwrap(await client.from(TDT).select('*').eq('parcel_id', parcelId).order('created_at')) as TitleDocumentRow[];
+      return rows.map(toTitleDocument);
+    },
+    async addTitle(parcelId, input: TitleDocumentInput) {
+      const row = unwrap(
+        await client.from(TDT).insert({
+          tenant_id: session.tenantId, parcel_id: parcelId,
+          doc_type: input.docType, reference: input.reference, status: 'pending', file_ref: input.fileRef ?? null,
+        }).select('*').single(),
+      ) as TitleDocumentRow;
+      return toTitleDocument(row);
+    },
+    async setTitleStatus(id, status: TitleDocStatus) {
+      const row = unwrap(await client.from(TDT).update({ status }).eq('id', id).select('*').single()) as TitleDocumentRow;
+      return toTitleDocument(row);
+    },
+    async removeTitle(id) {
+      const { error } = await client.from(TDT).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
