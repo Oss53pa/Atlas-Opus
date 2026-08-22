@@ -27,6 +27,8 @@ import type {
   TitleDocStatus,
 } from '../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
+import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
+import type { Financing, Drawdown } from '../domain/m5/types';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -80,6 +82,8 @@ export interface MockDb {
   dueDiligence: DueDiligenceItem[];
   landParcels: LandParcel[];
   titleDocuments: TitleDocument[];
+  financings: Financing[];
+  drawdowns: Drawdown[];
 }
 
 interface Deps {
@@ -277,8 +281,17 @@ export function createMockDb(): MockDb {
     { id: 'td-lp1a', tenantId: T, parcelId: 'lp-p1', docType: 'titre_foncier', reference: 'TF 12345', status: 'verified', fileRef: null },
     { id: 'td-lp1b', tenantId: T, parcelId: 'lp-p1', docType: 'acte_notarie', reference: 'AN-2026-0087', status: 'verified', fileRef: null },
   ];
+  // Financement (M5) — Palmiers : crédit promoteur avec deux tranches débloquées
+  // (alimentent les frais_financiers du bilan, RG-M5-02).
+  const financings: Financing[] = [
+    { id: 'fin-p1', tenantId: T, operationId: 'op-palmiers', source: 'credit_promoteur', amount: Money.of(1_500_000_000, 'XOF'), rate: 0.09, status: 'en_cours' },
+  ];
+  const drawdowns: Drawdown[] = [
+    { id: 'dw-p1', tenantId: T, financingId: 'fin-p1', amount: Money.of(600_000_000, 'XOF'), condition: 0.2, status: 'debloque', date: '2026-03-01' },
+    { id: 'dw-p2', tenantId: T, financingId: 'fin-p1', amount: Money.of(500_000_000, 'XOF'), condition: 0.5, status: 'demande', date: null },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -480,23 +493,37 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
     id: b.id, operationId: b.operationId, kind: b.kind, poste: b.poste,
     amountPlanned: b.amountPlanned, amountActual: b.amountActual,
   });
-  // RG-M7-09 — honoraires dérivés des intervenants (source de vérité M7),
-  // supersèdent toute ligne « honoraires » saisie manuellement.
+  const today = () => (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
+  // Postes dérivés (source de vérité hors bilan) : honoraires (M7) et
+  // frais_financiers (M5). Ils supersèdent toute ligne saisie manuellement.
+  const DERIVED_POSTES = ['honoraires', 'frais_financiers'];
   const honoraires = (opId: string, currency: string) =>
     honorairesFromStakeholders(
       db.stakeholders.filter((s) => s.operationId === opId && s.tenantId === session.tenantId),
       currency,
     );
-  const nonHonorairesSeeds = (opId: string) =>
-    seeds(opId).filter((b) => !(b.kind === 'cost' && b.poste === 'honoraires'));
+  const fraisFinanciers = (opId: string, currency: string) => {
+    const finIds = db.financings.filter((f) => f.operationId === opId && f.tenantId === session.tenantId);
+    const rateById = new Map(finIds.map((f) => [f.id, f.rate]));
+    const items = db.drawdowns
+      .filter((d) => d.tenantId === session.tenantId && rateById.has(d.financingId))
+      .map((d) => ({ amount: d.amount, rate: rateById.get(d.financingId) ?? 0, date: d.date, status: d.status }));
+    return fraisFinanciersFromDrawdowns(items, today(), currency);
+  };
+  const derivedCostLines = (opId: string, currency: string): { poste: string; amount: Money }[] =>
+    [
+      { poste: 'honoraires', amount: honoraires(opId, currency) },
+      { poste: 'frais_financiers', amount: fraisFinanciers(opId, currency) },
+    ].filter((l) => !l.amount.isZero());
+  const nonDerivedSeeds = (opId: string) =>
+    seeds(opId).filter((b) => !(b.kind === 'cost' && DERIVED_POSTES.includes(b.poste)));
 
   return {
     async summary(opId): Promise<BilanView | null> {
       const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
       if (!op) return null;
-      const lines: BilanLine[] = nonHonorairesSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
-      const hono = honoraires(opId, op.currency);
-      if (!hono.isZero()) lines.push({ kind: 'cost', amount: hono });
+      const lines: BilanLine[] = nonDerivedSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
+      for (const d of derivedCostLines(opId, op.currency)) lines.push({ kind: 'cost', amount: d.amount });
       return {
         summary: bilanSummary(lines, op.currency),
         tri: tri(db.cashflows[opId] ?? []),
@@ -507,11 +534,10 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
     async lines(opId) {
       const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
       const currency = op?.currency ?? 'XOF';
-      const records = nonHonorairesSeeds(opId).map(toRecord);
-      const hono = honoraires(opId, currency);
-      if (!hono.isZero()) {
-        const amount = hono.toMajorNumber();
-        records.push({ id: `honoraires-m7-${opId}`, operationId: opId, kind: 'cost', poste: 'honoraires', amountPlanned: amount, amountActual: amount });
+      const records = nonDerivedSeeds(opId).map(toRecord);
+      for (const d of derivedCostLines(opId, currency)) {
+        const amount = d.amount.toMajorNumber();
+        records.push({ id: `${d.poste}-derived-${opId}`, operationId: opId, kind: 'cost', poste: d.poste, amountPlanned: amount, amountActual: amount });
       }
       return records;
     },
