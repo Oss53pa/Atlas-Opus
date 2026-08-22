@@ -185,6 +185,7 @@ export const fr = {
   // ── Libellés de conditions de garde (§4) ────────────────────────────────
   'op.transition.cond.programValidated': 'Au moins un item de programme validé',
   'op.transition.cond.bilanInitialized': 'Bilan prévisionnel initialisé (M4)',
+  'op.transition.cond.ddCleared': 'Due diligence sans réserve critique (M2)',
   'op.transition.cond.dceReady': 'Au moins un marché à lancer défini (M8)',
   'op.transition.cond.marketNotified': 'Au moins un marché notifié (M8)',
   'op.transition.cond.permitGranted': 'Permis de construire accordé (M2)',

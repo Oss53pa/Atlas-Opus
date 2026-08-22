@@ -120,6 +120,31 @@ describe('Couche données mock — Gherkin §12', () => {
     expect(cosmos.doInsuranceValid).toBe(false);
   });
 
+  it('Garde DD (M2) dérivée : Riviera bloquée par litige critique, Palmiers levée', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+    // op-riviera : litige « critical » ouvert → DD non levée.
+    expect((await ops.getTransitionContext('op-riviera')).ddCleared).toBe(false);
+    // op-palmiers : seule réserve « high » déjà « cleared » → DD levée.
+    expect((await ops.getTransitionContext('op-palmiers')).ddCleared).toBe(true);
+  });
+
+  it('Une DD critique ouverte bloque amont → conception (RG-M2-03)', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const ctx = await ops.getTransitionContext('op-riviera');
+    const d = evaluateTransition(
+      'amont',
+      'conception',
+      { ...ctx, validatedProgramItems: 1, bilanInitialized: true },
+      { role: 'moa_director' },
+    );
+    expect(d.ok).toBe(false);
+    if (!d.ok && d.code === 'guard_unmet') {
+      expect(d.missing).toContain('op.transition.cond.ddCleared');
+    } else {
+      throw new Error('attendu guard_unmet');
+    }
+  });
+
   it('Une opération sans permis ni DO ne peut pas passer en réalisation', async () => {
     const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
     const ctx = await ops.getTransitionContext('op-cosmos');

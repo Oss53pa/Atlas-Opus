@@ -18,6 +18,7 @@ import type {
 } from '../../domain/m1/types';
 import type { TransitionContext } from '../../domain/m1/stateMachine';
 import { permitGate, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
+import { ddGate, type DueDiligenceItem } from '../../domain/m2/dueDiligence';
 import { doGate } from '../../domain/m7/rules';
 import type { InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
@@ -53,6 +54,7 @@ const OPS = 'ao_operations';
 const ITEMS = 'ao_program_items';
 const AUTH = 'ao_authorizations';
 const INS = 'ao_insurances';
+const DD = 'ao_due_diligence_items';
 
 /** Date du jour (ISO YYYY-MM-DD) pour l'évaluation des gardes d'échéance. */
 function todayIso(): string {
@@ -62,6 +64,7 @@ function todayIso(): string {
 const emptyCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
   validatedProgramItems: 0,
   bilanInitialized: false,
+  ddCleared: true,
   marketsToLaunch: 0,
   marketsNotified: 0,
   permitGranted: false,
@@ -145,6 +148,13 @@ export function createSupabaseOperationsRepo(
       validTo: r.valid_to,
     }));
     return doGate(rows, todayIso()).ok;
+  };
+
+  // RG-M2-03 — garde DD dérivée de ao_due_diligence_items via le domaine M2.
+  const ddClearedFor = async (opId: string): Promise<boolean> => {
+    const { data } = await client.from(DD).select('id,severity,status').eq('operation_id', opId);
+    const rows = (data ?? []) as DueDiligenceItem[];
+    return ddGate(rows).ok;
   };
 
   return {
@@ -235,13 +245,14 @@ export function createSupabaseOperationsRepo(
 
     async getTransitionContext(id) {
       // M4/M8/M11 non branchés en base ; bilanInitialized faux pour l'instant.
-      // Gardes M2 (permis) et M7 (DO) dérivées des tables authorizations/insurances.
-      const [validatedProgramItems, permitGranted, doInsuranceValid] = await Promise.all([
+      // Gardes M2 (permis, DD) et M7 (DO) dérivées des tables dédiées.
+      const [validatedProgramItems, permitGranted, doInsuranceValid, ddCleared] = await Promise.all([
         validatedCount(id),
         permitGrantedFor(id),
         doInsuranceValidFor(id),
+        ddClearedFor(id),
       ]);
-      return emptyCtx({ validatedProgramItems, permitGranted, doInsuranceValid });
+      return emptyCtx({ validatedProgramItems, permitGranted, doInsuranceValid, ddCleared });
     },
 
     async setPhase(id, to: Phase) {

@@ -10,6 +10,7 @@ import { PHASES, type Phase, type Role } from './types';
 export interface TransitionContext {
   validatedProgramItems: number; // M1/program
   bilanInitialized: boolean; // M4
+  ddCleared: boolean; // M2 — aucun item DD critical/high ouvert (RG-M2-03, via ddGate)
   marketsToLaunch: number; // M8 (DCE prêt)
   marketsNotified: number; // M8
   permitGranted: boolean; // M2 — permis de construire « granted » (RG-M2-07)
@@ -33,6 +34,7 @@ const FORWARD: Partial<Record<Phase, { to: Phase; conditions: Condition[] }>> = 
     conditions: [
       { key: 'op.transition.cond.programValidated', ok: (c) => c.validatedProgramItems >= 1 },
       { key: 'op.transition.cond.bilanInitialized', ok: (c) => c.bilanInitialized },
+      { key: 'op.transition.cond.ddCleared', ok: (c) => c.ddCleared }, // M2 (RG-M2-03)
     ],
   },
   conception: {

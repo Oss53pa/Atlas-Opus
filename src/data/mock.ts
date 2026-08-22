@@ -17,6 +17,7 @@ import type { TransitionContext } from '../domain/m1/stateMachine';
 import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
 import { permitGate, type Authorization } from '../domain/m2/authorizations';
+import { ddGate, type DueDiligenceItem } from '../domain/m2/dueDiligence';
 import { doGate } from '../domain/m7/rules';
 import type { InsuranceType } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
@@ -67,6 +68,7 @@ export interface MockDb {
   tenders: Tender[];
   authorizations: Authorization[];
   insurances: MockInsurance[];
+  dueDiligence: DueDiligenceItem[];
 }
 
 /** Assurance simplifiée pour la garde DO (M7) : le statut est dérivé de valid_to. */
@@ -87,6 +89,7 @@ interface Deps {
 const defaultCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
   validatedProgramItems: 0,
   bilanInitialized: false,
+  ddCleared: true,
   marketsToLaunch: 0,
   marketsNotified: 0,
   permitGranted: false,
@@ -256,8 +259,14 @@ export function createMockDb(): MockDb {
     { id: 'in-p1', tenantId: T, operationId: 'op-palmiers', type: 'DO', validTo: '2030-12-31' },
     { id: 'in-p2', tenantId: T, operationId: 'op-palmiers', type: 'decennale', validTo: '2030-12-31' },
   ];
+  // Due diligence (M2) — Riviera : litige « critical » ouvert (bloque conception, RG-M2-03).
+  // Palmiers : réserve « high » levée → non bloquante.
+  const dueDiligence: DueDiligenceItem[] = [
+    { id: 'dd-r1', tenantId: T, operationId: 'op-riviera', category: 'litige', finding: 'Litige de bornage avec parcelle voisine', severity: 'critical', status: 'open' },
+    { id: 'dd-p1', tenantId: T, operationId: 'op-palmiers', category: 'servitude', finding: 'Servitude de passage régularisée', severity: 'high', status: 'cleared' },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -349,16 +358,18 @@ export function createOperationsRepo(db: MockDb, session: Session, deps: Deps): 
     async getTransitionContext(opId) {
       const base = db.ctx[opId] ?? defaultCtx({});
       const hasBilan = db.bilan.some((b) => b.operationId === opId && b.tenantId === session.tenantId);
-      // Gardes M2 (permis) et M7 (DO) dérivées des collections, comme en base (adapter Supabase).
+      // Gardes M2 (permis, DD) et M7 (DO) dérivées des collections, comme en base (adapter Supabase).
       const today = (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
       const auths = db.authorizations.filter((a) => a.operationId === opId && a.tenantId === session.tenantId);
       const inss = db.insurances.filter((i) => i.operationId === opId && i.tenantId === session.tenantId);
+      const dds = db.dueDiligence.filter((d) => d.operationId === opId && d.tenantId === session.tenantId);
       return {
         ...base,
         validatedProgramItems: validatedCount(opId),
         bilanInitialized: hasBilan,
         permitGranted: permitGate(auths, today).ok,
         doInsuranceValid: doGate(inss, today).ok,
+        ddCleared: ddGate(dds).ok,
       };
     },
 
