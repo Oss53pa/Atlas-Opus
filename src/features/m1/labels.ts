@@ -3,6 +3,9 @@ import { getCountry } from '../../domain/country';
 import { posteKey } from '../../domain/finance/postes';
 import type { OpType, OperationStatus, Phase, ProgramCategory } from '../../domain/m1/types';
 import type { StakeholderType } from '../../domain/m2/types';
+import type { AuthorizationType, AuthorizationStatus } from '../../domain/m2/authorizations';
+import type { DueDiligenceCategory, DueDiligenceSeverity, DueDiligenceStatus } from '../../domain/m2/dueDiligence';
+import type { InsuranceType, InsuranceStatus } from '../../domain/m7/types';
 import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
 
@@ -114,3 +117,73 @@ export const countryLabel = (code: string) => {
   const c = getCountry(code);
   return c ? t(c.nameKey as MessageKey) : code;
 };
+
+// ── Conformité & gardes M1 (M2 autorisations/DD, M7 assurances) ──────────────
+const AUTH_TYPE_KEY: Record<AuthorizationType, MessageKey> = {
+  permis_construire: 'auth.type.permis_construire',
+  autorisation_env: 'auth.type.autorisation_env',
+  conformite: 'auth.type.conformite',
+};
+const AUTH_STATUS_KEY: Record<AuthorizationStatus, MessageKey> = {
+  draft: 'auth.status.draft',
+  submitted: 'auth.status.submitted',
+  granted: 'auth.status.granted',
+  refused: 'auth.status.refused',
+};
+export const AUTH_STATUS_TONE: Record<AuthorizationStatus, BadgeTone> = {
+  draft: 'neutral',
+  submitted: 'info',
+  granted: 'success',
+  refused: 'danger',
+};
+export const authorizationTypeLabel = (a: AuthorizationType) => t(AUTH_TYPE_KEY[a]);
+export const authorizationStatusLabel = (s: AuthorizationStatus) => t(AUTH_STATUS_KEY[s]);
+
+const INS_TYPE_KEY: Record<InsuranceType, MessageKey> = {
+  DO: 'ins.type.DO',
+  decennale: 'ins.type.decennale',
+  RC: 'ins.type.RC',
+  TRC: 'ins.type.TRC',
+  RC_pro: 'ins.type.RC_pro',
+};
+const INS_STATUS_KEY: Record<InsuranceStatus, MessageKey> = {
+  valid: 'ins.status.valid',
+  expiring: 'ins.status.expiring',
+  expired: 'ins.status.expired',
+  missing: 'ins.status.missing',
+};
+export const INS_STATUS_TONE: Record<InsuranceStatus, BadgeTone> = {
+  valid: 'success',
+  expiring: 'warning',
+  expired: 'danger',
+  missing: 'neutral',
+};
+export const insuranceTypeLabel = (i: InsuranceType) => t(INS_TYPE_KEY[i]);
+export const insuranceStatusLabel = (s: InsuranceStatus) => t(INS_STATUS_KEY[s]);
+
+const DD_CAT_KEY: Record<DueDiligenceCategory, MessageKey> = {
+  servitude: 'dd.cat.servitude',
+  litige: 'dd.cat.litige',
+  hypotheque: 'dd.cat.hypotheque',
+  bornage: 'dd.cat.bornage',
+  conformite: 'dd.cat.conformite',
+};
+const DD_SEV_KEY: Record<DueDiligenceSeverity, MessageKey> = {
+  low: 'dd.sev.low',
+  medium: 'dd.sev.medium',
+  high: 'dd.sev.high',
+  critical: 'dd.sev.critical',
+};
+export const DD_SEV_TONE: Record<DueDiligenceSeverity, BadgeTone> = {
+  low: 'neutral',
+  medium: 'info',
+  high: 'warning',
+  critical: 'danger',
+};
+const DD_STATUS_KEY: Record<DueDiligenceStatus, MessageKey> = {
+  open: 'dd.status.open',
+  cleared: 'dd.status.cleared',
+};
+export const ddCategoryLabel = (c: DueDiligenceCategory) => t(DD_CAT_KEY[c]);
+export const ddSeverityLabel = (s: DueDiligenceSeverity) => t(DD_SEV_KEY[s]);
+export const ddStatusLabel = (s: DueDiligenceStatus) => t(DD_STATUS_KEY[s]);

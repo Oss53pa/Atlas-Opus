@@ -22,6 +22,13 @@ export interface DueDiligenceItem {
   status: DueDiligenceStatus;
 }
 
+/** Saisie de création d'un item de due diligence (écran conformité). */
+export interface DueDiligenceInput {
+  category: DueDiligenceCategory;
+  finding: string;
+  severity: DueDiligenceSeverity;
+}
+
 /** Sévérités bloquantes pour la phase « conception » (RG-M2-03). */
 const BLOCKING_SEVERITIES: DueDiligenceSeverity[] = ['high', 'critical'];
 

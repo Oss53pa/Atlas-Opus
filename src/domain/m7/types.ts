@@ -18,12 +18,23 @@ export type InsuranceStatus = 'valid' | 'expiring' | 'expired' | 'missing';
 export interface Insurance {
   id: string;
   tenantId: string;
-  stakeholderId: string;
+  operationId: string;
+  stakeholderId: string | null;
   type: InsuranceType;
   insurer: string;
   validFrom: string;
   validTo: string | null;
   attestationRef: string | null;
+}
+
+/** Saisie de création d'une police (écran conformité). */
+export interface InsuranceInput {
+  type: InsuranceType;
+  insurer: string;
+  validFrom: string;
+  validTo?: string | null;
+  attestationRef?: string | null;
+  stakeholderId?: string | null;
 }
 
 /** Contrat d'intervenant (mission/honoraires). */
