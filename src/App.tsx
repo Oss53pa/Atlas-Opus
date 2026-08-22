@@ -15,6 +15,7 @@ import { StakeholdersScreen } from './features/m1/StakeholdersScreen';
 import { ComplianceScreen } from './features/m1/ComplianceScreen';
 import { FinancingScreen } from './features/m1/FinancingScreen';
 import { CommercialisationScreen } from './features/m1/CommercialisationScreen';
+import { ReportingScreen } from './features/m1/ReportingScreen';
 import { PaymentsScreen } from './features/m1/PaymentsScreen';
 import { PlanningScreen } from './features/m1/PlanningScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
@@ -43,6 +44,8 @@ function RouteView() {
       return <FinancingScreen id={route.id} />;
     case 'commercialisation':
       return <CommercialisationScreen id={route.id} />;
+    case 'reporting':
+      return <ReportingScreen id={route.id} />;
     case 'payments':
       return <PaymentsScreen id={route.id} />;
     case 'planning':

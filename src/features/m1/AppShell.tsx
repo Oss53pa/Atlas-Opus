@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Landmark,
   Store,
+  FileBarChart,
   Settings,
   CalendarDays,
 } from 'lucide-react';
@@ -76,6 +77,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           <button className={cx('ax-nav-item', route.name === 'commercialisation' && 'is-active')} onClick={() => go({ name: 'commercialisation', id: opId })}>
             <Store size={18} />
             {t('nav.commercialisation')}
+          </button>
+          <button className={cx('ax-nav-item', route.name === 'reporting' && 'is-active')} onClick={() => go({ name: 'reporting', id: opId })}>
+            <FileBarChart size={18} />
+            {t('nav.reporting')}
           </button>
           <button className={cx('ax-nav-item', route.name === 'payments' && 'is-active')} onClick={() => go({ name: 'payments', id: opId })}>
             <Banknote size={18} />

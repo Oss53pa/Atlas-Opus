@@ -11,6 +11,7 @@ export type Route =
   | { name: 'compliance'; id: string }
   | { name: 'financing'; id: string }
   | { name: 'commercialisation'; id: string }
+  | { name: 'reporting'; id: string }
   | { name: 'payments'; id: string }
   | { name: 'planning'; id: string }
   | { name: 'passation'; id: string };
