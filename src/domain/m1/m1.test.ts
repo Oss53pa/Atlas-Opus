@@ -16,12 +16,16 @@ import {
 } from './rules';
 import { validateOperationInput, validateOperationPatch } from './validation';
 import { getCountry } from '../country';
+import { permitGate } from '../m2/authorizations';
+import { doGate } from '../m7/rules';
 
 const fullCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
   validatedProgramItems: 0,
   bilanInitialized: false,
   marketsToLaunch: 0,
   marketsNotified: 0,
+  permitGranted: false,
+  doInsuranceValid: false,
   globalProgress: 0,
   receptionDeclaredByDirector: false,
   receptionPvIssued: false,
@@ -54,6 +58,64 @@ describe('Machine à états §4', () => {
       role: 'owner',
     });
     expect(d).toEqual({ ok: false, code: 'invalid_transition' });
+  });
+
+  it('passation → réalisation bloquée sans permis (M2) ni DO (M7) — RG-M2-07 / RG-M7-04', () => {
+    const d = evaluateTransition('passation', 'realisation', fullCtx({ marketsNotified: 1 }), { role: 'moa_director' });
+    expect(d.ok).toBe(false);
+    if (!d.ok && d.code === 'guard_unmet') {
+      expect(d.missing).toContain('op.transition.cond.permitGranted');
+      expect(d.missing).toContain('op.transition.cond.doInsurance');
+    } else {
+      throw new Error('attendu guard_unmet');
+    }
+  });
+
+  it('passation → réalisation : DO seule manquante reste bloquante', () => {
+    const d = evaluateTransition('passation', 'realisation', fullCtx({ marketsNotified: 1, permitGranted: true }), {
+      role: 'moa_director',
+    });
+    expect(d.ok).toBe(false);
+    if (!d.ok && d.code === 'guard_unmet') {
+      expect(d.missing).toEqual(['op.transition.cond.doInsurance']);
+    } else {
+      throw new Error('attendu guard_unmet');
+    }
+  });
+
+  it('passation → réalisation passe quand marché notifié + permis + DO', () => {
+    const d = evaluateTransition(
+      'passation',
+      'realisation',
+      fullCtx({ marketsNotified: 1, permitGranted: true, doInsuranceValid: true }),
+      { role: 'moa_director' },
+    );
+    expect(d.ok).toBe(true);
+  });
+
+  it('câblage réel des gardes : permitGate (M2) + doGate (M7) alimentent le contexte M1', () => {
+    const today = '2026-08-22';
+    // Permis accordé (non expiré) + police DO couvrante → gardes levées.
+    const permitOk = permitGate([{ type: 'permis_construire', status: 'granted', validity: '2027-01-01' }], today).ok;
+    const doOk = doGate([{ type: 'DO', validTo: '2027-01-01' }], today).ok;
+    const passing = evaluateTransition(
+      'passation',
+      'realisation',
+      fullCtx({ marketsNotified: 1, permitGranted: permitOk, doInsuranceValid: doOk }),
+      { role: 'moa_director' },
+    );
+    expect(passing.ok).toBe(true);
+
+    // Permis seulement « submitted » + DO expirée → transition refusée.
+    const permitKo = permitGate([{ type: 'permis_construire', status: 'submitted', validity: null }], today).ok;
+    const doKo = doGate([{ type: 'DO', validTo: '2026-01-01' }], today).ok;
+    const blocked = evaluateTransition(
+      'passation',
+      'realisation',
+      fullCtx({ marketsNotified: 1, permitGranted: permitKo, doInsuranceValid: doKo }),
+      { role: 'moa_director' },
+    );
+    expect(blocked.ok).toBe(false);
   });
 
   it('retour arrière : exige moa_director (RG-M1-10)', () => {
