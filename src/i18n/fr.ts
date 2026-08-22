@@ -94,6 +94,8 @@ export const fr = {
   'dashboard.byPhase': 'Répartition par phase',
   'dashboard.top': 'Principales opérations',
   'dashboard.alerts': 'Alertes & échéances',
+  'dashboard.risk': 'Classement par risque',
+  'dashboard.risk.none': 'Aucune opération à risque',
   'dashboard.empty': 'Aucune opération à afficher.',
 
   // ── Portefeuille (écran 6.1) ────────────────────────────────────────────

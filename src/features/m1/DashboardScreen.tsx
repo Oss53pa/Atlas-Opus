@@ -1,19 +1,14 @@
-import { Plus, FolderOpen, ShieldCheck, Clock, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Plus, FolderOpen, ShieldCheck, AlertTriangle, ChevronRight } from 'lucide-react';
 import { Banner, Button, Card, EmptyState, Money as MoneyView, Skeleton, StatCard } from '../../ui';
 import { PhaseBadge } from './PhaseBadge';
-import { useAggregatedMarge, useOperations } from '../../app/providers';
+import { useAggregatedMarge, useOperations, usePortfolioRisk } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatPercent } from '../../lib/format';
 import { Money } from '../../domain/money/Money';
 import { PHASES, type Operation, type Phase } from '../../domain/m1/types';
+import { riskScore, countBySeverity } from '../../domain/m21';
 import { phaseLabel } from './labels';
-
-const ALERTS = [
-  { key: 'alerts.guarantee', icon: ShieldCheck, tone: 'warning' },
-  { key: 'alerts.decompte', icon: Clock, tone: 'info' },
-  { key: 'alerts.insurance', icon: AlertTriangle, tone: 'danger' },
-] as const;
 
 function mainCurrencyTotal(ops: Operation[]): { currency: string; total: Money } {
   const byCur = new Map<string, number>();
@@ -28,6 +23,7 @@ function mainCurrencyTotal(ops: Operation[]): { currency: string; total: Money }
 export function DashboardScreen() {
   const { data: ops, loading, error, refetch } = useOperations({});
   const { byCurrency: margeByCur, loading: margeLoading } = useAggregatedMarge(ops);
+  const { alertsByOp, loading: riskLoading } = usePortfolioRisk(ops);
   const { navigate } = useNav();
 
   if (loading) {
@@ -78,6 +74,11 @@ export function DashboardScreen() {
   const phaseCounts = PHASES.map((p) => ({ phase: p, count: ops.filter((o) => o.phase === p).length })).filter((x) => x.count > 0);
   const maxPhase = Math.max(...phaseCounts.map((x) => x.count), 1);
   const top = [...ops].sort((a, b) => b.budgetBac - a.budgetBac).slice(0, 5);
+  const ranked = [...ops]
+    .map((o) => ({ op: o, alerts: alertsByOp.get(o.id) ?? [] }))
+    .filter((r) => r.alerts.length > 0)
+    .sort((a, b) => riskScore(b.alerts) - riskScore(a.alerts))
+    .slice(0, 5);
 
   return (
     <div className="flex flex-col gap-6">
@@ -129,19 +130,45 @@ export function DashboardScreen() {
           </ul>
         </Card>
 
-        {/* Alertes */}
+        {/* Classement par risque (M21) */}
         <Card>
-          <h2 className="text-[16px] font-medium">{t('dashboard.alerts')}</h2>
-          <ul className="mt-4 flex flex-col gap-2">
-            {ALERTS.map(({ key, icon: Icon, tone }) => (
-              <li key={key} className="flex items-start gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
-                <span style={{ color: `var(--ax-${tone})`, marginTop: 1 }}>
-                  <Icon size={16} />
-                </span>
-                <span className="text-[13px] text-ink-2">{t(key)}</span>
-              </li>
-            ))}
-          </ul>
+          <h2 className="text-[16px] font-medium">{t('dashboard.risk')}</h2>
+          {riskLoading ? (
+            <div className="mt-4 flex flex-col gap-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 40 }} />)}</div>
+          ) : ranked.length === 0 ? (
+            <div className="mt-4 flex items-center gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
+              <span style={{ color: 'var(--ax-success)', marginTop: 1 }}><ShieldCheck size={16} /></span>
+              <span className="text-[13px] text-ink-2">{t('dashboard.risk.none')}</span>
+            </div>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-2">
+              {ranked.map(({ op, alerts }) => {
+                const danger = countBySeverity(alerts, 'danger');
+                return (
+                  <li
+                    key={op.id}
+                    className="ax-tr flex items-center gap-3 rounded-md px-3 py-2"
+                    style={{ background: 'var(--ax-glass-subtle)' }}
+                    onClick={() => navigate({ name: 'cockpit', id: op.id })}
+                  >
+                    <span style={{ color: danger > 0 ? 'var(--ax-danger)' : 'var(--ax-warning)', marginTop: 1 }}>
+                      <AlertTriangle size={16} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium">{op.name}</span>
+                      <span className="text-[11px] text-ink-3">
+                        {t('cockpit.alerts.count', {
+                          danger,
+                          echeance: countBySeverity(alerts, 'echeance'),
+                          info: countBySeverity(alerts, 'info'),
+                        })}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Card>
       </div>
 
