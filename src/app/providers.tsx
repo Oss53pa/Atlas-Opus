@@ -42,6 +42,8 @@ import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
 import { Money } from '../domain/money/Money';
+import { deriveOperationAlerts, type ConsolidatedAlert } from '../domain/m21';
+import { bilanToAlertFacts } from '../features/m1/alerts';
 import { supabase } from '../data/supabase/client';
 import {
   createSupabaseBilanRepo,
@@ -296,6 +298,43 @@ export function useTenders(operationId: string): AsyncState<Tender[]> {
 }
 
 /** Marge agrégée du portefeuille, par devise (somme exacte via Money). */
+/** Alertes consolidées par opération pour le classement par risque du portefeuille (M21). */
+export function usePortfolioRisk(ops: Operation[] | null): { alertsByOp: Map<string, ConsolidatedAlert[]>; loading: boolean } {
+  const { bilan } = useData();
+  const [result, setResult] = useState<{ alertsByOp: Map<string, ConsolidatedAlert[]>; loading: boolean }>({
+    alertsByOp: new Map(),
+    loading: true,
+  });
+  const key = ops ? ops.map((o) => o.id).join(',') : '';
+
+  useEffect(() => {
+    if (!ops) return;
+    let alive = true;
+    const today = new Date().toISOString().slice(0, 10);
+    (async () => {
+      const entries = await Promise.all(
+        ops.map((o) =>
+          bilan
+            .summary(o.id)
+            .then((s) => ({ o, s }))
+            .catch(() => ({ o, s: null })),
+        ),
+      );
+      const alertsByOp = new Map<string, ConsolidatedAlert[]>();
+      for (const { o, s } of entries) {
+        alertsByOp.set(o.id, deriveOperationAlerts(bilanToAlertFacts(o, s, today)));
+      }
+      if (alive) setResult({ alertsByOp, loading: false });
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bilan, key]);
+
+  return result;
+}
+
 export function useAggregatedMarge(ops: Operation[] | null): { byCurrency: Map<string, Money>; loading: boolean } {
   const { bilan } = useData();
   const [result, setResult] = useState<{ byCurrency: Map<string, Money>; loading: boolean }>({

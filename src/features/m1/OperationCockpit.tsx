@@ -18,9 +18,8 @@ import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
 import { nextPhase } from '../../domain/m1/stateMachine';
-import { consolidateAlerts, countBySeverity, type AlertSeverity, type ConsolidatedAlert } from '../../domain/m21';
-import type { BilanView } from '../../data/repo';
-import type { Operation } from '../../domain/m1/types';
+import { countBySeverity, deriveOperationAlerts, type AlertSeverity } from '../../domain/m21';
+import { bilanToAlertFacts } from './alerts';
 
 /** Rendu (icône + tonalité) par sévérité d'alerte consolidée. */
 const SEVERITY_STYLE: Record<AlertSeverity, { tone: string; icon: typeof AlertTriangle }> = {
@@ -28,25 +27,6 @@ const SEVERITY_STYLE: Record<AlertSeverity, { tone: string; icon: typeof AlertTr
   echeance: { tone: 'warning', icon: Clock },
   info: { tone: 'info', icon: ShieldCheck },
 };
-
-/**
- * Agrège les alertes de l'opération à partir des indicateurs déjà calculés
- * par les modules (RG-M21-01 : aucun recalcul financier ici).
- */
-function deriveAlerts(op: Operation, bilan: BilanView | null, today: string): ConsolidatedAlert[] {
-  const alerts: ConsolidatedAlert[] = [];
-  if (bilan) {
-    if (bilan.summary.marge.isNegative()) alerts.push({ source: 'm4', severity: 'danger', labelKey: 'alerts.marginNegative' });
-    if (bilan.summary.coutTotal.gt(bilan.bac) && !bilan.bac.isZero())
-      alerts.push({ source: 'm4', severity: 'danger', labelKey: 'alerts.budgetOverrun' });
-    const revenueExpected = op.phase === 'realisation' || op.phase === 'reception' || op.phase === 'exploitation';
-    if (revenueExpected && bilan.summary.recettesRealisees.isZero())
-      alerts.push({ source: 'm6', severity: 'echeance', labelKey: 'alerts.noRevenue' });
-  }
-  if (op.endDate && op.endDate < today && op.status === 'active')
-    alerts.push({ source: 'm12', severity: 'echeance', labelKey: 'alerts.deadlinePassed' });
-  return consolidateAlerts(alerts);
-}
 
 export function OperationCockpit({ id }: { id: string }) {
   const { data: op, loading, error, refetch } = useOperation(id);
@@ -77,7 +57,7 @@ export function OperationCockpit({ id }: { id: string }) {
   }
 
   const target = nextPhase(op.phase);
-  const alerts = deriveAlerts(op, bilan, new Date().toISOString().slice(0, 10));
+  const alerts = deriveOperationAlerts(bilanToAlertFacts(op, bilan, new Date().toISOString().slice(0, 10)));
 
   return (
     <div className="flex flex-col gap-6">
