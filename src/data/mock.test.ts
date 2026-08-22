@@ -105,4 +105,32 @@ describe('Couche données mock — Gherkin §12', () => {
     ctx = await ops.getTransitionContext(op.id);
     expect(ctx.validatedProgramItems).toBeGreaterThanOrEqual(1);
   });
+
+  it('Gardes permis (M2) & DO (M7) dérivées des tables authorizations/insurances', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+
+    // op-palmiers : permis « granted » + police DO couvrante → gardes levées.
+    const palmiers = await ops.getTransitionContext('op-palmiers');
+    expect(palmiers.permitGranted).toBe(true);
+    expect(palmiers.doInsuranceValid).toBe(true);
+
+    // op-cosmos : permis « submitted » + aucune DO → gardes bloquantes.
+    const cosmos = await ops.getTransitionContext('op-cosmos');
+    expect(cosmos.permitGranted).toBe(false);
+    expect(cosmos.doInsuranceValid).toBe(false);
+  });
+
+  it('Une opération sans permis ni DO ne peut pas passer en réalisation', async () => {
+    const ops = createOperationsRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const ctx = await ops.getTransitionContext('op-cosmos');
+    // Même avec un marché notifié, l'absence de permis/DO bloque (RG-M2-07 / RG-M7-04).
+    const d = evaluateTransition('passation', 'realisation', { ...ctx, marketsNotified: 1 }, { role: 'moa_director' });
+    expect(d.ok).toBe(false);
+    if (!d.ok && d.code === 'guard_unmet') {
+      expect(d.missing).toContain('op.transition.cond.permitGranted');
+      expect(d.missing).toContain('op.transition.cond.doInsurance');
+    } else {
+      throw new Error('attendu guard_unmet');
+    }
+  });
 });

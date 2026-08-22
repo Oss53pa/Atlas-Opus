@@ -17,6 +17,9 @@ import type {
   ProgramItemDraft,
 } from '../../domain/m1/types';
 import type { TransitionContext } from '../../domain/m1/stateMachine';
+import { permitGate, type AuthorizationType, type AuthorizationStatus } from '../../domain/m2/authorizations';
+import { doGate } from '../../domain/m7/rules';
+import type { InsuranceType } from '../../domain/m7/types';
 import { getCountry } from '../../domain/country';
 import type { Telemetry } from '../../lib/telemetry';
 import type {
@@ -48,6 +51,13 @@ const TD = 'ao_tenders';
 
 const OPS = 'ao_operations';
 const ITEMS = 'ao_program_items';
+const AUTH = 'ao_authorizations';
+const INS = 'ao_insurances';
+
+/** Date du jour (ISO YYYY-MM-DD) pour l'évaluation des gardes d'échéance. */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const emptyCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
   validatedProgramItems: 0,
@@ -118,6 +128,23 @@ export function createSupabaseOperationsRepo(
     if (versions.length === 0) return 0;
     const latest = Math.max(...versions);
     return versions.filter((v) => v === latest).length;
+  };
+
+  // RG-M2-07 — garde permis dérivée de ao_authorizations via le domaine M2.
+  const permitGrantedFor = async (opId: string): Promise<boolean> => {
+    const { data } = await client.from(AUTH).select('type,status,validity').eq('operation_id', opId);
+    const rows = (data ?? []) as { type: AuthorizationType; status: AuthorizationStatus; validity: string | null }[];
+    return permitGate(rows, todayIso()).ok;
+  };
+
+  // RG-M7-04 — garde DO dérivée de ao_insurances via le domaine M7.
+  const doInsuranceValidFor = async (opId: string): Promise<boolean> => {
+    const { data } = await client.from(INS).select('type,valid_to').eq('operation_id', opId);
+    const rows = (data ?? []).map((r: { type: InsuranceType; valid_to: string | null }) => ({
+      type: r.type,
+      validTo: r.valid_to,
+    }));
+    return doGate(rows, todayIso()).ok;
   };
 
   return {
@@ -208,7 +235,13 @@ export function createSupabaseOperationsRepo(
 
     async getTransitionContext(id) {
       // M4/M8/M11 non branchés en base ; bilanInitialized faux pour l'instant.
-      return emptyCtx({ validatedProgramItems: await validatedCount(id) });
+      // Gardes M2 (permis) et M7 (DO) dérivées des tables authorizations/insurances.
+      const [validatedProgramItems, permitGranted, doInsuranceValid] = await Promise.all([
+        validatedCount(id),
+        permitGrantedFor(id),
+        doInsuranceValidFor(id),
+      ]);
+      return emptyCtx({ validatedProgramItems, permitGranted, doInsuranceValid });
     },
 
     async setPhase(id, to: Phase) {

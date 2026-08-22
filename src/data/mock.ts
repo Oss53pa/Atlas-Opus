@@ -16,6 +16,9 @@ import type {
 import type { TransitionContext } from '../domain/m1/stateMachine';
 import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
+import { permitGate, type Authorization } from '../domain/m2/authorizations';
+import { doGate } from '../domain/m7/rules';
+import type { InsuranceType } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
@@ -62,6 +65,17 @@ export interface MockDb {
   decomptes: Decompte[];
   tasks: Task[];
   tenders: Tender[];
+  authorizations: Authorization[];
+  insurances: MockInsurance[];
+}
+
+/** Assurance simplifiée pour la garde DO (M7) : le statut est dérivé de valid_to. */
+export interface MockInsurance {
+  id: string;
+  tenantId: string;
+  operationId: string;
+  type: InsuranceType;
+  validTo: string | null;
 }
 
 interface Deps {
@@ -156,7 +170,8 @@ export function createMockDb(): MockDb {
   ];
 
   const ctx: Record<string, TransitionContext> = {
-    'op-palmiers': defaultCtx({ marketsToLaunch: 4, marketsNotified: 4, permitGranted: true, doInsuranceValid: true, globalProgress: 0.62 }),
+    // permitGranted / doInsuranceValid sont dérivés des collections authorizations/insurances.
+    'op-palmiers': defaultCtx({ marketsToLaunch: 4, marketsNotified: 4, globalProgress: 0.62 }),
     'op-cosmos': defaultCtx({ marketsToLaunch: 0 }),
     'op-riviera': defaultCtx({}),
     'op-atlantique': defaultCtx({ marketsToLaunch: 2, marketsNotified: 1 }),
@@ -231,7 +246,18 @@ export function createMockDb(): MockDb {
     { id: 'td-c1', tenantId: T, operationId: 'op-cosmos', mode: 'private', procedure: 'AOR', object: 'Conception-réalisation centre commercial', thresholdOk: true, anoRequired: false, status: 'planned', awardedTo: null, createdAt: '2026-05-10T08:00:00.000Z', updatedAt: '2026-05-10T08:00:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders };
+  // Autorisations (M2) — Palmiers : permis accordé (garde levée) ; Cosmos : déposé (bloquant).
+  const authorizations: Authorization[] = [
+    { id: 'au-p1', tenantId: T, operationId: 'op-palmiers', type: 'permis_construire', authority: 'Mairie du Plateau', status: 'granted', validity: '2030-12-31' },
+    { id: 'au-c1', tenantId: T, operationId: 'op-cosmos', type: 'permis_construire', authority: 'Mairie de Cocody', status: 'submitted', validity: null },
+  ];
+  // Assurances (M7) — Palmiers : DO couvrante (garde levée). Cosmos : aucune DO.
+  const insurances: MockInsurance[] = [
+    { id: 'in-p1', tenantId: T, operationId: 'op-palmiers', type: 'DO', validTo: '2030-12-31' },
+    { id: 'in-p2', tenantId: T, operationId: 'op-palmiers', type: 'decennale', validTo: '2030-12-31' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -323,7 +349,17 @@ export function createOperationsRepo(db: MockDb, session: Session, deps: Deps): 
     async getTransitionContext(opId) {
       const base = db.ctx[opId] ?? defaultCtx({});
       const hasBilan = db.bilan.some((b) => b.operationId === opId && b.tenantId === session.tenantId);
-      return { ...base, validatedProgramItems: validatedCount(opId), bilanInitialized: hasBilan };
+      // Gardes M2 (permis) et M7 (DO) dérivées des collections, comme en base (adapter Supabase).
+      const today = (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
+      const auths = db.authorizations.filter((a) => a.operationId === opId && a.tenantId === session.tenantId);
+      const inss = db.insurances.filter((i) => i.operationId === opId && i.tenantId === session.tenantId);
+      return {
+        ...base,
+        validatedProgramItems: validatedCount(opId),
+        bilanInitialized: hasBilan,
+        permitGranted: permitGate(auths, today).ok,
+        doInsuranceValid: doGate(inss, today).ok,
+      };
     },
 
     async setPhase(opId, to: Phase) {
