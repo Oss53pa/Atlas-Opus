@@ -22,6 +22,7 @@ import { doGate } from '../m7/rules';
 const fullCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
   validatedProgramItems: 0,
   bilanInitialized: false,
+  ddCleared: true,
   marketsToLaunch: 0,
   marketsNotified: 0,
   permitGranted: false,
@@ -51,6 +52,21 @@ describe('Machine à états §4', () => {
       role: 'moa_director',
     });
     expect(d.ok).toBe(true);
+  });
+
+  it('amont → conception bloquée par une DD critique non levée (RG-M2-03)', () => {
+    const d = evaluateTransition(
+      'amont',
+      'conception',
+      fullCtx({ validatedProgramItems: 1, bilanInitialized: true, ddCleared: false }),
+      { role: 'moa_director' },
+    );
+    expect(d.ok).toBe(false);
+    if (!d.ok && d.code === 'guard_unmet') {
+      expect(d.missing).toEqual(['op.transition.cond.ddCleared']);
+    } else {
+      throw new Error('attendu guard_unmet');
+    }
   });
 
   it('refuse une transition qui saute une phase (§9)', () => {
