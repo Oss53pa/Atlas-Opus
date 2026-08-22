@@ -453,6 +453,7 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
         summary: bilanSummary(lines, currency, realized),
         tri: null,
         bac: Money.of(Number((op as { budget_bac: number | string }).budget_bac), currency),
+        cashflow: [],
       };
     },
 

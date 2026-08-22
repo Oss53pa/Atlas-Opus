@@ -88,6 +88,8 @@ export interface BilanView {
   summary: BilanSummary;
   tri: number | null;
   bac: Money;
+  /** Flux nets de trésorerie par période (encaissements − décaissements). */
+  cashflow: number[];
 }
 
 export interface BilanLineRecord {

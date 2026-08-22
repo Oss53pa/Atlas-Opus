@@ -91,3 +91,35 @@ export function penaliteRetard(montantMarche: Money, taux: number, joursRetard: 
   const brute = montantMarche.mulRate(taux).multiplyInt(Math.max(0, Math.trunc(joursRetard)));
   return plafond ? brute.min(plafond) : brute;
 }
+
+// ── Plan de trésorerie (M4) ─────────────────────────────────────────────────
+export interface PlanTresorerie {
+  /** Trésorerie cumulée par période : cumule[t] = Σ_{k≤t} flux[k]. */
+  cumule: number[];
+  /** Point bas = min(trésorerie cumulée) ; négatif ⇒ besoin de financement. */
+  besoinMax: number;
+  /** Index de la période du point bas (−1 si série vide). */
+  pointBasIndex: number;
+}
+
+/**
+ * Plan de trésorerie à partir des flux nets par période (encaissements −
+ * décaissements). `besoinMax` = min du cumulé (réf CLAUDE.md §7 / Spec M4 §5).
+ */
+export function planTresorerie(flowsNets: number[]): PlanTresorerie {
+  const cumule: number[] = [];
+  let acc = 0;
+  for (const f of flowsNets) {
+    acc += f;
+    cumule.push(acc);
+  }
+  let besoinMax = 0;
+  let pointBasIndex = -1;
+  cumule.forEach((v, i) => {
+    if (pointBasIndex === -1 || v < besoinMax) {
+      besoinMax = v;
+      pointBasIndex = i;
+    }
+  });
+  return { cumule, besoinMax, pointBasIndex };
+}

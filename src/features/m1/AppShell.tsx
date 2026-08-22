@@ -29,7 +29,9 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ')
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { route, navigate } = useNav();
-  const opId = route.name === 'cockpit' || route.name === 'program' ? route.id : null;
+  // Toute route d'opération porte un `id` : garder le contexte (et le groupe de
+  // nav opération) sur tous les écrans, pas seulement cockpit/programme.
+  const opId = 'id' in route ? route.id : null;
   const go = (r: Route) => {
     navigate(r);
     onNavigate?.();

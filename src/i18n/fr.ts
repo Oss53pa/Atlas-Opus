@@ -95,6 +95,8 @@ export const fr = {
   'dashboard.byPhase': 'Répartition par phase',
   'dashboard.top': 'Principales opérations',
   'dashboard.alerts': 'Alertes & échéances',
+  'cockpit.treasury.need': 'Besoin max',
+  'cockpit.treasury.pointBas': 'Trésorerie cumulée · point bas en rouge',
   'dashboard.risk': 'Classement par risque',
   'dashboard.risk.none': 'Aucune opération à risque',
 
