@@ -279,6 +279,20 @@ describe('Couche données mock — Gherkin §12', () => {
     expect(await other.units('op-palmiers')).toEqual([]);
   });
 
+  it('Recettes M6 → bilan M4 : recettesRealisees = encaissements settled (RG-M6-02)', async () => {
+    const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const com = createCommercialisationRepo(db, sessionFor('tenant-demo'), deps(tel));
+    // Seed Palmiers : re-p1 (2,1M) + re-p2 (14,7M) settled = 16,8M ; re-p3 pending exclu.
+    const view = await bilan.summary('op-palmiers');
+    expect(view!.summary.recettesRealisees.equals(Money.of(16_800_000, 'XOF'))).toBe(true);
+
+    // Encaisser un montant supplémentaire met à jour la recette réalisée.
+    const r = await com.addReceipt('sa-p2', { amount: Money.of(2_750_000, 'XOF'), method: 'virement' });
+    await com.setReceiptStatus(r.id, 'settled');
+    const after = await bilan.summary('op-palmiers');
+    expect(after!.summary.recettesRealisees.equals(Money.of(19_550_000, 'XOF'))).toBe(true);
+  });
+
   it('Financement M5 → bilan M4 : frais_financiers dérivés des tranches débloquées (RG-M5-02)', async () => {
     const bilan = createBilanRepo(db, sessionFor('tenant-demo'), deps(tel));
     const lines = await bilan.lines('op-palmiers');

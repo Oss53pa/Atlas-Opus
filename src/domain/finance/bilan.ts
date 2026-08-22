@@ -38,14 +38,25 @@ export function tauxMarge(lines: BilanLine[], currency: Currency): number {
 export interface BilanSummary {
   coutTotal: Money;
   recettes: Money;
+  /** Recettes réalisées (encaissements settled, M6). */
+  recettesRealisees: Money;
   marge: Money;
   tauxMarge: number;
 }
 
-export function bilanSummary(lines: BilanLine[], currency: Currency): BilanSummary {
+/**
+ * `recettesRealisees` provient de M6 (encaissements « settled ») — source de
+ * vérité des recettes réalisées — et n'est pas dérivée des lignes de bilan.
+ */
+export function bilanSummary(
+  lines: BilanLine[],
+  currency: Currency,
+  recettesRealisees: Money = Money.zero(currency),
+): BilanSummary {
   return {
     coutTotal: coutTotal(lines, currency),
     recettes: recettes(lines, currency),
+    recettesRealisees,
     marge: marge(lines, currency),
     tauxMarge: tauxMarge(lines, currency),
   };

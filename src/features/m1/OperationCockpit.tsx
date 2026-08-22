@@ -96,7 +96,12 @@ export function OperationCockpit({ id }: { id: string }) {
         ) : (
           <>
             <StatCard label={t('bilan.cost')}>{bilan ? bilan.summary.coutTotal.format(locale) : '—'}</StatCard>
-            <StatCard label={t('bilan.revenue')}>{bilan ? bilan.summary.recettes.format(locale) : '—'}</StatCard>
+            <StatCard
+              label={t('bilan.revenue')}
+              hint={bilan ? t('bilan.revenueRealized', { amount: bilan.summary.recettesRealisees.format(locale) }) : undefined}
+            >
+              {bilan ? bilan.summary.recettes.format(locale) : '—'}
+            </StatCard>
             <StatCard
               label={t('bilan.margin')}
               hint={bilan ? `${t('bilan.marginRate')} ${formatPercent(bilan.summary.tauxMarge, locale)}` : undefined}

@@ -30,6 +30,7 @@ import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, Receipt, ReceiptInput, ReceiptStatus } from '../domain/m6/types';
+import { recettesEncaissees } from '../domain/m6/commercialisation';
 import type { Insurance, InsuranceInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
@@ -551,8 +552,14 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
       if (!op) return null;
       const lines: BilanLine[] = nonDerivedSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
       for (const d of derivedCostLines(opId, op.currency)) lines.push({ kind: 'cost', amount: d.amount });
+      // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
+      const saleIds = new Set(db.sales.filter((s) => s.operationId === opId && s.tenantId === session.tenantId).map((s) => s.id));
+      const realized = recettesEncaissees(
+        db.receipts.filter((r) => r.tenantId === session.tenantId && saleIds.has(r.saleId)),
+        op.currency,
+      );
       return {
-        summary: bilanSummary(lines, op.currency),
+        summary: bilanSummary(lines, op.currency, realized),
         tri: tri(db.cashflows[opId] ?? []),
         bac: Money.of(op.budgetBac, op.currency),
       };
