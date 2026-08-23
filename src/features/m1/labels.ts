@@ -21,6 +21,8 @@ import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
 import type { RfiStatus, RfiPriority } from '../../domain/rfi/types';
+import type { UtilityType, ConnectionStatus } from '../../domain/m18/types';
+import type { DocCategory, LibraryStatus } from '../../domain/m22/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -561,6 +563,52 @@ export const RFI_PRIORITY_TONE: Record<RfiPriority, BadgeTone> = {
 };
 export const rfiStatusLabel = (s: RfiStatus) => t(RFI_STATUS_KEY[s]);
 export const rfiPriorityLabel = (p: RfiPriority) => t(RFI_PRIORITY_KEY[p]);
+
+// ── Concessionnaires & raccordements (M18) ───────────────────────────────────
+const UTILITY_KEY: Record<UtilityType, MessageKey> = {
+  eau: 'cx.utility.eau',
+  electricite: 'cx.utility.electricite',
+  telecom: 'cx.utility.telecom',
+  assainissement: 'cx.utility.assainissement',
+  gaz: 'cx.utility.gaz',
+};
+const CONNECTION_STATUS_KEY: Record<ConnectionStatus, MessageKey> = {
+  demande: 'cx.status.demande',
+  etude: 'cx.status.etude',
+  devis: 'cx.status.devis',
+  paye: 'cx.status.paye',
+  raccorde: 'cx.status.raccorde',
+};
+export const CONNECTION_STATUS_TONE: Record<ConnectionStatus, BadgeTone> = {
+  demande: 'neutral',
+  etude: 'info',
+  devis: 'warning',
+  paye: 'accent',
+  raccorde: 'success',
+};
+export const utilityLabel = (u: UtilityType) => t(UTILITY_KEY[u]);
+export const connectionStatusLabel = (s: ConnectionStatus) => t(CONNECTION_STATUS_KEY[s]);
+
+// ── Documents / GED transverse (M22) ─────────────────────────────────────────
+const DOC_CATEGORY_KEY: Record<DocCategory, MessageKey> = {
+  contrat: 'lib.cat.contrat',
+  administratif: 'lib.cat.administratif',
+  financier: 'lib.cat.financier',
+  technique: 'lib.cat.technique',
+  correspondance: 'lib.cat.correspondance',
+};
+const LIBRARY_STATUS_KEY: Record<LibraryStatus, MessageKey> = {
+  brouillon: 'lib.status.brouillon',
+  publie: 'lib.status.publie',
+  archive: 'lib.status.archive',
+};
+export const LIBRARY_STATUS_TONE: Record<LibraryStatus, BadgeTone> = {
+  brouillon: 'neutral',
+  publie: 'success',
+  archive: 'info',
+};
+export const docCategoryLabel = (c: DocCategory) => t(DOC_CATEGORY_KEY[c]);
+export const libraryStatusLabel = (s: LibraryStatus) => t(LIBRARY_STATUS_KEY[s]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

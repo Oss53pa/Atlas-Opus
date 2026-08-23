@@ -71,6 +71,8 @@ import type { SiteReport, SiteReportInput } from '../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
 import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
+import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
+import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 
 export interface Session {
   userId: string;
@@ -216,6 +218,22 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Concessionnaires & raccordements (M18). */
+export interface ConnectionsRepo {
+  list(operationId: string): Promise<Connection[]>;
+  add(operationId: string, input: ConnectionInput): Promise<Connection>;
+  setStatus(id: string, status: ConnectionStatus): Promise<Connection>;
+  remove(id: string): Promise<void>;
+}
+
+/** Documents — GED transverse (M22). */
+export interface LibraryRepo {
+  list(operationId: string): Promise<LibraryDoc[]>;
+  add(operationId: string, input: LibraryDocInput): Promise<LibraryDoc>;
+  setStatus(id: string, status: LibraryStatus): Promise<LibraryDoc>;
+  remove(id: string): Promise<void>;
 }
 
 /** Conception & GED (M11) : documents & visas. */

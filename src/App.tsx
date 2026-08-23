@@ -30,6 +30,8 @@ import { PilotageScreen } from './features/m1/PilotageScreen';
 import { ModificationsScreen } from './features/m1/ModificationsScreen';
 import { ConceptionScreen } from './features/m1/ConceptionScreen';
 import { RfiScreen } from './features/m1/RfiScreen';
+import { RaccordementsScreen } from './features/m1/RaccordementsScreen';
+import { DocumentsScreen } from './features/m1/DocumentsScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -85,6 +87,10 @@ function RouteView() {
       return <ConceptionScreen id={route.id} />;
     case 'rfi':
       return <RfiScreen id={route.id} />;
+    case 'raccordements':
+      return <RaccordementsScreen id={route.id} />;
+    case 'documents':
+      return <DocumentsScreen id={route.id} />;
     default:
       return <DashboardScreen />;
   }

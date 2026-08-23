@@ -49,6 +49,8 @@ import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
 import { buildNewChangeOrder } from '../domain/m14';
 import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
+import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
+import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -86,6 +88,8 @@ import type {
   ChangeOrderPatch,
   DocumentsRepo,
   RfisRepo,
+  ConnectionsRepo,
+  LibraryRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -133,6 +137,8 @@ export interface MockDb {
   changeOrders: ChangeOrder[];
   documents: Document[];
   rfis: Rfi[];
+  connections: Connection[];
+  library: LibraryDoc[];
 }
 
 interface Deps {
@@ -450,7 +456,20 @@ export function createMockDb(): MockDb {
     { id: 'rfi-p2', tenantId: T, operationId: 'op-palmiers', number: 'RFI-039', subject: 'Nuancier façade', question: 'Confirmation du nuancier RAL pour l\u2019enduit de façade.', raisedBy: 'Entreprise BTP Ivoire', priority: 'normale', status: 'repondue', dueDate: '2026-05-30', documentRef: null, answer: 'RAL 1015 validé' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis };
+  // Concessionnaires & raccordements (M18) — Palmiers.
+  const connections: Connection[] = [
+    { id: 'cx-p1', tenantId: T, operationId: 'op-palmiers', utility: 'electricite', concessionaire: 'CIE', reference: 'CIE-2026-4412', status: 'devis', cost: 38_000_000, requestedAt: '2026-04-10' },
+    { id: 'cx-p2', tenantId: T, operationId: 'op-palmiers', utility: 'eau', concessionaire: 'SODECI', reference: 'SOD-2026-0891', status: 'raccorde', cost: 12_500_000, requestedAt: '2026-03-05' },
+    { id: 'cx-p3', tenantId: T, operationId: 'op-palmiers', utility: 'telecom', concessionaire: 'Orange CI', reference: 'ORG-2026-2210', status: 'demande', cost: 6_000_000, requestedAt: '2026-06-01' },
+  ];
+  // Documents — GED transverse (M22) — Palmiers.
+  const library: LibraryDoc[] = [
+    { id: 'lb-p1', tenantId: T, operationId: 'op-palmiers', name: 'Marché gros œuvre — lot 1', category: 'contrat', reference: 'M-2026-001', version: 2, status: 'publie', updatedAt: '2026-03-01T08:00:00.000Z' },
+    { id: 'lb-p2', tenantId: T, operationId: 'op-palmiers', name: 'Permis de construire', category: 'administratif', reference: 'PC-PLATEAU-0142', version: 1, status: 'publie', updatedAt: '2026-02-10T08:00:00.000Z' },
+    { id: 'lb-p3', tenantId: T, operationId: 'op-palmiers', name: 'Plan de financement', category: 'financier', reference: 'FIN-2026-01', version: 3, status: 'brouillon', updatedAt: '2026-06-08T08:00:00.000Z' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1161,6 +1180,65 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createConnectionsRepo(db: MockDb, session: Session, deps: Deps): ConnectionsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.connections).filter((c) => c.operationId === opId).map((c) => ({ ...c }));
+    },
+    async add(opId, input: ConnectionInput) {
+      const c: Connection = {
+        id: id(), tenantId: session.tenantId, operationId: opId, utility: input.utility,
+        concessionaire: input.concessionaire.trim(), reference: input.reference.trim(),
+        status: 'demande', cost: input.cost, requestedAt: input.requestedAt,
+      };
+      db.connections.push(c);
+      return { ...c };
+    },
+    async setStatus(cid, status: ConnectionStatus) {
+      const c = db.connections.find((x) => x.id === cid && x.tenantId === session.tenantId);
+      if (!c) throw new Error('not_found');
+      c.status = status;
+      return { ...c };
+    },
+    async remove(cid) {
+      const i = db.connections.findIndex((x) => x.id === cid && x.tenantId === session.tenantId);
+      if (i >= 0) db.connections.splice(i, 1);
+    },
+  };
+}
+
+export function createLibraryRepo(db: MockDb, session: Session, deps: Deps): LibraryRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.library).filter((d) => d.operationId === opId).map((d) => ({ ...d }));
+    },
+    async add(opId, input: LibraryDocInput) {
+      const d: LibraryDoc = {
+        id: id(), tenantId: session.tenantId, operationId: opId, name: input.name.trim(),
+        category: input.category, reference: input.reference.trim(), version: 1, status: 'brouillon', updatedAt: now(),
+      };
+      db.library.push(d);
+      return { ...d };
+    },
+    async setStatus(did, status: LibraryStatus) {
+      const d = db.library.find((x) => x.id === did && x.tenantId === session.tenantId);
+      if (!d) throw new Error('not_found');
+      d.status = status;
+      d.updatedAt = now();
+      return { ...d };
+    },
+    async remove(did) {
+      const i = db.library.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
+      if (i >= 0) db.library.splice(i, 1);
     },
   };
 }

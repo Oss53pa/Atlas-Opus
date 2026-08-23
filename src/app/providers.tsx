@@ -24,6 +24,8 @@ import {
   createChangeOrdersRepo,
   createDocumentsRepo,
   createRfisRepo,
+  createConnectionsRepo,
+  createLibraryRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -53,6 +55,8 @@ import type {
   ChangeOrdersRepo,
   DocumentsRepo,
   RfisRepo,
+  ConnectionsRepo,
+  LibraryRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -76,6 +80,8 @@ import type { SiteReport } from '../domain/m13/types';
 import type { ChangeOrder } from '../domain/m14/types';
 import type { Document } from '../domain/ged/types';
 import type { Rfi } from '../domain/rfi/types';
+import type { Connection } from '../domain/m18/types';
+import type { LibraryDoc } from '../domain/m22/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -107,6 +113,8 @@ import {
   createSupabaseChangeOrdersRepo,
   createSupabaseDocumentsRepo,
   createSupabaseRfisRepo,
+  createSupabaseConnectionsRepo,
+  createSupabaseLibraryRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -136,6 +144,8 @@ interface DataApi {
   changeOrders: ChangeOrdersRepo;
   documents: DocumentsRepo;
   rfis: RfisRepo;
+  connections: ConnectionsRepo;
+  library: LibraryRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -177,6 +187,8 @@ function buildMockApi(): DataApi {
     changeOrders: createChangeOrdersRepo(db, session, { telemetry }),
     documents: createDocumentsRepo(db, session, { telemetry }),
     rfis: createRfisRepo(db, session, { telemetry }),
+    connections: createConnectionsRepo(db, session, { telemetry }),
+    library: createLibraryRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -238,6 +250,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           changeOrders: createSupabaseChangeOrdersRepo(supabase, session),
           documents: createSupabaseDocumentsRepo(supabase, session),
           rfis: createSupabaseRfisRepo(supabase, session),
+          connections: createSupabaseConnectionsRepo(supabase, session),
+          library: createSupabaseLibraryRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -445,6 +459,16 @@ export function useDocuments(operationId: string): AsyncState<Document[]> {
 export function useRfis(operationId: string): AsyncState<Rfi[]> {
   const { rfis } = useData();
   return useAsync(() => rfis.list(operationId), [rfis, operationId]);
+}
+
+export function useConnections(operationId: string): AsyncState<Connection[]> {
+  const { connections } = useData();
+  return useAsync(() => connections.list(operationId), [connections, operationId]);
+}
+
+export function useLibrary(operationId: string): AsyncState<LibraryDoc[]> {
+  const { library } = useData();
+  return useAsync(() => library.list(operationId), [library, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {
