@@ -16,7 +16,8 @@ export type Route =
   | { name: 'planning'; id: string }
   | { name: 'passation'; id: string }
   | { name: 'etudes'; id: string }
-  | { name: 'analyse'; id: string };
+  | { name: 'analyse'; id: string }
+  | { name: 'achats'; id: string };
 
 interface NavApi {
   route: Route;
