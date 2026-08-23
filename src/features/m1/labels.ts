@@ -16,6 +16,8 @@ import type { OfferStatus } from '../../domain/m9/types';
 import type { PurchaseStatus } from '../../domain/m10/types';
 import type { ReserveSeverity, ReserveStatus } from '../../domain/m19/types';
 import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/types';
+import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
+import type { AuditAction } from '../../domain/m23/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -427,6 +429,60 @@ export const GUARANTEE_STATUS_TONE: Record<GuaranteeDisplayStatus, BadgeTone> = 
 };
 export const guaranteeTypeLabel = (t2: GuaranteeType) => t(GUARANTEE_TYPE_KEY[t2]);
 export const guaranteeStatusLabel = (s: GuaranteeDisplayStatus) => t(GUARANTEE_STATUS_KEY[s]);
+
+// ── Registre des risques (M20) ───────────────────────────────────────────────
+const RISK_CATEGORY_KEY: Record<RiskCategory, MessageKey> = {
+  technique: 'risk.cat.technique',
+  financier: 'risk.cat.financier',
+  juridique: 'risk.cat.juridique',
+  delai: 'risk.cat.delai',
+  hsse: 'risk.cat.hsse',
+  externe: 'risk.cat.externe',
+};
+const RISK_STATUS_KEY: Record<RiskStatus, MessageKey> = {
+  ouvert: 'risk.status.ouvert',
+  maitrise: 'risk.status.maitrise',
+  clos: 'risk.status.clos',
+};
+export const RISK_STATUS_TONE: Record<RiskStatus, BadgeTone> = {
+  ouvert: 'warning',
+  maitrise: 'info',
+  clos: 'success',
+};
+const RISK_LEVEL_KEY: Record<RiskLevel, MessageKey> = {
+  faible: 'risk.level.faible',
+  moyen: 'risk.level.moyen',
+  eleve: 'risk.level.eleve',
+  critique: 'risk.level.critique',
+};
+export const RISK_LEVEL_TONE: Record<RiskLevel, BadgeTone> = {
+  faible: 'neutral',
+  moyen: 'info',
+  eleve: 'warning',
+  critique: 'danger',
+};
+export const riskCategoryLabel = (c: RiskCategory) => t(RISK_CATEGORY_KEY[c]);
+export const riskStatusLabel = (s: RiskStatus) => t(RISK_STATUS_KEY[s]);
+export const riskLevelLabel = (l: RiskLevel) => t(RISK_LEVEL_KEY[l]);
+
+// ── Journal d'audit (M23) ────────────────────────────────────────────────────
+const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {
+  create: 'audit.action.create',
+  update: 'audit.action.update',
+  approve: 'audit.action.approve',
+  transition: 'audit.action.transition',
+  export: 'audit.action.export',
+  access: 'audit.action.access',
+};
+export const AUDIT_ACTION_TONE: Record<AuditAction, BadgeTone> = {
+  create: 'info',
+  update: 'neutral',
+  approve: 'success',
+  transition: 'accent',
+  export: 'neutral',
+  access: 'neutral',
+};
+export const auditActionLabel = (a: AuditAction) => t(AUDIT_ACTION_KEY[a]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

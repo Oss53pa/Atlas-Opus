@@ -65,6 +65,8 @@ import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
+import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
+import type { AuditEntry, AuditInput } from '../domain/m23/types';
 
 export interface Session {
   userId: string;
@@ -210,6 +212,20 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Registre des risques (M20). */
+export interface RisksRepo {
+  list(operationId: string): Promise<Risk[]>;
+  add(operationId: string, input: RiskInput): Promise<Risk>;
+  setStatus(id: string, status: RiskStatus): Promise<Risk>;
+  remove(id: string): Promise<void>;
+}
+
+/** Journal d'audit (M23) : append-only (aucune édition/suppression). */
+export interface AuditRepo {
+  list(operationId: string): Promise<AuditEntry[]>;
+  append(operationId: string, input: AuditInput): Promise<AuditEntry>;
 }
 
 /** Cautions & garanties (M17) : garanties bancaires. */
