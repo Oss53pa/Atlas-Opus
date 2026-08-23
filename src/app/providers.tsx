@@ -18,6 +18,8 @@ import {
   createPurchasingRepo,
   createReceptionRepo,
   createGuaranteesRepo,
+  createRisksRepo,
+  createAuditRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -41,6 +43,8 @@ import type {
   PurchasingRepo,
   ReceptionRepo,
   GuaranteesRepo,
+  RisksRepo,
+  AuditRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -58,6 +62,8 @@ import type { Offer } from '../domain/m9/types';
 import type { PurchaseOrder } from '../domain/m10/types';
 import type { Reserve } from '../domain/m19/types';
 import type { Guarantee } from '../domain/m17/types';
+import type { Risk } from '../domain/m20/types';
+import type { AuditEntry } from '../domain/m23/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -83,6 +89,8 @@ import {
   createSupabasePurchasingRepo,
   createSupabaseReceptionRepo,
   createSupabaseGuaranteesRepo,
+  createSupabaseRisksRepo,
+  createSupabaseAuditRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -106,6 +114,8 @@ interface DataApi {
   purchasing: PurchasingRepo;
   reception: ReceptionRepo;
   guarantees: GuaranteesRepo;
+  risks: RisksRepo;
+  audit: AuditRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -141,6 +151,8 @@ function buildMockApi(): DataApi {
     purchasing: createPurchasingRepo(db, session, { telemetry }),
     reception: createReceptionRepo(db, session, { telemetry }),
     guarantees: createGuaranteesRepo(db, session, { telemetry }),
+    risks: createRisksRepo(db, session, { telemetry }),
+    audit: createAuditRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -196,6 +208,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           purchasing: createSupabasePurchasingRepo(supabase, session),
           reception: createSupabaseReceptionRepo(supabase, session),
           guarantees: createSupabaseGuaranteesRepo(supabase, session),
+          risks: createSupabaseRisksRepo(supabase, session),
+          audit: createSupabaseAuditRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -373,6 +387,16 @@ export function useReserves(operationId: string): AsyncState<Reserve[]> {
 export function useGuarantees(operationId: string): AsyncState<Guarantee[]> {
   const { guarantees } = useData();
   return useAsync(() => guarantees.list(operationId), [guarantees, operationId]);
+}
+
+export function useRisks(operationId: string): AsyncState<Risk[]> {
+  const { risks } = useData();
+  return useAsync(() => risks.list(operationId), [risks, operationId]);
+}
+
+export function useAudit(operationId: string): AsyncState<AuditEntry[]> {
+  const { audit } = useData();
+  return useAsync(() => audit.list(operationId), [audit, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

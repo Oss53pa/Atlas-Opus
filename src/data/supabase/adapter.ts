@@ -56,12 +56,14 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus, ReserveSeverity } from '../../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus, GuaranteeType } from '../../domain/m17/types';
+import type { Risk, RiskInput, RiskStatus, RiskCategory } from '../../domain/m20/types';
+import type { AuditEntry, AuditInput, AuditAction } from '../../domain/m23/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1174,6 +1176,76 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Registre des risques (M20) ───────────────────────────────────────────────
+interface RiskRow {
+  id: string; tenant_id: string; operation_id: string; code: string; label: string; category: string;
+  probability: number | string; impact: number | string; status: string; mitigation: string | null;
+}
+function toRisk(r: RiskRow): Risk {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, code: r.code, label: r.label,
+    category: r.category as RiskCategory, probability: Number(r.probability), impact: Number(r.impact),
+    status: r.status as RiskStatus, mitigation: r.mitigation,
+  };
+}
+export function createSupabaseRisksRepo(client: SupabaseClient, session: Session): RisksRepo {
+  const RK = 'ao_risks';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(RK).select('*').eq('operation_id', opId).order('created_at')) as RiskRow[];
+      return rows.map(toRisk);
+    },
+    async add(opId, input: RiskInput) {
+      const row = unwrap(
+        await client.from(RK).insert({
+          tenant_id: session.tenantId, operation_id: opId, code: input.code, label: input.label,
+          category: input.category, probability: input.probability, impact: input.impact,
+          status: 'ouvert', mitigation: input.mitigation ?? null,
+        }).select('*').single(),
+      ) as RiskRow;
+      return toRisk(row);
+    },
+    async setStatus(id, status: RiskStatus) {
+      const row = unwrap(await client.from(RK).update({ status }).eq('id', id).select('*').single()) as RiskRow;
+      return toRisk(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(RK).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Journal d'audit (M23) — append-only ──────────────────────────────────────
+interface AuditRow {
+  id: string; tenant_id: string; operation_id: string; at: string; actor: string;
+  action: string; module: string; object: string; summary: string | null;
+}
+function toAudit(r: AuditRow): AuditEntry {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, at: r.at, actor: r.actor,
+    action: r.action as AuditAction, module: r.module, object: r.object, summary: r.summary,
+  };
+}
+export function createSupabaseAuditRepo(client: SupabaseClient, session: Session): AuditRepo {
+  const AL = 'ao_audit_log';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(AL).select('*').eq('operation_id', opId).order('at', { ascending: false })) as AuditRow[];
+      return rows.map(toAudit);
+    },
+    async append(opId, input: AuditInput) {
+      const row = unwrap(
+        await client.from(AL).insert({
+          tenant_id: session.tenantId, operation_id: opId, actor: session.userId,
+          action: input.action, module: input.module, object: input.object, summary: input.summary ?? null,
+        }).select('*').single(),
+      ) as AuditRow;
+      return toAudit(row);
     },
   };
 }

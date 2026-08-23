@@ -42,6 +42,8 @@ import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
+import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
+import type { AuditEntry, AuditInput } from '../domain/m23/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -72,6 +74,8 @@ import type {
   PurchasingRepo,
   ReceptionRepo,
   GuaranteesRepo,
+  RisksRepo,
+  AuditRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -113,6 +117,8 @@ export interface MockDb {
   purchaseOrders: PurchaseOrder[];
   reserves: Reserve[];
   guarantees: Guarantee[];
+  risks: Risk[];
+  auditLog: AuditEntry[];
 }
 
 interface Deps {
@@ -393,7 +399,21 @@ export function createMockDb(): MockDb {
     { id: 'gt-p3', tenantId: T, operationId: 'op-palmiers', type: 'soumission', issuer: 'NSIA Banque', amount: 20_000_000, validFrom: '2026-01-15', validUntil: '2026-03-15', status: 'liberee' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees };
+  // Registre des risques (M20) — Palmiers.
+  const risks: Risk[] = [
+    { id: 'rk-p1', tenantId: T, operationId: 'op-palmiers', code: 'R-04', label: 'Retard livraison acier (tension marché)', category: 'delai', probability: 4, impact: 4, status: 'ouvert', mitigation: 'Double sourcing + stock tampon' },
+    { id: 'rk-p2', tenantId: T, operationId: 'op-palmiers', code: 'R-07', label: 'Dérive du coût gros œuvre', category: 'financier', probability: 3, impact: 5, status: 'maitrise', mitigation: 'Marché à prix ferme, avenants plafonnés' },
+    { id: 'rk-p3', tenantId: T, operationId: 'op-palmiers', code: 'R-11', label: 'Attestation décennale entreprise expirée', category: 'juridique', probability: 5, impact: 5, status: 'ouvert', mitigation: 'Suspension paiement jusqu\u2019à régularisation' },
+    { id: 'rk-p4', tenantId: T, operationId: 'op-palmiers', code: 'R-02', label: 'Intempéries saison des pluies', category: 'externe', probability: 3, impact: 2, status: 'ouvert', mitigation: 'Planning avec marge météo' },
+  ];
+  // Journal d'audit (M23) — Palmiers : quelques traces (append-only).
+  const auditLog: AuditEntry[] = [
+    { id: 'au-l1', tenantId: T, operationId: 'op-palmiers', at: '2026-06-08T10:12:00.000Z', actor: 'MOA — Direction', action: 'approve', module: 'M16', object: 'Décompte n°2', summary: 'Validation décompte 285 M' },
+    { id: 'au-l2', tenantId: T, operationId: 'op-palmiers', at: '2026-06-05T14:30:00.000Z', actor: 'AMO', action: 'update', module: 'M19', object: 'Réserve étanchéité', summary: 'Réserve majeure ouverte' },
+    { id: 'au-l3', tenantId: T, operationId: 'op-palmiers', at: '2026-05-20T09:00:00.000Z', actor: 'MOA — Direction', action: 'transition', module: 'M1', object: 'Opération', summary: 'Passage en réalisation' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1104,6 +1124,59 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createRisksRepo(db: MockDb, session: Session, deps: Deps): RisksRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.risks).filter((r) => r.operationId === opId).map((r) => ({ ...r }));
+    },
+    async add(opId, input: RiskInput) {
+      const r: Risk = {
+        id: id(), tenantId: session.tenantId, operationId: opId, code: input.code.trim(), label: input.label.trim(),
+        category: input.category, probability: input.probability, impact: input.impact,
+        status: 'ouvert', mitigation: input.mitigation?.trim() || null,
+      };
+      db.risks.push(r);
+      return { ...r };
+    },
+    async setStatus(rid, status: RiskStatus) {
+      const r = db.risks.find((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (!r) throw new Error('not_found');
+      r.status = status;
+      return { ...r };
+    },
+    async remove(rid) {
+      const i = db.risks.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.risks.splice(i, 1);
+    },
+  };
+}
+
+export function createAuditRepo(db: MockDb, session: Session, deps: Deps): AuditRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.auditLog)
+        .filter((e) => e.operationId === opId)
+        .map((e) => ({ ...e }))
+        .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    },
+    async append(opId, input: AuditInput) {
+      // RG-M23 — append-only : uniquement une insertion.
+      const e: AuditEntry = {
+        id: id(), tenantId: session.tenantId, operationId: opId, at: now(),
+        actor: session.userId, action: input.action, module: input.module.trim(),
+        object: input.object.trim(), summary: input.summary?.trim() || null,
+      };
+      db.auditLog.push(e);
+      return { ...e };
     },
   };
 }

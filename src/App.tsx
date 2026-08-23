@@ -24,6 +24,8 @@ import { AnalyseScreen } from './features/m1/AnalyseScreen';
 import { AchatsScreen } from './features/m1/AchatsScreen';
 import { ReceptionScreen } from './features/m1/ReceptionScreen';
 import { CautionsScreen } from './features/m1/CautionsScreen';
+import { RisquesScreen } from './features/m1/RisquesScreen';
+import { JournalScreen } from './features/m1/JournalScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -67,6 +69,10 @@ function RouteView() {
       return <ReceptionScreen id={route.id} />;
     case 'cautions':
       return <CautionsScreen id={route.id} />;
+    case 'risques':
+      return <RisquesScreen id={route.id} />;
+    case 'journal':
+      return <JournalScreen id={route.id} />;
     default:
       return <DashboardScreen />;
   }
