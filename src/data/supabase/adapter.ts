@@ -56,8 +56,9 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
+import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1169,6 +1170,44 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Analyse des offres (M9) ──────────────────────────────────────────────────
+interface OfferRow {
+  id: string; tenant_id: string; operation_id: string; tender_id: string; bidder: string;
+  amount: number | string; score_technical: number | string; status: string;
+}
+function toOffer(r: OfferRow): Offer {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, tenderId: r.tender_id,
+    bidder: r.bidder, amount: Number(r.amount), scoreTechnical: Number(r.score_technical), status: r.status as OfferStatus,
+  };
+}
+export function createSupabaseOffersRepo(client: SupabaseClient, session: Session): OffersRepo {
+  const OF = 'ao_offers';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(OF).select('*').eq('operation_id', opId).order('created_at')) as OfferRow[];
+      return rows.map(toOffer);
+    },
+    async add(opId, input: OfferInput) {
+      const row = unwrap(
+        await client.from(OF).insert({
+          tenant_id: session.tenantId, operation_id: opId, tender_id: input.tenderId,
+          bidder: input.bidder, amount: input.amount, score_technical: input.scoreTechnical, status: 'recu',
+        }).select('*').single(),
+      ) as OfferRow;
+      return toOffer(row);
+    },
+    async setStatus(id, status: OfferStatus) {
+      const row = unwrap(await client.from(OF).update({ status }).eq('id', id).select('*').single()) as OfferRow;
+      return toOffer(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(OF).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };

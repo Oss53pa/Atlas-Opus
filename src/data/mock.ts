@@ -38,6 +38,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
+import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -64,6 +65,7 @@ import type {
   TendersRepo,
   GovernanceRepo,
   StudiesRepo,
+  OffersRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -101,6 +103,7 @@ export interface MockDb {
   raciAssignments: RaciAssignment[];
   decisions: Decision[];
   studies: Study[];
+  offers: Offer[];
 }
 
 interface Deps {
@@ -352,7 +355,14 @@ export function createMockDb(): MockDb {
     { id: 'et-r1', tenantId: T, operationId: 'op-riviera', kind: 'programmatique', provider: 'Atelier Programmation', status: 'validee', cost: 9_000_000, dueDate: '2026-05-01', summary: 'Programme fonctionnel arrêté' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies };
+  // Analyse des offres (M9) — Palmiers : dépouillement du marché second œuvre (td-p2).
+  const offers: Offer[] = [
+    { id: 'of-p1', tenantId: T, operationId: 'op-palmiers', tenderId: 'td-p2', bidder: 'Second Œuvre CI', amount: 480_000_000, scoreTechnical: 82, status: 'conforme' },
+    { id: 'of-p2', tenantId: T, operationId: 'op-palmiers', tenderId: 'td-p2', bidder: 'Finitions Modernes', amount: 452_000_000, scoreTechnical: 76, status: 'conforme' },
+    { id: 'of-p3', tenantId: T, operationId: 'op-palmiers', tenderId: 'td-p2', bidder: 'BTP Express', amount: 410_000_000, scoreTechnical: 61, status: 'ecarte' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1063,6 +1073,34 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createOffersRepo(db: MockDb, session: Session, deps: Deps): OffersRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.offers).filter((o) => o.operationId === opId).map((o) => ({ ...o }));
+    },
+    async add(opId, input: OfferInput) {
+      const o: Offer = {
+        id: id(), tenantId: session.tenantId, operationId: opId, tenderId: input.tenderId,
+        bidder: input.bidder.trim(), amount: input.amount, scoreTechnical: input.scoreTechnical, status: 'recu',
+      };
+      db.offers.push(o);
+      return { ...o };
+    },
+    async setStatus(oid, status: OfferStatus) {
+      const o = db.offers.find((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (!o) throw new Error('not_found');
+      o.status = status;
+      return { ...o };
+    },
+    async remove(oid) {
+      const i = db.offers.findIndex((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (i >= 0) db.offers.splice(i, 1);
     },
   };
 }
