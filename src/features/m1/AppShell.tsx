@@ -34,7 +34,7 @@ const FAMILIES: FamilyDef[] = [
     modules: [
       { code: 'M1', labelKey: 'mod.m1', route: 'program' },
       { code: 'M2', labelKey: 'mod.m2', route: 'compliance' },
-      { code: 'M3', labelKey: 'mod.m3' },
+      { code: 'M3', labelKey: 'mod.m3', route: 'etudes' },
     ],
   },
   {
