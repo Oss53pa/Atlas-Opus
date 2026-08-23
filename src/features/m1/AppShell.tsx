@@ -45,7 +45,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M5', labelKey: 'mod.m5', route: 'financing' },
       { code: 'M6', labelKey: 'mod.m6', route: 'commercialisation' },
       { code: 'M16', labelKey: 'mod.m16', route: 'payments' },
-      { code: 'M17', labelKey: 'mod.m17' },
+      { code: 'M17', labelKey: 'mod.m17', route: 'cautions' },
     ],
   },
   {
@@ -74,7 +74,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M14', labelKey: 'mod.m14' },
       { code: 'M15', labelKey: 'mod.m15' },
       { code: 'M18', labelKey: 'mod.m18' },
-      { code: 'M19', labelKey: 'mod.m19' },
+      { code: 'M19', labelKey: 'mod.m19', route: 'reception' },
     ],
   },
   {

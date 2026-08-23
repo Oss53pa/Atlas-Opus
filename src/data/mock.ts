@@ -40,6 +40,8 @@ import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
+import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
+import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -68,6 +70,8 @@ import type {
   StudiesRepo,
   OffersRepo,
   PurchasingRepo,
+  ReceptionRepo,
+  GuaranteesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -107,6 +111,8 @@ export interface MockDb {
   studies: Study[];
   offers: Offer[];
   purchaseOrders: PurchaseOrder[];
+  reserves: Reserve[];
+  guarantees: Guarantee[];
 }
 
 interface Deps {
@@ -373,7 +379,21 @@ export function createMockDb(): MockDb {
     { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders };
+  // Réception & GPA (M19) — Palmiers : réserves de pré-réception (1 majeure ouverte).
+  const reserves: Reserve[] = [
+    { id: 'rs-p1', tenantId: T, operationId: 'op-palmiers', label: 'Étanchéité terrasse R+4 non conforme', location: 'Bât. A · R+4 · terrasse', severity: 'majeure', status: 'ouverte', raisedAt: '2026-06-01', clearedAt: null },
+    { id: 'rs-p2', tenantId: T, operationId: 'op-palmiers', label: 'Faïence salle de bain fissurée', location: 'Bât. A · Lot 12', severity: 'mineure', status: 'ouverte', raisedAt: '2026-06-02', clearedAt: null },
+    { id: 'rs-p3', tenantId: T, operationId: 'op-palmiers', label: 'Peinture cage d\u2019escalier reprise', location: 'Bât. A · circulation', severity: 'mineure', status: 'levee', raisedAt: '2026-05-20', clearedAt: '2026-06-05' },
+  ];
+
+  // Cautions & garanties (M17) — Palmiers : garanties bancaires (une à échéance).
+  const guarantees: Guarantee[] = [
+    { id: 'gt-p1', tenantId: T, operationId: 'op-palmiers', type: 'restitution_avance', issuer: 'Ecobank CI', amount: 145_000_000, validFrom: '2026-03-01', validUntil: '2027-03-01', status: 'active' },
+    { id: 'gt-p2', tenantId: T, operationId: 'op-palmiers', type: 'bonne_execution', issuer: 'SGBCI', amount: 72_500_000, validFrom: '2026-03-01', validUntil: '2026-09-05', status: 'active' },
+    { id: 'gt-p3', tenantId: T, operationId: 'op-palmiers', type: 'soumission', issuer: 'NSIA Banque', amount: 20_000_000, validFrom: '2026-01-15', validUntil: '2026-03-15', status: 'liberee' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1084,6 +1104,65 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createGuaranteesRepo(db: MockDb, session: Session, deps: Deps): GuaranteesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.guarantees).filter((g) => g.operationId === opId).map((g) => ({ ...g }));
+    },
+    async add(opId, input: GuaranteeInput) {
+      const g: Guarantee = {
+        id: id(), tenantId: session.tenantId, operationId: opId, type: input.type, issuer: input.issuer.trim(),
+        amount: input.amount, validFrom: input.validFrom, validUntil: input.validUntil ?? null, status: 'active',
+      };
+      db.guarantees.push(g);
+      return { ...g };
+    },
+    async setStatus(gid, status: GuaranteeStatus) {
+      const g = db.guarantees.find((x) => x.id === gid && x.tenantId === session.tenantId);
+      if (!g) throw new Error('not_found');
+      g.status = status;
+      return { ...g };
+    },
+    async remove(gid) {
+      const i = db.guarantees.findIndex((x) => x.id === gid && x.tenantId === session.tenantId);
+      if (i >= 0) db.guarantees.splice(i, 1);
+    },
+  };
+}
+
+export function createReceptionRepo(db: MockDb, session: Session, deps: Deps): ReceptionRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async reserves(opId) {
+      return mine(db.reserves).filter((r) => r.operationId === opId).map((r) => ({ ...r }));
+    },
+    async addReserve(opId, input: ReserveInput) {
+      const r: Reserve = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        label: input.label.trim(), location: input.location.trim(), severity: input.severity,
+        status: 'ouverte', raisedAt: input.raisedAt, clearedAt: null,
+      };
+      db.reserves.push(r);
+      return { ...r };
+    },
+    async setReserveStatus(rid, status: ReserveStatus) {
+      const r = db.reserves.find((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (!r) throw new Error('not_found');
+      r.status = status;
+      r.clearedAt = status === 'levee' ? now().slice(0, 10) : null;
+      return { ...r };
+    },
+    async removeReserve(rid) {
+      const i = db.reserves.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.reserves.splice(i, 1);
     },
   };
 }
