@@ -56,7 +56,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -68,6 +68,8 @@ import type { SiteReport, SiteReportInput } from '../../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput, ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { Document, DocumentInput, DocStatus, DocDiscipline } from '../../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus, RfiPriority } from '../../domain/rfi/types';
+import type { Connection, ConnectionInput, ConnectionStatus, UtilityType } from '../../domain/m18/types';
+import type { LibraryDoc, LibraryDocInput, LibraryStatus, DocCategory } from '../../domain/m22/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1179,6 +1181,83 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Concessionnaires & raccordements (M18) ───────────────────────────────────
+interface ConnectionRow {
+  id: string; tenant_id: string; operation_id: string; utility: string; concessionaire: string;
+  reference: string; status: string; cost: number | string; requested_at: string;
+}
+function toConnection(r: ConnectionRow): Connection {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, utility: r.utility as UtilityType,
+    concessionaire: r.concessionaire, reference: r.reference, status: r.status as ConnectionStatus,
+    cost: Number(r.cost), requestedAt: r.requested_at,
+  };
+}
+export function createSupabaseConnectionsRepo(client: SupabaseClient, session: Session): ConnectionsRepo {
+  const CX = 'ao_connections';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(CX).select('*').eq('operation_id', opId).order('requested_at', { ascending: false })) as ConnectionRow[];
+      return rows.map(toConnection);
+    },
+    async add(opId, input: ConnectionInput) {
+      const row = unwrap(
+        await client.from(CX).insert({
+          tenant_id: session.tenantId, operation_id: opId, utility: input.utility, concessionaire: input.concessionaire,
+          reference: input.reference, status: 'demande', cost: input.cost, requested_at: input.requestedAt,
+        }).select('*').single(),
+      ) as ConnectionRow;
+      return toConnection(row);
+    },
+    async setStatus(id, status: ConnectionStatus) {
+      const row = unwrap(await client.from(CX).update({ status }).eq('id', id).select('*').single()) as ConnectionRow;
+      return toConnection(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(CX).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Documents — GED transverse (M22) ─────────────────────────────────────────
+interface LibraryRow {
+  id: string; tenant_id: string; operation_id: string; name: string; category: string;
+  reference: string; version: number; status: string; updated_at: string;
+}
+function toLibraryDoc(r: LibraryRow): LibraryDoc {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, name: r.name, category: r.category as DocCategory,
+    reference: r.reference, version: Number(r.version), status: r.status as LibraryStatus, updatedAt: r.updated_at,
+  };
+}
+export function createSupabaseLibraryRepo(client: SupabaseClient, session: Session): LibraryRepo {
+  const LB = 'ao_doc_library';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(LB).select('*').eq('operation_id', opId).order('updated_at', { ascending: false })) as LibraryRow[];
+      return rows.map(toLibraryDoc);
+    },
+    async add(opId, input: LibraryDocInput) {
+      const row = unwrap(
+        await client.from(LB).insert({
+          tenant_id: session.tenantId, operation_id: opId, name: input.name, category: input.category,
+          reference: input.reference, version: 1, status: 'brouillon',
+        }).select('*').single(),
+      ) as LibraryRow;
+      return toLibraryDoc(row);
+    },
+    async setStatus(id, status: LibraryStatus) {
+      const row = unwrap(await client.from(LB).update({ status }).eq('id', id).select('*').single()) as LibraryRow;
+      return toLibraryDoc(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(LB).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
