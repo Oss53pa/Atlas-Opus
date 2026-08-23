@@ -4,22 +4,22 @@ interface StatCardProps {
   label: string;
   children: ReactNode;
   hint?: ReactNode;
-  /** Accent ambre sur la valeur (KPI mis en avant : marge, TRI). */
+  /** Accent terre cuite sur la valeur — signale un problème / une décision. */
   emphasis?: boolean;
 }
 
-/** Tuile KPI — surface verre subtile, label discret, valeur en avant. */
+/**
+ * Tuile KPI autonome (handoff) — cadre crème, label mono 10px majuscules,
+ * valeur mono 23px. Pour la rangée à cadre unique, préférer `KpiRow`.
+ */
 export function StatCard({ label, children, hint, emphasis = false }: StatCardProps) {
   return (
-    <div className="ax-card ax-card--subtle p-4">
-      <div className="text-[11px] uppercase tracking-wide text-ink-3">{label}</div>
-      <div
-        className="mt-1.5 text-lg"
-        style={{ fontWeight: 500, color: emphasis ? 'var(--ax-accent-strong)' : 'var(--ax-text)' }}
-      >
+    <div className="ax-card" style={{ padding: '15px 18px' }}>
+      <div className="ax-kpi__label">{label}</div>
+      <div className="ax-kpi__value mono" style={emphasis ? { color: 'var(--ax-accent)' } : undefined}>
         {children}
       </div>
-      {hint && <div className="mt-1 text-[11px] text-ink-3">{hint}</div>}
+      {hint && <div className="ax-kpi__sub">{hint}</div>}
     </div>
   );
 }
