@@ -15,6 +15,7 @@ import {
   createGovernanceRepo,
   createStudiesRepo,
   createOffersRepo,
+  createPurchasingRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -35,6 +36,7 @@ import type {
   GovernanceRepo,
   StudiesRepo,
   OffersRepo,
+  PurchasingRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -49,6 +51,7 @@ import type { Task } from '../domain/m12/types';
 import type { Tender } from '../domain/m8/types';
 import type { Study } from '../domain/m3/types';
 import type { Offer } from '../domain/m9/types';
+import type { PurchaseOrder } from '../domain/m10/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -71,6 +74,7 @@ import {
   createSupabaseGovernanceRepo,
   createSupabaseStudiesRepo,
   createSupabaseOffersRepo,
+  createSupabasePurchasingRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -91,6 +95,7 @@ interface DataApi {
   governance: GovernanceRepo;
   studies: StudiesRepo;
   offers: OffersRepo;
+  purchasing: PurchasingRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -123,6 +128,7 @@ function buildMockApi(): DataApi {
     governance: createGovernanceRepo(db, session, { telemetry }),
     studies: createStudiesRepo(db, session, { telemetry }),
     offers: createOffersRepo(db, session, { telemetry }),
+    purchasing: createPurchasingRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -175,6 +181,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           governance: createSupabaseGovernanceRepo(supabase, session),
           studies: createSupabaseStudiesRepo(supabase, session),
           offers: createSupabaseOffersRepo(supabase, session),
+          purchasing: createSupabasePurchasingRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -337,6 +344,11 @@ export function useStudies(operationId: string): AsyncState<Study[]> {
 export function useOffers(operationId: string): AsyncState<Offer[]> {
   const { offers } = useData();
   return useAsync(() => offers.list(operationId), [offers, operationId]);
+}
+
+export function usePurchaseOrders(operationId: string): AsyncState<PurchaseOrder[]> {
+  const { purchasing } = useData();
+  return useAsync(() => purchasing.list(operationId), [purchasing, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

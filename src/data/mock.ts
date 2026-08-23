@@ -39,6 +39,7 @@ import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
+import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -66,6 +67,7 @@ import type {
   GovernanceRepo,
   StudiesRepo,
   OffersRepo,
+  PurchasingRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -104,6 +106,7 @@ export interface MockDb {
   decisions: Decision[];
   studies: Study[];
   offers: Offer[];
+  purchaseOrders: PurchaseOrder[];
 }
 
 interface Deps {
@@ -362,7 +365,15 @@ export function createMockDb(): MockDb {
     { id: 'of-p3', tenantId: T, operationId: 'op-palmiers', tenderId: 'td-p2', bidder: 'BTP Express', amount: 410_000_000, scoreTechnical: 61, status: 'ecarte' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers };
+  // Achats & logistique (M10) — Palmiers : bons de commande d'approvisionnement.
+  const purchaseOrders: PurchaseOrder[] = [
+    { id: 'po-p1', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-014', supplier: 'Ciments d\u2019Afrique', item: 'Ciment CPJ 42.5', quantity: 1200, unit: 'sacs', amount: 42_000_000, status: 'receptionne' },
+    { id: 'po-p2', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-021', supplier: 'Acier CI', item: 'Fer \u00e0 b\u00e9ton HA12', quantity: 18, unit: 't', amount: 27_000_000, status: 'livre' },
+    { id: 'po-p3', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-028', supplier: 'Menuiserie Alu Plus', item: 'Ch\u00e2ssis aluminium', quantity: 96, unit: 'u', amount: 33_000_000, status: 'commande' },
+    { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1073,6 +1084,35 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): PurchasingRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.purchaseOrders).filter((o) => o.operationId === opId).map((o) => ({ ...o }));
+    },
+    async add(opId, input: PurchaseOrderInput) {
+      const o: PurchaseOrder = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        reference: input.reference.trim(), supplier: input.supplier.trim(), item: input.item.trim(),
+        quantity: input.quantity, unit: input.unit.trim(), amount: input.amount, status: 'brouillon',
+      };
+      db.purchaseOrders.push(o);
+      return { ...o };
+    },
+    async setStatus(oid, status: PurchaseStatus) {
+      const o = db.purchaseOrders.find((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (!o) throw new Error('not_found');
+      o.status = status;
+      return { ...o };
+    },
+    async remove(oid) {
+      const i = db.purchaseOrders.findIndex((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (i >= 0) db.purchaseOrders.splice(i, 1);
     },
   };
 }

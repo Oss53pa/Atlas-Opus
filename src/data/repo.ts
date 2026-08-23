@@ -62,6 +62,7 @@ import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
+import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
 
 export interface Session {
   userId: string;
@@ -207,6 +208,14 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Achats & logistique (M10) : bons de commande & réceptions. */
+export interface PurchasingRepo {
+  list(operationId: string): Promise<PurchaseOrder[]>;
+  add(operationId: string, input: PurchaseOrderInput): Promise<PurchaseOrder>;
+  setStatus(id: string, status: PurchaseStatus): Promise<PurchaseOrder>;
+  remove(id: string): Promise<void>;
 }
 
 /** Analyse des offres (M9) : offres rattachées aux marchés (M8). */

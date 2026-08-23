@@ -13,6 +13,7 @@ import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
 import type { StudyKind, StudyStatus } from '../../domain/m3/types';
 import type { OfferStatus } from '../../domain/m9/types';
+import type { PurchaseStatus } from '../../domain/m10/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -365,6 +366,21 @@ export const OFFER_STATUS_TONE: Record<OfferStatus, BadgeTone> = {
   retenu: 'accent',
 };
 export const offerStatusLabel = (s: OfferStatus) => t(OFFER_STATUS_KEY[s]);
+
+// ── Achats & logistique (M10) ────────────────────────────────────────────────
+const PURCHASE_STATUS_KEY: Record<PurchaseStatus, MessageKey> = {
+  brouillon: 'purchase.status.brouillon',
+  commande: 'purchase.status.commande',
+  livre: 'purchase.status.livre',
+  receptionne: 'purchase.status.receptionne',
+};
+export const PURCHASE_STATUS_TONE: Record<PurchaseStatus, BadgeTone> = {
+  brouillon: 'neutral',
+  commande: 'info',
+  livre: 'warning',
+  receptionne: 'success',
+};
+export const purchaseStatusLabel = (s: PurchaseStatus) => t(PURCHASE_STATUS_KEY[s]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

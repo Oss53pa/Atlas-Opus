@@ -56,9 +56,10 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
+import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1170,6 +1171,44 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Achats & logistique (M10) ────────────────────────────────────────────────
+interface PurchaseOrderRow {
+  id: string; tenant_id: string; operation_id: string; reference: string; supplier: string;
+  item: string; quantity: number | string; unit: string; amount: number | string; status: string;
+}
+function toPurchaseOrder(r: PurchaseOrderRow): PurchaseOrder {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, supplier: r.supplier,
+    item: r.item, quantity: Number(r.quantity), unit: r.unit, amount: Number(r.amount), status: r.status as PurchaseStatus,
+  };
+}
+export function createSupabasePurchasingRepo(client: SupabaseClient, session: Session): PurchasingRepo {
+  const PO = 'ao_purchase_orders';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(PO).select('*').eq('operation_id', opId).order('created_at')) as PurchaseOrderRow[];
+      return rows.map(toPurchaseOrder);
+    },
+    async add(opId, input: PurchaseOrderInput) {
+      const row = unwrap(
+        await client.from(PO).insert({
+          tenant_id: session.tenantId, operation_id: opId, reference: input.reference, supplier: input.supplier,
+          item: input.item, quantity: input.quantity, unit: input.unit, amount: input.amount, status: 'brouillon',
+        }).select('*').single(),
+      ) as PurchaseOrderRow;
+      return toPurchaseOrder(row);
+    },
+    async setStatus(id, status: PurchaseStatus) {
+      const row = unwrap(await client.from(PO).update({ status }).eq('id', id).select('*').single()) as PurchaseOrderRow;
+      return toPurchaseOrder(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(PO).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
