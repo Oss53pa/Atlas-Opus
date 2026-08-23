@@ -6,10 +6,9 @@ import {
   Activity,
   Wallet,
   ShieldCheck,
-  Clock,
   AlertTriangle,
 } from 'lucide-react';
-import { Badge, Banner, Button, Card, Progress, Skeleton, StatCard } from '../../ui';
+import { Badge, Banner, Button, KpiRow, Panel, FactList, Progress, Skeleton, type Fact, type FactSeverity } from '../../ui';
 import { PhaseBadge } from './PhaseBadge';
 import { TransitionDialog } from './TransitionDialog';
 import { countryLabel, opTypeLabel, phaseLabel, statusLabel, STATUS_TONE } from './labels';
@@ -23,11 +22,11 @@ import { planTresorerie } from '../../domain/finance/bilan';
 import { Money } from '../../domain/money/Money';
 import { bilanToAlertFacts } from './alerts';
 
-/** Rendu (icône + tonalité) par sévérité d'alerte consolidée. */
-const SEVERITY_STYLE: Record<AlertSeverity, { tone: string; icon: typeof AlertTriangle }> = {
-  danger: { tone: 'danger', icon: AlertTriangle },
-  echeance: { tone: 'warning', icon: Clock },
-  info: { tone: 'info', icon: ShieldCheck },
+/** Barre de sévérité (handoff) par sévérité d'alerte consolidée. */
+const ALERT_BAR: Record<AlertSeverity, FactSeverity> = {
+  danger: 'danger',
+  echeance: 'accent',
+  info: 'neutral',
 };
 
 export function OperationCockpit({ id }: { id: string }) {
@@ -95,51 +94,35 @@ export function OperationCockpit({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* KPI bilan — calculés via Money.ts (alimentés par M4) */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {bilanLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 84 }} />)
-        ) : (
-          <>
-            <StatCard label={t('bilan.cost')}>{bilan ? bilan.summary.coutTotal.format(locale) : '—'}</StatCard>
-            <StatCard
-              label={t('bilan.revenue')}
-              hint={bilan ? t('bilan.revenueRealized', { amount: bilan.summary.recettesRealisees.format(locale) }) : undefined}
-            >
-              {bilan ? bilan.summary.recettes.format(locale) : '—'}
-            </StatCard>
-            <StatCard
-              label={t('bilan.margin')}
-              hint={bilan ? `${t('bilan.marginRate')} ${formatPercent(bilan.summary.tauxMarge, locale)}` : undefined}
-            >
-              {bilan ? (
-                <span style={{ color: bilan.summary.marge.isNegative() ? 'var(--ax-danger)' : 'var(--ax-success)' }}>
-                  {bilan.summary.marge.isNegative() ? '' : '+'}
-                  {bilan.summary.marge.format(locale)}
-                </span>
-              ) : (
-                '—'
-              )}
-            </StatCard>
-            <StatCard label={t('bilan.tri')} emphasis>
-              {bilan && bilan.tri != null ? formatPercent(bilan.tri, locale) : '—'}
-            </StatCard>
-          </>
-        )}
-      </div>
+      {/* KPI bilan — calculés via Money.ts (alimentés par M4) ; rangée handoff */}
+      {bilanLoading ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} style={{ height: 84 }} />)}
+        </div>
+      ) : bilan ? (
+        <KpiRow
+          items={[
+            { label: t('bilan.cost'), value: bilan.summary.coutTotal.format(locale) },
+            {
+              label: t('bilan.revenue'),
+              value: bilan.summary.recettes.format(locale),
+              sub: t('bilan.revenueRealized', { amount: bilan.summary.recettesRealisees.format(locale) }),
+            },
+            {
+              label: t('bilan.margin'),
+              value: `${bilan.summary.marge.isNegative() ? '' : '+'}${bilan.summary.marge.format(locale)}`,
+              sub: `${t('bilan.marginRate')} ${formatPercent(bilan.summary.tauxMarge, locale)}`,
+              accent: bilan.summary.marge.isNegative(),
+            },
+            { label: t('bilan.tri'), value: bilan.tri != null ? formatPercent(bilan.tri, locale) : '—', accent: true },
+          ]}
+        />
+      ) : null}
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.55fr_1fr]">
         {/* Bilan + courbes (placeholder M4/M12) */}
-        <Card tone="strong" className="md:col-span-2">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-[18px] font-medium">{t('cockpit.bilan')}</h2>
-              <p className="mt-0.5 text-[13px] text-ink-2">{t('cockpit.bilan.subtitle')}</p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Progress value={op.progress ?? 0} label={t('bilan.progress', { pct: formatPercent(op.progress ?? 0, locale, 0) })} />
-          </div>
+        <Panel title={t('cockpit.bilan')} meta={t('cockpit.bilan.subtitle')}>
+          <Progress value={op.progress ?? 0} label={t('bilan.progress', { pct: formatPercent(op.progress ?? 0, locale, 0) })} />
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <PlaceholderWidget icon={<Activity size={16} />} title={t('cockpit.scurve')} />
             {bilan && bilan.cashflow.length > 0 ? (
@@ -148,43 +131,36 @@ export function OperationCockpit({ id }: { id: string }) {
               <PlaceholderWidget icon={<Wallet size={16} />} title={t('cockpit.cashflow')} />
             )}
           </div>
-        </Card>
+        </Panel>
 
         {/* Alertes consolidées & priorisées (RG-M21-02) */}
-        <Card>
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[16px] font-medium">{t('cockpit.risks')}</h2>
-            {alerts.length > 0 && (
-              <span className="text-[11px] text-ink-3">
-                {t('cockpit.alerts.count', {
+        <Panel
+          title={t('cockpit.risks')}
+          meta={
+            alerts.length > 0
+              ? t('cockpit.alerts.count', {
                   danger: countBySeverity(alerts, 'danger'),
                   echeance: countBySeverity(alerts, 'echeance'),
                   info: countBySeverity(alerts, 'info'),
-                })}
-              </span>
-            )}
-          </div>
+                })
+              : undefined
+          }
+          bodyPadded={alerts.length === 0}
+        >
           {alerts.length === 0 ? (
-            <div className="mt-4 flex items-center gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
-              <span style={{ color: 'var(--ax-success)', marginTop: 1 }}><ShieldCheck size={16} /></span>
+            <div className="flex items-center gap-3">
+              <span style={{ color: 'var(--ax-text-secondary)' }}><ShieldCheck size={16} /></span>
               <span className="text-[13px] text-ink-2">{t('alerts.none')}</span>
             </div>
           ) : (
-            <ul className="mt-4 flex flex-col gap-2">
-              {alerts.map((al, i) => {
-                const { tone, icon: Icon } = SEVERITY_STYLE[al.severity];
-                return (
-                  <li key={`${al.source}-${i}`} className="flex items-start gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
-                    <span style={{ color: `var(--ax-${tone})`, marginTop: 1 }}>
-                      <Icon size={16} />
-                    </span>
-                    <span className="text-[13px] text-ink-2">{t(al.labelKey)}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            <FactList
+              items={alerts.map((al): Fact => ({
+                label: t(al.labelKey),
+                severity: ALERT_BAR[al.severity],
+              }))}
+            />
           )}
-        </Card>
+        </Panel>
       </div>
 
       <TransitionDialog op={op} open={transitionOpen} onClose={() => setTransitionOpen(false)} onDone={refetch} />
