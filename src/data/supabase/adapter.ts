@@ -56,7 +56,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -66,6 +66,8 @@ import type { Risk, RiskInput, RiskStatus, RiskCategory } from '../../domain/m20
 import type { AuditEntry, AuditInput, AuditAction } from '../../domain/m23/types';
 import type { SiteReport, SiteReportInput } from '../../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput, ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
+import type { Document, DocumentInput, DocStatus, DocDiscipline } from '../../domain/ged/types';
+import type { Rfi, RfiInput, RfiStatus, RfiPriority } from '../../domain/rfi/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1177,6 +1179,86 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Conception & GED (M11) ───────────────────────────────────────────────────
+interface DocumentRow {
+  id: string; tenant_id: string; operation_id: string; reference: string; title: string;
+  discipline: string; indice: string; status: string;
+}
+function toDocument(r: DocumentRow): Document {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, title: r.title,
+    discipline: r.discipline as DocDiscipline, indice: r.indice, status: r.status as DocStatus,
+  };
+}
+export function createSupabaseDocumentsRepo(client: SupabaseClient, session: Session): DocumentsRepo {
+  const DT = 'ao_documents';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(DT).select('*').eq('operation_id', opId).order('created_at')) as DocumentRow[];
+      return rows.map(toDocument);
+    },
+    async add(opId, input: DocumentInput) {
+      const row = unwrap(
+        await client.from(DT).insert({
+          tenant_id: session.tenantId, operation_id: opId, reference: input.reference, title: input.title,
+          discipline: input.discipline, indice: input.indice || 'A', status: 'en_cours',
+        }).select('*').single(),
+      ) as DocumentRow;
+      return toDocument(row);
+    },
+    async setStatus(id, status: DocStatus) {
+      const row = unwrap(await client.from(DT).update({ status }).eq('id', id).select('*').single()) as DocumentRow;
+      return toDocument(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(DT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── RFI & collaboration (M12) ────────────────────────────────────────────────
+interface RfiRow {
+  id: string; tenant_id: string; operation_id: string; number: string; subject: string; question: string;
+  raised_by: string; priority: string; status: string; due_date: string | null; document_ref: string | null; answer: string | null;
+}
+function toRfi(r: RfiRow): Rfi {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, number: r.number, subject: r.subject,
+    question: r.question, raisedBy: r.raised_by, priority: r.priority as RfiPriority, status: r.status as RfiStatus,
+    dueDate: r.due_date, documentRef: r.document_ref, answer: r.answer,
+  };
+}
+export function createSupabaseRfisRepo(client: SupabaseClient, session: Session): RfisRepo {
+  const RF = 'ao_rfis';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(RF).select('*').eq('operation_id', opId).order('created_at')) as RfiRow[];
+      return rows.map(toRfi);
+    },
+    async add(opId, input: RfiInput) {
+      const row = unwrap(
+        await client.from(RF).insert({
+          tenant_id: session.tenantId, operation_id: opId, number: input.number, subject: input.subject,
+          question: input.question, raised_by: input.raisedBy, priority: input.priority, status: 'ouverte',
+          due_date: input.dueDate ?? null, document_ref: input.documentRef ?? null, answer: null,
+        }).select('*').single(),
+      ) as RfiRow;
+      return toRfi(row);
+    },
+    async setStatus(id, status: RfiStatus, answer?: string | null) {
+      const upd: Record<string, unknown> = { status };
+      if (answer !== undefined) upd.answer = answer;
+      const row = unwrap(await client.from(RF).update(upd).eq('id', id).select('*').single()) as RfiRow;
+      return toRfi(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(RF).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
