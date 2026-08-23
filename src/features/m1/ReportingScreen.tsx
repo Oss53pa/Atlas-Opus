@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2, FileDown } from 'lucide-react';
-import { Badge, Banner, Button, Card, EmptyState, Modal, Skeleton, Textarea, useToast } from '../../ui';
+import { Badge, Banner, Button, Card, DataTable, EmptyState, Modal, Panel, Skeleton, Textarea, useToast, type TableRowData } from '../../ui';
 import { useData, useOperation, useBilan, useReports } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, locale, type MessageKey } from '../../i18n';
@@ -121,36 +121,42 @@ export function ReportingScreen({ id }: { id: string }) {
           {rows.map((snap, i) => {
             const prev = rows[i + 1]; // rows triés du + récent au + ancien
             const delta = prev ? compareReports(prev.data, snap.data) : null;
+            const deltaCell = (n: number) => (
+              <span style={{ color: n >= 0 ? 'var(--ax-text-2)' : 'var(--ax-danger)' }}>{deltaMoney(n)}</span>
+            );
+            const metricRows: TableRowData[] = [
+              { cells: [t('reporting.metric.marge'), <span className="mono">{new Intl.NumberFormat(locale).format(Math.round(snap.data.marge))}</span>, ...(delta ? [<span className="mono">{deltaCell(delta.marge)}</span>] : [])] },
+              { cells: [t('reporting.metric.recettesRealisees'), <span className="mono">{new Intl.NumberFormat(locale).format(Math.round(snap.data.recettesRealisees))}</span>, ...(delta ? [<span className="mono">{deltaCell(delta.recettesRealisees)}</span>] : [])] },
+              { cells: [t('reporting.metric.progress'), <span className="mono">{formatPercent(snap.data.progress, locale, 0)}</span>, ...(delta ? [<span className="mono" style={{ color: delta.progress >= 0 ? 'var(--ax-text-2)' : 'var(--ax-danger)' }}>{deltaMoney(Math.round(delta.progress * 100))} pts</span>] : [])] },
+              { cells: [t('reporting.metric.alerts'), <span className="mono">{snap.data.alertsDanger} / {snap.data.alertsEcheance}</span>, ...(delta ? [<span className="text-ink-3">—</span>] : [])] },
+            ];
             return (
-              <Card key={snap.id} tone="strong">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
+              <Panel
+                key={snap.id}
+                title={
+                  <span className="flex items-center gap-2">
                     <Badge tone="accent">{t(TYPE_KEY[snap.type])}</Badge>
-                    <span className="text-[12px] text-ink-3">{t('reporting.generatedAt', { date: formatDate(snap.generatedAt.slice(0, 10), locale) })}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-normal text-ink-3">{t('reporting.generatedAt', { date: formatDate(snap.generatedAt.slice(0, 10), locale) })}</span>
+                  </span>
+                }
+                actions={
+                  <>
                     <Button variant="glass" size="sm" onClick={() => openExport(snap)}><FileDown size={14} />{t('reporting.export')}</Button>
                     {canEdit && <Button variant="ghost" size="sm" icon aria-label={t('reporting.removed')} onClick={() => remove(snap.id)}><Trash2 size={15} /></Button>}
-                  </div>
-                </div>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full text-[13px]">
-                    <thead>
-                      <tr className="text-ink-3">
-                        <th className="pb-1 text-left font-normal">{t('reporting.col.metric')}</th>
-                        <th className="pb-1 text-right font-normal">{t('reporting.col.value')}</th>
-                        {delta && <th className="pb-1 text-right font-normal">{t('reporting.vsPrevious')}</th>}
-                      </tr>
-                    </thead>
-                    <tbody className="mono">
-                      <MetricRow label={t('reporting.metric.marge')} value={new Intl.NumberFormat(locale).format(Math.round(snap.data.marge))} delta={delta ? deltaMoney(delta.marge) : undefined} deltaPositive={delta ? delta.marge >= 0 : undefined} />
-                      <MetricRow label={t('reporting.metric.recettesRealisees')} value={new Intl.NumberFormat(locale).format(Math.round(snap.data.recettesRealisees))} delta={delta ? deltaMoney(delta.recettesRealisees) : undefined} deltaPositive={delta ? delta.recettesRealisees >= 0 : undefined} />
-                      <MetricRow label={t('reporting.metric.progress')} value={formatPercent(snap.data.progress, locale, 0)} delta={delta ? deltaMoney(Math.round(delta.progress * 100)) + ' pts' : undefined} deltaPositive={delta ? delta.progress >= 0 : undefined} />
-                      <MetricRow label={t('reporting.metric.alerts')} value={`${snap.data.alertsDanger} / ${snap.data.alertsEcheance}`} />
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
+                  </>
+                }
+                bodyPadded={false}
+              >
+                <DataTable
+                  template={delta ? '1.4fr 1fr 1fr' : '1.4fr 1fr'}
+                  columns={
+                    delta
+                      ? [{ label: t('reporting.col.metric') }, { label: t('reporting.col.value'), align: 'right' }, { label: t('reporting.vsPrevious'), align: 'right' }]
+                      : [{ label: t('reporting.col.metric') }, { label: t('reporting.col.value'), align: 'right' }]
+                  }
+                  rows={metricRows}
+                />
+              </Panel>
             );
           })}
         </div>
@@ -175,14 +181,3 @@ export function ReportingScreen({ id }: { id: string }) {
   );
 }
 
-function MetricRow({ label, value, delta, deltaPositive }: { label: string; value: string; delta?: string; deltaPositive?: boolean }) {
-  return (
-    <tr style={{ borderTop: '1px solid var(--ax-border)' }}>
-      <td className="py-1.5 pr-2 text-left" style={{ fontFamily: 'inherit' }}>{label}</td>
-      <td className="py-1.5 text-right">{value}</td>
-      {delta !== undefined && (
-        <td className="py-1.5 text-right" style={{ color: deltaPositive ? 'var(--ax-success)' : 'var(--ax-danger)' }}>{delta}</td>
-      )}
-    </tr>
-  );
-}
