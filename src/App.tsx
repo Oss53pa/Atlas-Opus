@@ -22,6 +22,8 @@ import { PassationScreen } from './features/m1/PassationScreen';
 import { EtudesScreen } from './features/m1/EtudesScreen';
 import { AnalyseScreen } from './features/m1/AnalyseScreen';
 import { AchatsScreen } from './features/m1/AchatsScreen';
+import { ReceptionScreen } from './features/m1/ReceptionScreen';
+import { CautionsScreen } from './features/m1/CautionsScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -61,6 +63,10 @@ function RouteView() {
       return <AnalyseScreen id={route.id} />;
     case 'achats':
       return <AchatsScreen id={route.id} />;
+    case 'reception':
+      return <ReceptionScreen id={route.id} />;
+    case 'cautions':
+      return <CautionsScreen id={route.id} />;
     default:
       return <DashboardScreen />;
   }

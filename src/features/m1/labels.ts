@@ -14,6 +14,8 @@ import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/
 import type { StudyKind, StudyStatus } from '../../domain/m3/types';
 import type { OfferStatus } from '../../domain/m9/types';
 import type { PurchaseStatus } from '../../domain/m10/types';
+import type { ReserveSeverity, ReserveStatus } from '../../domain/m19/types';
+import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -381,6 +383,50 @@ export const PURCHASE_STATUS_TONE: Record<PurchaseStatus, BadgeTone> = {
   receptionne: 'success',
 };
 export const purchaseStatusLabel = (s: PurchaseStatus) => t(PURCHASE_STATUS_KEY[s]);
+
+// ── Réception & GPA (M19) ────────────────────────────────────────────────────
+const RESERVE_SEVERITY_KEY: Record<ReserveSeverity, MessageKey> = {
+  mineure: 'reserve.severity.mineure',
+  majeure: 'reserve.severity.majeure',
+};
+export const RESERVE_SEVERITY_TONE: Record<ReserveSeverity, BadgeTone> = {
+  mineure: 'warning',
+  majeure: 'danger',
+};
+const RESERVE_STATUS_KEY: Record<ReserveStatus, MessageKey> = {
+  ouverte: 'reserve.status.ouverte',
+  levee: 'reserve.status.levee',
+};
+export const RESERVE_STATUS_TONE: Record<ReserveStatus, BadgeTone> = {
+  ouverte: 'neutral',
+  levee: 'success',
+};
+export const reserveSeverityLabel = (s: ReserveSeverity) => t(RESERVE_SEVERITY_KEY[s]);
+export const reserveStatusLabel = (s: ReserveStatus) => t(RESERVE_STATUS_KEY[s]);
+
+// ── Cautions & garanties (M17) ───────────────────────────────────────────────
+const GUARANTEE_TYPE_KEY: Record<GuaranteeType, MessageKey> = {
+  restitution_avance: 'guarantee.type.restitution_avance',
+  bonne_execution: 'guarantee.type.bonne_execution',
+  retenue_garantie: 'guarantee.type.retenue_garantie',
+  soumission: 'guarantee.type.soumission',
+};
+const GUARANTEE_STATUS_KEY: Record<GuaranteeDisplayStatus, MessageKey> = {
+  active: 'guarantee.status.active',
+  liberee: 'guarantee.status.liberee',
+  appelee: 'guarantee.status.appelee',
+  expiring: 'guarantee.status.expiring',
+  expiree: 'guarantee.status.expiree',
+};
+export const GUARANTEE_STATUS_TONE: Record<GuaranteeDisplayStatus, BadgeTone> = {
+  active: 'success',
+  liberee: 'neutral',
+  appelee: 'danger',
+  expiring: 'warning',
+  expiree: 'danger',
+};
+export const guaranteeTypeLabel = (t2: GuaranteeType) => t(GUARANTEE_TYPE_KEY[t2]);
+export const guaranteeStatusLabel = (s: GuaranteeDisplayStatus) => t(GUARANTEE_STATUS_KEY[s]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

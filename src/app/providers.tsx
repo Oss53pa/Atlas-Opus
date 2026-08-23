@@ -16,6 +16,8 @@ import {
   createStudiesRepo,
   createOffersRepo,
   createPurchasingRepo,
+  createReceptionRepo,
+  createGuaranteesRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -37,6 +39,8 @@ import type {
   StudiesRepo,
   OffersRepo,
   PurchasingRepo,
+  ReceptionRepo,
+  GuaranteesRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -52,6 +56,8 @@ import type { Tender } from '../domain/m8/types';
 import type { Study } from '../domain/m3/types';
 import type { Offer } from '../domain/m9/types';
 import type { PurchaseOrder } from '../domain/m10/types';
+import type { Reserve } from '../domain/m19/types';
+import type { Guarantee } from '../domain/m17/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -75,6 +81,8 @@ import {
   createSupabaseStudiesRepo,
   createSupabaseOffersRepo,
   createSupabasePurchasingRepo,
+  createSupabaseReceptionRepo,
+  createSupabaseGuaranteesRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -96,6 +104,8 @@ interface DataApi {
   studies: StudiesRepo;
   offers: OffersRepo;
   purchasing: PurchasingRepo;
+  reception: ReceptionRepo;
+  guarantees: GuaranteesRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -129,6 +139,8 @@ function buildMockApi(): DataApi {
     studies: createStudiesRepo(db, session, { telemetry }),
     offers: createOffersRepo(db, session, { telemetry }),
     purchasing: createPurchasingRepo(db, session, { telemetry }),
+    reception: createReceptionRepo(db, session, { telemetry }),
+    guarantees: createGuaranteesRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -182,6 +194,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           studies: createSupabaseStudiesRepo(supabase, session),
           offers: createSupabaseOffersRepo(supabase, session),
           purchasing: createSupabasePurchasingRepo(supabase, session),
+          reception: createSupabaseReceptionRepo(supabase, session),
+          guarantees: createSupabaseGuaranteesRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -349,6 +363,16 @@ export function useOffers(operationId: string): AsyncState<Offer[]> {
 export function usePurchaseOrders(operationId: string): AsyncState<PurchaseOrder[]> {
   const { purchasing } = useData();
   return useAsync(() => purchasing.list(operationId), [purchasing, operationId]);
+}
+
+export function useReserves(operationId: string): AsyncState<Reserve[]> {
+  const { reception } = useData();
+  return useAsync(() => reception.reserves(operationId), [reception, operationId]);
+}
+
+export function useGuarantees(operationId: string): AsyncState<Guarantee[]> {
+  const { guarantees } = useData();
+  return useAsync(() => guarantees.list(operationId), [guarantees, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

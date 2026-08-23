@@ -63,6 +63,8 @@ import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
+import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
+import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 
 export interface Session {
   userId: string;
@@ -208,6 +210,22 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Cautions & garanties (M17) : garanties bancaires. */
+export interface GuaranteesRepo {
+  list(operationId: string): Promise<Guarantee[]>;
+  add(operationId: string, input: GuaranteeInput): Promise<Guarantee>;
+  setStatus(id: string, status: GuaranteeStatus): Promise<Guarantee>;
+  remove(id: string): Promise<void>;
+}
+
+/** Réception & GPA (M19) : réserves & levées. */
+export interface ReceptionRepo {
+  reserves(operationId: string): Promise<Reserve[]>;
+  addReserve(operationId: string, input: ReserveInput): Promise<Reserve>;
+  setReserveStatus(id: string, status: ReserveStatus): Promise<Reserve>;
+  removeReserve(id: string): Promise<void>;
 }
 
 /** Achats & logistique (M10) : bons de commande & réceptions. */

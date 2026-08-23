@@ -56,10 +56,12 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
+import type { Reserve, ReserveInput, ReserveStatus, ReserveSeverity } from '../../domain/m19/types';
+import type { Guarantee, GuaranteeInput, GuaranteeStatus, GuaranteeType } from '../../domain/m17/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1171,6 +1173,83 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Cautions & garanties (M17) ───────────────────────────────────────────────
+interface GuaranteeRow {
+  id: string; tenant_id: string; operation_id: string; type: string; issuer: string;
+  amount: number | string; valid_from: string; valid_until: string | null; status: string;
+}
+function toGuarantee(r: GuaranteeRow): Guarantee {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, type: r.type as GuaranteeType, issuer: r.issuer,
+    amount: Number(r.amount), validFrom: r.valid_from, validUntil: r.valid_until, status: r.status as GuaranteeStatus,
+  };
+}
+export function createSupabaseGuaranteesRepo(client: SupabaseClient, session: Session): GuaranteesRepo {
+  const GT = 'ao_guarantees';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(GT).select('*').eq('operation_id', opId).order('created_at')) as GuaranteeRow[];
+      return rows.map(toGuarantee);
+    },
+    async add(opId, input: GuaranteeInput) {
+      const row = unwrap(
+        await client.from(GT).insert({
+          tenant_id: session.tenantId, operation_id: opId, type: input.type, issuer: input.issuer,
+          amount: input.amount, valid_from: input.validFrom, valid_until: input.validUntil ?? null, status: 'active',
+        }).select('*').single(),
+      ) as GuaranteeRow;
+      return toGuarantee(row);
+    },
+    async setStatus(id, status: GuaranteeStatus) {
+      const row = unwrap(await client.from(GT).update({ status }).eq('id', id).select('*').single()) as GuaranteeRow;
+      return toGuarantee(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(GT).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Réception & GPA (M19) ────────────────────────────────────────────────────
+interface ReserveRow {
+  id: string; tenant_id: string; operation_id: string; label: string; location: string;
+  severity: string; status: string; raised_at: string; cleared_at: string | null;
+}
+function toReserve(r: ReserveRow): Reserve {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, label: r.label, location: r.location,
+    severity: r.severity as ReserveSeverity, status: r.status as ReserveStatus, raisedAt: r.raised_at, clearedAt: r.cleared_at,
+  };
+}
+export function createSupabaseReceptionRepo(client: SupabaseClient, session: Session): ReceptionRepo {
+  const RS = 'ao_reserves';
+  return {
+    async reserves(opId) {
+      const rows = unwrap(await client.from(RS).select('*').eq('operation_id', opId).order('raised_at', { ascending: false })) as ReserveRow[];
+      return rows.map(toReserve);
+    },
+    async addReserve(opId, input: ReserveInput) {
+      const row = unwrap(
+        await client.from(RS).insert({
+          tenant_id: session.tenantId, operation_id: opId, label: input.label, location: input.location,
+          severity: input.severity, status: 'ouverte', raised_at: input.raisedAt, cleared_at: null,
+        }).select('*').single(),
+      ) as ReserveRow;
+      return toReserve(row);
+    },
+    async setReserveStatus(id, status: ReserveStatus) {
+      const cleared_at = status === 'levee' ? new Date().toISOString().slice(0, 10) : null;
+      const row = unwrap(await client.from(RS).update({ status, cleared_at }).eq('id', id).select('*').single()) as ReserveRow;
+      return toReserve(row);
+    },
+    async removeReserve(id) {
+      const { error } = await client.from(RS).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
