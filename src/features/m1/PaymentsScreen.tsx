@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2, ArrowRight, FileText } from 'lucide-react';
-import { Badge, Banner, Button, Card, EmptyState, Field, Money as MoneyView, Skeleton, StatCard, useToast } from '../../ui';
+import { Badge, Banner, Button, Card, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Skeleton, useToast } from '../../ui';
 import { decompteStatusLabel, DECOMPTE_TONE } from './labels';
 import { useContracts, useData, useDecomptes, useOperation } from '../../app/providers';
 import { useNav } from '../../app/router';
@@ -99,14 +99,12 @@ export function PaymentsScreen({ id }: { id: string }) {
 
       {readOnly && <Banner tone="warning">{t('payments.readonly')}</Banner>}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={t('payments.total.net')}>
-          <MoneyView amount={totalNet.toMajorNumber()} currency={currency} />
-        </StatCard>
-        <StatCard label={t('payments.total.paid')} emphasis>
-          <MoneyView amount={totalPaid.toMajorNumber()} currency={currency} />
-        </StatCard>
-      </div>
+      <KpiRow
+        items={[
+          { label: t('payments.total.net'), value: <MoneyView amount={totalNet.toMajorNumber()} currency={currency} /> },
+          { label: t('payments.total.paid'), value: <MoneyView amount={totalPaid.toMajorNumber()} currency={currency} />, accent: true },
+        ]}
+      />
 
       {addingContract && canEdit && (
         <Card tone="strong">
@@ -130,30 +128,29 @@ export function PaymentsScreen({ id }: { id: string }) {
         contracts.map((c) => {
           const list = decomptes.filter((d) => d.contractId === c.id).sort((a, b) => a.number - b.number);
           return (
-            <Card key={c.id} tone="strong">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="mono text-[12px] text-ink-3">{c.reference}</span>
-                    <span className="text-[15px] font-medium">{c.contractor}</span>
-                  </div>
-                  <div className="mono mt-0.5 text-[12px] text-ink-3"><MoneyView amount={c.amount} currency={currency} /></div>
-                </div>
-                <div className="flex gap-1">
-                  {canEdit && (
+            <Panel
+              key={c.id}
+              title={
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="mono text-[12px] text-ink-3">{c.reference}</span>
+                  <span>{c.contractor}</span>
+                  <span className="mono text-[12px] text-ink-3">· <MoneyView amount={c.amount} currency={currency} /></span>
+                </span>
+              }
+              actions={
+                canEdit && (
+                  <>
                     <Button variant="glass" size="sm" onClick={() => { setDecFor(decFor === c.id ? null : c.id); setDDraft({ gross: '', retentionPct: '5' }); }}>
                       <Plus size={15} />
                       {t('payments.addDecompte')}
                     </Button>
-                  )}
-                  {canEdit && (
                     <Button variant="ghost" size="sm" icon aria-label={t('payments.contract.removed')} onClick={() => removeContract(c.id)}>
                       <Trash2 size={15} />
                     </Button>
-                  )}
-                </div>
-              </div>
-
+                  </>
+                )
+              }
+            >
               {decFor === c.id && canEdit && (
                 <div className="mt-3 rounded-md p-3" style={{ background: 'var(--ax-glass-subtle)' }}>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -197,7 +194,7 @@ export function PaymentsScreen({ id }: { id: string }) {
                   })}
                 </ul>
               )}
-            </Card>
+            </Panel>
           );
         })
       )}
