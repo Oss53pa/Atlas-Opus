@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
-import { Badge, Banner, Button, Card, EmptyState, Field, Money as MoneyView, Select, Skeleton, StatCard, useToast } from '../../ui';
+import { Badge, Banner, Button, Card, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Select, Skeleton, useToast } from '../../ui';
 import {
   financingSourceLabel,
   financingStatusLabel,
@@ -97,15 +97,13 @@ export function FinancingScreen({ id }: { id: string }) {
 
       {readOnly && <Banner tone="warning">{t('financing.readonly')}</Banner>}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label={t('financing.kpi.total')}>
-          <MoneyView amount={total.toMajorNumber()} currency={currency} />
-        </StatCard>
-        <StatCard label={t('financing.title')}>{rows.length}</StatCard>
-        <StatCard label={t('financing.progress', { pct: formatPercent(progress, locale, 0) })}>
-          {formatPercent(progress, locale, 0)}
-        </StatCard>
-      </div>
+      <KpiRow
+        items={[
+          { label: t('financing.kpi.total'), value: <MoneyView amount={total.toMajorNumber()} currency={currency} /> },
+          { label: t('financing.title'), value: rows.length },
+          { label: t('financing.progress', { pct: formatPercent(progress, locale, 0) }), value: formatPercent(progress, locale, 0) },
+        ]}
+      />
 
       {adding && canEdit && (
         <Card tone="strong">
@@ -194,31 +192,33 @@ function FinancingCard({
   };
 
   return (
-    <Card tone="strong">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[15px] font-medium">{financingSourceLabel(f.source)}</span>
-            <Badge tone={FIN_STATUS_TONE[f.status]}>{financingStatusLabel(f.status)}</Badge>
-          </div>
-          <div className="mt-0.5 text-[12px] text-ink-3">
-            <MoneyView amount={f.amount.toMajorNumber()} currency={currency} /> · {formatPercent(f.rate, locale, 2)}
-          </div>
-        </div>
-        {canEdit && (
-          <div className="flex items-center gap-1.5">
+    <Panel
+      title={
+        <span className="flex items-center gap-2">
+          {financingSourceLabel(f.source)}
+          <Badge tone={FIN_STATUS_TONE[f.status]}>{financingStatusLabel(f.status)}</Badge>
+          <span className="mono text-[12px] text-ink-3">
+            · <MoneyView amount={f.amount.toMajorNumber()} currency={currency} /> · {formatPercent(f.rate, locale, 2)}
+          </span>
+        </span>
+      }
+      actions={
+        canEdit && (
+          <>
             {FINANCING_STATUSES.filter((s) => canTransitionFinancing(f.status, s)).map((s) => (
               <Button key={s} variant="glass" size="sm" onClick={() => onStatus(s)}>{financingStatusLabel(s)}</Button>
             ))}
             <Button variant="ghost" size="sm" icon aria-label={t('financing.removed')} onClick={onRemove}><Trash2 size={15} /></Button>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-2">
-        <StatCard label={t('financing.kpi.released')}><MoneyView amount={released.toMajorNumber()} currency={currency} /></StatCard>
-        <StatCard label={t('financing.kpi.interest')}><MoneyView amount={interest.toMajorNumber()} currency={currency} /></StatCard>
-      </div>
+          </>
+        )
+      }
+    >
+      <KpiRow
+        items={[
+          { label: t('financing.kpi.released'), value: <MoneyView amount={released.toMajorNumber()} currency={currency} /> },
+          { label: t('financing.kpi.interest'), value: <MoneyView amount={interest.toMajorNumber()} currency={currency} /> },
+        ]}
+      />
 
       <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--ax-border)' }}>
         <div className="flex items-center justify-between">
@@ -260,6 +260,6 @@ function FinancingCard({
           </ul>
         ) : null}
       </div>
-    </Card>
+    </Panel>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
-import { Badge, Banner, Button, Card, Select, Skeleton, useToast } from '../../ui';
+import { Badge, Banner, Button, KpiRow, Panel, Select, Skeleton, useToast } from '../../ui';
 import { posteLabel } from './labels';
 import { useData, useBilanLines, useOperation } from '../../app/providers';
 import { useNav } from '../../app/router';
@@ -58,21 +58,21 @@ export function BilanEditor({ id }: { id: string }) {
     const list = rows.filter((r) => r.kind === kind);
     const postes = kind === 'cost' ? COST_POSTES : REVENUE_POSTES;
     return (
-      <Card tone="strong">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[16px] font-medium">{t(kind === 'cost' ? 'bilan.section.costs' : 'bilan.section.revenues')}</h2>
-          {canEdit && (
+      <Panel
+        title={t(kind === 'cost' ? 'bilan.section.costs' : 'bilan.section.revenues')}
+        actions={
+          canEdit && (
             <Button variant="glass" size="sm" onClick={() => addLine(kind)}>
               <Plus size={16} />
               {t(kind === 'cost' ? 'bilan.addCost' : 'bilan.addRevenue')}
             </Button>
-          )}
-        </div>
-
+          )
+        }
+      >
         {list.length === 0 ? (
-          <p className="mt-3 text-[13px] text-ink-3">{t('bilan.empty')}</p>
+          <p className="text-[13px] text-ink-3">{t('bilan.empty')}</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-2">
+          <ul className="flex flex-col gap-2">
             <li className="hidden items-center gap-2 px-1 sm:flex">
               <span className="flex-1 text-[11px] uppercase tracking-wide text-ink-3">{t('bilan.col.poste')}</span>
               <span className="w-[150px] text-right text-[11px] uppercase tracking-wide text-ink-3">{t('bilan.col.planned')}</span>
@@ -117,7 +117,7 @@ export function BilanEditor({ id }: { id: string }) {
             ))}
           </ul>
         )}
-      </Card>
+      </Panel>
     );
   };
 
@@ -135,35 +135,27 @@ export function BilanEditor({ id }: { id: string }) {
 
       {readOnly && <Banner tone="warning">{t('bilan.readonly')}</Banner>}
 
-      {/* Totaux en direct */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Card tone="subtle" padded={false} className="p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink-3">{t('bilan.cost')}</div>
-          <div className="mono mt-1.5 text-lg" style={{ fontWeight: 500 }}>{sum.coutTotal.format(locale)}</div>
-        </Card>
-        <Card tone="subtle" padded={false} className="p-4">
-          <div className="text-[11px] uppercase tracking-wide text-ink-3">{t('bilan.revenue')}</div>
-          <div className="mono mt-1.5 text-lg" style={{ fontWeight: 500 }}>{sum.recettes.format(locale)}</div>
-        </Card>
-        <Card tone="subtle" padded={false} className="col-span-2 p-4 sm:col-span-1">
-          <div className="text-[11px] uppercase tracking-wide text-ink-3">
-            {t('bilan.margin')} · {formatPercent(sum.tauxMarge, locale)}
-          </div>
-          <div className="mono mt-1.5 text-lg" style={{ fontWeight: 500, color: sum.marge.isNegative() ? 'var(--ax-danger)' : 'var(--ax-success)' }}>
-            {sum.marge.isNegative() ? '' : '+'}
-            {sum.marge.format(locale)} <span className="text-[12px] text-ink-3">{currency}</span>
-          </div>
-        </Card>
-      </div>
+      {/* Totaux en direct — rangée d'indicateurs */}
+      <KpiRow
+        items={[
+          { label: t('bilan.cost'), value: sum.coutTotal.format(locale) },
+          { label: t('bilan.revenue'), value: sum.recettes.format(locale) },
+          {
+            label: `${t('bilan.margin')} · ${formatPercent(sum.tauxMarge, locale)}`,
+            value: `${sum.marge.isNegative() ? '' : '+'}${sum.marge.format(locale)}`,
+            accent: sum.marge.isNegative(),
+          },
+        ]}
+      />
 
       {loading ? (
-        <Card>
+        <Panel>
           <div className="flex flex-col gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} style={{ height: 40 }} />
             ))}
           </div>
-        </Card>
+        </Panel>
       ) : (
         <>
           {section('cost')}
