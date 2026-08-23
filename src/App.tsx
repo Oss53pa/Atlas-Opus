@@ -19,6 +19,7 @@ import { ReportingScreen } from './features/m1/ReportingScreen';
 import { PaymentsScreen } from './features/m1/PaymentsScreen';
 import { PlanningScreen } from './features/m1/PlanningScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
+import { EtudesScreen } from './features/m1/EtudesScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -52,6 +53,8 @@ function RouteView() {
       return <PlanningScreen id={route.id} />;
     case 'passation':
       return <PassationScreen id={route.id} />;
+    case 'etudes':
+      return <EtudesScreen id={route.id} />;
     default:
       return <DashboardScreen />;
   }

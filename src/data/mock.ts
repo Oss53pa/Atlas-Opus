@@ -37,6 +37,7 @@ import type { Insurance, InsuranceInput, RaciAssignment, RaciInput, Decision, De
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
+import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -62,6 +63,7 @@ import type {
   PlanningRepo,
   TendersRepo,
   GovernanceRepo,
+  StudiesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -98,6 +100,7 @@ export interface MockDb {
   reportSnapshots: ReportSnapshot[];
   raciAssignments: RaciAssignment[];
   decisions: Decision[];
+  studies: Study[];
 }
 
 interface Deps {
@@ -342,7 +345,14 @@ export function createMockDb(): MockDb {
     { id: 'de-p2', tenantId: T, operationId: 'op-palmiers', kind: 'OS', reference: 'OS-2026-012', date: '2026-05-20', summary: 'Ordre de service de démarrage — lot 1 gros œuvre', decidedBy: 'MOA — Direction', createdAt: '2026-05-20T09:00:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions };
+  // Études amont (M3) — Cosmos : diagnostics en cours ; Riviera : programmation validée.
+  const studies: Study[] = [
+    { id: 'et-c1', tenantId: T, operationId: 'op-cosmos', kind: 'geotechnique', provider: 'Géotech CI', status: 'en_cours', cost: 18_000_000, dueDate: '2026-07-15', summary: null },
+    { id: 'et-c2', tenantId: T, operationId: 'op-cosmos', kind: 'environnementale', provider: 'EnviroSahel', status: 'remise', cost: 22_000_000, dueDate: '2026-06-30', summary: 'EIES remise, avis favorable sous réserves' },
+    { id: 'et-r1', tenantId: T, operationId: 'op-riviera', kind: 'programmatique', provider: 'Atelier Programmation', status: 'validee', cost: 9_000_000, dueDate: '2026-05-01', summary: 'Programme fonctionnel arrêté' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1053,6 +1063,35 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createStudiesRepo(db: MockDb, session: Session, deps: Deps): StudiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.studies).filter((s) => s.operationId === opId).map((s) => ({ ...s }));
+    },
+    async add(opId, input: StudyInput) {
+      const s: Study = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        kind: input.kind, provider: input.provider.trim(), status: 'planifiee',
+        cost: input.cost, dueDate: input.dueDate ?? null, summary: input.summary?.trim() || null,
+      };
+      db.studies.push(s);
+      return { ...s };
+    },
+    async setStatus(sid, status: StudyStatus) {
+      const s = db.studies.find((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (!s) throw new Error('not_found');
+      s.status = status;
+      return { ...s };
+    },
+    async remove(sid) {
+      const i = db.studies.findIndex((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (i >= 0) db.studies.splice(i, 1);
     },
   };
 }

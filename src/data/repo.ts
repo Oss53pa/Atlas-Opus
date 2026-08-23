@@ -60,6 +60,7 @@ import type {
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
 import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
+import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 
 export interface Session {
   userId: string;
@@ -205,6 +206,14 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Études amont (M3) : diagnostics & études préalables. */
+export interface StudiesRepo {
+  list(operationId: string): Promise<Study[]>;
+  add(operationId: string, input: StudyInput): Promise<Study>;
+  setStatus(id: string, status: StudyStatus): Promise<Study>;
+  remove(id: string): Promise<void>;
 }
 
 export interface TendersRepo {

@@ -11,6 +11,7 @@ import type { FinancingSource, FinancingStatus, DrawdownStatus } from '../../dom
 import type { UnitStatus, SaleKind, SaleStatus, ReceiptStatus } from '../../domain/m6/types';
 import type { DecompteStatus } from '../../domain/payments/types';
 import type { TenderStatus, TenderProcedure, TenderMode } from '../../domain/m8/types';
+import type { StudyKind, StudyStatus } from '../../domain/m3/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -325,6 +326,30 @@ export const RECEIPT_STATUS_TONE: Record<ReceiptStatus, BadgeTone> = {
   pending: 'neutral',
   settled: 'success',
 };
+// ── Études amont (M3) ────────────────────────────────────────────────────────
+const STUDY_KIND_KEY: Record<StudyKind, MessageKey> = {
+  geotechnique: 'study.kind.geotechnique',
+  environnementale: 'study.kind.environnementale',
+  programmatique: 'study.kind.programmatique',
+  topographique: 'study.kind.topographique',
+  hydraulique: 'study.kind.hydraulique',
+  autre: 'study.kind.autre',
+};
+const STUDY_STATUS_KEY: Record<StudyStatus, MessageKey> = {
+  planifiee: 'study.status.planifiee',
+  en_cours: 'study.status.en_cours',
+  remise: 'study.status.remise',
+  validee: 'study.status.validee',
+};
+export const STUDY_STATUS_TONE: Record<StudyStatus, BadgeTone> = {
+  planifiee: 'neutral',
+  en_cours: 'info',
+  remise: 'warning',
+  validee: 'success',
+};
+export const studyKindLabel = (k: StudyKind) => t(STUDY_KIND_KEY[k]);
+export const studyStatusLabel = (s: StudyStatus) => t(STUDY_STATUS_KEY[s]);
+
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);
 export const saleStatusLabel = (s: SaleStatus) => t(SALE_STATUS_KEY[s]);

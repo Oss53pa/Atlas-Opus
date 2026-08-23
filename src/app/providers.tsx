@@ -13,6 +13,7 @@ import {
   createPlanningRepo,
   createTendersRepo,
   createGovernanceRepo,
+  createStudiesRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -31,6 +32,7 @@ import type {
   PlanningRepo,
   TendersRepo,
   GovernanceRepo,
+  StudiesRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -43,6 +45,7 @@ import type { Insurance, RaciAssignment, Decision } from '../domain/m7/types';
 import type { Contract, Decompte } from '../domain/payments/types';
 import type { Task } from '../domain/m12/types';
 import type { Tender } from '../domain/m8/types';
+import type { Study } from '../domain/m3/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -63,6 +66,7 @@ import {
   createSupabasePlanningRepo,
   createSupabaseTendersRepo,
   createSupabaseGovernanceRepo,
+  createSupabaseStudiesRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -81,6 +85,7 @@ interface DataApi {
   planning: PlanningRepo;
   tenders: TendersRepo;
   governance: GovernanceRepo;
+  studies: StudiesRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -111,6 +116,7 @@ function buildMockApi(): DataApi {
     planning: createPlanningRepo(db, session, { telemetry }),
     tenders: createTendersRepo(db, session, { telemetry }),
     governance: createGovernanceRepo(db, session, { telemetry }),
+    studies: createStudiesRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -161,6 +167,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           planning: createSupabasePlanningRepo(supabase, session),
           tenders: createSupabaseTendersRepo(supabase, session),
           governance: createSupabaseGovernanceRepo(supabase, session),
+          studies: createSupabaseStudiesRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -313,6 +320,11 @@ export function useTasks(operationId: string): AsyncState<Task[]> {
 export function useTenders(operationId: string): AsyncState<Tender[]> {
   const { tenders } = useData();
   return useAsync(() => tenders.list(operationId), [tenders, operationId]);
+}
+
+export function useStudies(operationId: string): AsyncState<Study[]> {
+  const { studies } = useData();
+  return useAsync(() => studies.list(operationId), [studies, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

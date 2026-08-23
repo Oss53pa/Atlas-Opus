@@ -56,7 +56,8 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo } from '../repo';
+import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1132,6 +1133,45 @@ interface DecisionRow {
 }
 function toDecision(r: DecisionRow): Decision {
   return { id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, kind: r.kind as DecisionKind, reference: r.reference, date: r.date, summary: r.summary, decidedBy: r.decided_by, createdAt: r.created_at };
+}
+
+// ── Études amont (M3) ────────────────────────────────────────────────────────
+interface StudyRow {
+  id: string; tenant_id: string; operation_id: string; kind: string; provider: string;
+  status: string; cost: number | string; due_date: string | null; summary: string | null;
+}
+function toStudy(r: StudyRow): Study {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, kind: r.kind as StudyKind,
+    provider: r.provider, status: r.status as StudyStatus, cost: Number(r.cost),
+    dueDate: r.due_date, summary: r.summary,
+  };
+}
+export function createSupabaseStudiesRepo(client: SupabaseClient, session: Session): StudiesRepo {
+  const ST = 'ao_studies';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(ST).select('*').eq('operation_id', opId).order('created_at')) as StudyRow[];
+      return rows.map(toStudy);
+    },
+    async add(opId, input: StudyInput) {
+      const row = unwrap(
+        await client.from(ST).insert({
+          tenant_id: session.tenantId, operation_id: opId, kind: input.kind, provider: input.provider,
+          status: 'planifiee', cost: input.cost, due_date: input.dueDate ?? null, summary: input.summary ?? null,
+        }).select('*').single(),
+      ) as StudyRow;
+      return toStudy(row);
+    },
+    async setStatus(id, status: StudyStatus) {
+      const row = unwrap(await client.from(ST).update({ status }).eq('id', id).select('*').single()) as StudyRow;
+      return toStudy(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
 }
 
 export function createSupabaseGovernanceRepo(client: SupabaseClient, session: Session): GovernanceRepo {
