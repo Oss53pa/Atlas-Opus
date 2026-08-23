@@ -61,6 +61,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
+import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 
 export interface Session {
   userId: string;
@@ -206,6 +207,14 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Analyse des offres (M9) : offres rattachées aux marchés (M8). */
+export interface OffersRepo {
+  list(operationId: string): Promise<Offer[]>;
+  add(operationId: string, input: OfferInput): Promise<Offer>;
+  setStatus(id: string, status: OfferStatus): Promise<Offer>;
+  remove(id: string): Promise<void>;
 }
 
 /** Études amont (M3) : diagnostics & études préalables. */
