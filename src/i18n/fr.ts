@@ -231,6 +231,7 @@ export const fr = {
   'bilan.tri': 'TRI',
   'bilan.eac': 'Coût à terminaison (EAC)',
   'bilan.progress': 'Avancement {pct}',
+  'bilan.progress.short': 'Avancement',
   'cockpit.scurve': 'Courbe en S — avancement',
   'cockpit.cashflow': 'Trésorerie',
   'cockpit.risks': 'Alertes de risque',

@@ -1,5 +1,5 @@
 import { Plus, FolderOpen, ShieldCheck, AlertTriangle, ChevronRight } from 'lucide-react';
-import { Banner, Button, Card, EmptyState, Money as MoneyView, Skeleton, StatCard } from '../../ui';
+import { Banner, Button, Card, EmptyState, KpiRow, Panel, FactList, Money as MoneyView, Skeleton, DataTable, type Fact } from '../../ui';
 import { PhaseBadge } from './PhaseBadge';
 import { useAggregatedMarge, useOperations, usePortfolioRisk } from '../../app/providers';
 import { useNav } from '../../app/router';
@@ -81,41 +81,29 @@ export function DashboardScreen() {
     .slice(0, 5);
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[26px] font-medium sm:text-[30px]">{t('dashboard.title')}</h1>
-        <p className="mt-1 text-[14px] text-ink-2">{t('dashboard.subtitle')}</p>
+    <div className="flex flex-col gap-4">
+      <div className="mb-1">
+        <h1 className="text-[26px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('dashboard.title')}</h1>
+        <p className="mt-1 text-[13px] text-ink-3">{t('dashboard.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={t('dashboard.kpi.operations')}>
-          {active} <span className="text-[13px] text-ink-3">/ {ops.length}</span>
-        </StatCard>
-        <StatCard label={t('dashboard.kpi.budget')}>
-          <MoneyView amount={total.toMajorNumber()} currency={currency} />
-        </StatCard>
-        <StatCard label={t('dashboard.kpi.marge')}>
-          {margeLoading ? (
-            '…'
-          ) : marge ? (
-            <span style={{ color: marge.isNegative() ? 'var(--ax-danger)' : 'var(--ax-success)' }}>
-              {marge.isNegative() ? '' : '+'}
-              {marge.format(locale)}
-            </span>
-          ) : (
-            '—'
-          )}
-        </StatCard>
-        <StatCard label={t('dashboard.kpi.progress')} emphasis>
-          {formatPercent(avgProgress, locale, 0)}
-        </StatCard>
-      </div>
+      <KpiRow
+        items={[
+          { label: t('dashboard.kpi.operations'), value: <>{active} <span className="text-[13px] text-ink-3">/ {ops.length}</span></> },
+          { label: t('dashboard.kpi.budget'), value: <MoneyView amount={total.toMajorNumber()} currency={currency} /> },
+          {
+            label: t('dashboard.kpi.marge'),
+            value: margeLoading ? '…' : marge ? `${marge.isNegative() ? '' : '+'}${marge.format(locale)}` : '—',
+            accent: !!marge && marge.isNegative(),
+          },
+          { label: t('dashboard.kpi.progress'), value: formatPercent(avgProgress, locale, 0), accent: true },
+        ]}
+      />
 
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.55fr_1fr]">
         {/* Répartition par phase */}
-        <Card tone="strong" className="md:col-span-2">
-          <h2 className="text-[18px] font-medium">{t('dashboard.byPhase')}</h2>
-          <ul className="mt-4 flex flex-col gap-3">
+        <Panel title={t('dashboard.byPhase')}>
+          <ul className="flex flex-col gap-3">
             {phaseCounts.map(({ phase, count }) => (
               <li key={phase} className="flex items-center gap-3">
                 <span className="w-[110px] shrink-0">
@@ -128,81 +116,69 @@ export function DashboardScreen() {
               </li>
             ))}
           </ul>
-        </Card>
+        </Panel>
 
         {/* Classement par risque (M21) */}
-        <Card>
-          <h2 className="text-[16px] font-medium">{t('dashboard.risk')}</h2>
+        <Panel title={t('dashboard.risk')} bodyPadded={riskLoading || ranked.length === 0}>
           {riskLoading ? (
-            <div className="mt-4 flex flex-col gap-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 40 }} />)}</div>
+            <div className="flex flex-col gap-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 40 }} />)}</div>
           ) : ranked.length === 0 ? (
-            <div className="mt-4 flex items-center gap-3 rounded-md px-3 py-2" style={{ background: 'var(--ax-glass-subtle)' }}>
-              <span style={{ color: 'var(--ax-success)', marginTop: 1 }}><ShieldCheck size={16} /></span>
+            <div className="flex items-center gap-3">
+              <span style={{ color: 'var(--ax-text-secondary)' }}><ShieldCheck size={16} /></span>
               <span className="text-[13px] text-ink-2">{t('dashboard.risk.none')}</span>
             </div>
           ) : (
-            <ul className="mt-4 flex flex-col gap-2">
-              {ranked.map(({ op, alerts }) => {
+            <FactList
+              items={ranked.map(({ op, alerts }): Fact => {
                 const danger = countBySeverity(alerts, 'danger');
-                return (
-                  <li
-                    key={op.id}
-                    className="ax-tr flex items-center gap-3 rounded-md px-3 py-2"
-                    style={{ background: 'var(--ax-glass-subtle)' }}
-                    onClick={() => navigate({ name: 'cockpit', id: op.id })}
-                  >
-                    <span style={{ color: danger > 0 ? 'var(--ax-danger)' : 'var(--ax-warning)', marginTop: 1 }}>
-                      <AlertTriangle size={16} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium">{op.name}</span>
-                      <span className="text-[11px] text-ink-3">
-                        {t('cockpit.alerts.count', {
-                          danger,
-                          echeance: countBySeverity(alerts, 'echeance'),
-                          info: countBySeverity(alerts, 'info'),
-                        })}
-                      </span>
-                    </span>
-                  </li>
-                );
+                return {
+                  label: op.name,
+                  sub: t('cockpit.alerts.count', {
+                    danger,
+                    echeance: countBySeverity(alerts, 'echeance'),
+                    info: countBySeverity(alerts, 'info'),
+                  }),
+                  severity: danger > 0 ? 'danger' : 'accent',
+                  onClick: () => navigate({ name: 'cockpit', id: op.id }),
+                };
               })}
-            </ul>
+            />
           )}
-        </Card>
+        </Panel>
       </div>
 
       {/* Principales opérations */}
-      <Card tone="strong">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[18px] font-medium">{t('dashboard.top')}</h2>
+      <Panel
+        title={t('dashboard.top')}
+        actions={
           <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'portfolio' })}>
             {t('common.viewAll')}
             <ChevronRight size={15} />
           </Button>
-        </div>
-        <ul className="mt-4 flex flex-col gap-2">
-          {top.map((op) => (
-            <li
-              key={op.id}
-              className="ax-tr flex items-center gap-3 rounded-md px-3 py-2"
-              style={{ background: 'var(--ax-glass-subtle)' }}
-              onClick={() => navigate({ name: 'cockpit', id: op.id })}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-medium">{op.name}</span>
-                <span className="text-[12px] text-ink-3">{phaseLabel(op.phase)}</span>
-              </span>
-              <span className="hidden sm:block" style={{ width: 90 }}>
-                <span className="ax-progress block">
-                  <span className="ax-progress__bar block" style={{ width: `${Math.round((op.progress ?? 0) * 100)}%` }} />
-                </span>
-              </span>
-              <MoneyView amount={op.budgetBac} currency={op.currency} className="w-[150px] shrink-0 text-right text-[13px]" />
-            </li>
-          ))}
-        </ul>
-      </Card>
+        }
+        bodyPadded={false}
+      >
+        <DataTable
+          template="1.6fr 1fr 120px 170px"
+          columns={[
+            { label: t('portfolio.col.name') },
+            { label: t('portfolio.col.phase') },
+            { label: t('bilan.progress.short') },
+            { label: t('dashboard.kpi.budget'), align: 'right' },
+          ]}
+          rows={top.map((op) => ({
+            onClick: () => navigate({ name: 'cockpit', id: op.id }),
+            cells: [
+              <span className="font-medium">{op.name}</span>,
+              phaseLabel(op.phase),
+              <span className="ax-progress block" style={{ maxWidth: 90 }}>
+                <span className="ax-progress__bar block" style={{ width: `${Math.round((op.progress ?? 0) * 100)}%` }} />
+              </span>,
+              <MoneyView amount={op.budgetBac} currency={op.currency} className="mono" />,
+            ],
+          }))}
+        />
+      </Panel>
     </div>
   );
 }
