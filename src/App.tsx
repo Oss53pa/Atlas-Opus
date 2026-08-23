@@ -26,6 +26,8 @@ import { ReceptionScreen } from './features/m1/ReceptionScreen';
 import { CautionsScreen } from './features/m1/CautionsScreen';
 import { RisquesScreen } from './features/m1/RisquesScreen';
 import { JournalScreen } from './features/m1/JournalScreen';
+import { PilotageScreen } from './features/m1/PilotageScreen';
+import { ModificationsScreen } from './features/m1/ModificationsScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -73,6 +75,10 @@ function RouteView() {
       return <RisquesScreen id={route.id} />;
     case 'journal':
       return <JournalScreen id={route.id} />;
+    case 'pilotage':
+      return <PilotageScreen id={route.id} />;
+    case 'modifications':
+      return <ModificationsScreen id={route.id} />;
     default:
       return <DashboardScreen />;
   }
