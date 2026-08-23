@@ -56,7 +56,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -64,6 +64,8 @@ import type { Reserve, ReserveInput, ReserveStatus, ReserveSeverity } from '../.
 import type { Guarantee, GuaranteeInput, GuaranteeStatus, GuaranteeType } from '../../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus, RiskCategory } from '../../domain/m20/types';
 import type { AuditEntry, AuditInput, AuditAction } from '../../domain/m23/types';
+import type { SiteReport, SiteReportInput } from '../../domain/m13/types';
+import type { ChangeOrder, CreateChangeOrderInput, ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
 const BL = 'ao_bilan_lines';
@@ -1175,6 +1177,101 @@ export function createSupabaseStudiesRepo(client: SupabaseClient, session: Sessi
     },
     async remove(id) {
       const { error } = await client.from(ST).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Pilotage de réalisation (M13) ────────────────────────────────────────────
+interface SiteReportRow {
+  id: string; tenant_id: string; operation_id: string; number: number; date: string;
+  author: string; progress: number | string; summary: string; blockers: number | string;
+}
+function toSiteReport(r: SiteReportRow): SiteReport {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, number: Number(r.number), date: r.date,
+    author: r.author, progress: Number(r.progress), summary: r.summary, blockers: Number(r.blockers),
+  };
+}
+export function createSupabaseSiteReportsRepo(client: SupabaseClient, session: Session): SiteReportsRepo {
+  const SR = 'ao_site_reports';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(SR).select('*').eq('operation_id', opId).order('date', { ascending: false })) as SiteReportRow[];
+      return rows.map(toSiteReport);
+    },
+    async add(opId, input: SiteReportInput) {
+      const existing = unwrap(await client.from(SR).select('number').eq('operation_id', opId)) as { number: number }[];
+      const number = existing.reduce((max, r) => Math.max(max, Number(r.number)), 0) + 1;
+      const row = unwrap(
+        await client.from(SR).insert({
+          tenant_id: session.tenantId, operation_id: opId, number, date: input.date, author: input.author,
+          progress: input.progress, summary: input.summary, blockers: input.blockers,
+        }).select('*').single(),
+      ) as SiteReportRow;
+      return toSiteReport(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(SR).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Maîtrise des modifications (M15 / change control) ─────────────────────────
+interface ChangeOrderRow {
+  id: string; tenant_id: string; operation_id: string; contract_id: string | null; origin: string;
+  description: string; impact_cost: number | string; impact_days: number; impact_quality: string | null;
+  impact_analyzed: boolean; status: string; avenant_ref: string | null; decided_by: string | null;
+  rejection_reason: string | null; created_at: string; updated_at: string;
+}
+function toChangeOrder(r: ChangeOrderRow, currency: string): ChangeOrder {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, contractId: r.contract_id,
+    origin: r.origin as ChangeOrigin, description: r.description, impactCost: Money.of(Number(r.impact_cost), currency),
+    impactDays: Number(r.impact_days), impactQuality: r.impact_quality, impactAnalyzed: r.impact_analyzed,
+    status: r.status as ChangeStatus, avenantRef: r.avenant_ref, decidedBy: r.decided_by,
+    rejectionReason: r.rejection_reason, createdAt: r.created_at, updatedAt: r.updated_at,
+  };
+}
+export function createSupabaseChangeOrdersRepo(client: SupabaseClient, session: Session): ChangeOrdersRepo {
+  const CO = 'ao_change_orders';
+  const currencyOf = async (opId: string): Promise<string> => {
+    const row = unwrap(await client.from('ao_operations').select('currency').eq('id', opId).single()) as { currency: string };
+    return row.currency;
+  };
+  return {
+    async list(opId) {
+      const currency = await currencyOf(opId);
+      const rows = unwrap(await client.from(CO).select('*').eq('operation_id', opId).order('created_at')) as ChangeOrderRow[];
+      return rows.map((r) => toChangeOrder(r, currency));
+    },
+    async add(opId, input: CreateChangeOrderInput) {
+      const currency = await currencyOf(opId);
+      const row = unwrap(
+        await client.from(CO).insert({
+          tenant_id: session.tenantId, operation_id: opId, contract_id: input.contractId,
+          origin: input.origin, description: input.description, impact_cost: 0, impact_days: 0,
+          impact_analyzed: false, status: 'requested',
+        }).select('*').single(),
+      ) as ChangeOrderRow;
+      return toChangeOrder(row, currency);
+    },
+    async update(id, patch: ChangeOrderPatch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.impactCost !== undefined) upd.impact_cost = patch.impactCost.toMajorNumber();
+      if (patch.impactDays !== undefined) upd.impact_days = patch.impactDays;
+      if (patch.impactQuality !== undefined) upd.impact_quality = patch.impactQuality;
+      if (patch.impactAnalyzed !== undefined) upd.impact_analyzed = patch.impactAnalyzed;
+      if (patch.status !== undefined) upd.status = patch.status;
+      if (patch.avenantRef !== undefined) upd.avenant_ref = patch.avenantRef;
+      if (patch.decidedBy !== undefined) upd.decided_by = patch.decidedBy;
+      if (patch.rejectionReason !== undefined) upd.rejection_reason = patch.rejectionReason;
+      const row = unwrap(await client.from(CO).update(upd).eq('id', id).select('*').single()) as ChangeOrderRow;
+      return toChangeOrder(row, await currencyOf(row.operation_id));
+    },
+    async remove(id) {
+      const { error } = await client.from(CO).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };

@@ -71,8 +71,8 @@ const FAMILIES: FamilyDef[] = [
     labelKey: 'nav.family.execution',
     modules: [
       { code: 'M13', labelKey: 'mod.m13', route: 'planning' },
-      { code: 'M14', labelKey: 'mod.m14' },
-      { code: 'M15', labelKey: 'mod.m15' },
+      { code: 'M14', labelKey: 'mod.m14', route: 'pilotage' },
+      { code: 'M15', labelKey: 'mod.m15', route: 'modifications' },
       { code: 'M18', labelKey: 'mod.m18' },
       { code: 'M19', labelKey: 'mod.m19', route: 'reception' },
     ],

@@ -18,6 +18,7 @@ import type { ReserveSeverity, ReserveStatus } from '../../domain/m19/types';
 import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/types';
 import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
 import type { AuditAction } from '../../domain/m23/types';
+import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -483,6 +484,33 @@ export const AUDIT_ACTION_TONE: Record<AuditAction, BadgeTone> = {
   access: 'neutral',
 };
 export const auditActionLabel = (a: AuditAction) => t(AUDIT_ACTION_KEY[a]);
+
+// ── Maîtrise des modifications (M15) ─────────────────────────────────────────
+const CHANGE_ORIGIN_KEY: Record<ChangeOrigin, MessageKey> = {
+  moa: 'change.origin.moa',
+  moe: 'change.origin.moe',
+  entreprise: 'change.origin.entreprise',
+  reglementaire: 'change.origin.reglementaire',
+  aleas: 'change.origin.aleas',
+};
+const CHANGE_STATUS_KEY: Record<ChangeStatus, MessageKey> = {
+  requested: 'change.status.requested',
+  under_review: 'change.status.under_review',
+  arbitrated: 'change.status.arbitrated',
+  approved: 'change.status.approved',
+  rejected: 'change.status.rejected',
+  converted: 'change.status.converted',
+};
+export const CHANGE_STATUS_TONE: Record<ChangeStatus, BadgeTone> = {
+  requested: 'neutral',
+  under_review: 'info',
+  arbitrated: 'warning',
+  approved: 'accent',
+  rejected: 'danger',
+  converted: 'success',
+};
+export const changeOriginLabel = (o: ChangeOrigin) => t(CHANGE_ORIGIN_KEY[o]);
+export const changeStatusLabel = (s: ChangeStatus) => t(CHANGE_STATUS_KEY[s]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

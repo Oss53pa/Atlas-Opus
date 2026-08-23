@@ -44,6 +44,9 @@ import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
 import type { AuditEntry, AuditInput } from '../domain/m23/types';
+import type { SiteReport, SiteReportInput } from '../domain/m13/types';
+import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
+import { buildNewChangeOrder } from '../domain/m14';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -76,6 +79,9 @@ import type {
   GuaranteesRepo,
   RisksRepo,
   AuditRepo,
+  SiteReportsRepo,
+  ChangeOrdersRepo,
+  ChangeOrderPatch,
 } from './repo';
 
 interface BilanSeed {
@@ -119,6 +125,8 @@ export interface MockDb {
   guarantees: Guarantee[];
   risks: Risk[];
   auditLog: AuditEntry[];
+  siteReports: SiteReport[];
+  changeOrders: ChangeOrder[];
 }
 
 interface Deps {
@@ -413,7 +421,18 @@ export function createMockDb(): MockDb {
     { id: 'au-l3', tenantId: T, operationId: 'op-palmiers', at: '2026-05-20T09:00:00.000Z', actor: 'MOA — Direction', action: 'transition', module: 'M1', object: 'Opération', summary: 'Passage en réalisation' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog };
+  // Pilotage de réalisation (M13) — Palmiers : comptes rendus de chantier.
+  const siteReports: SiteReport[] = [
+    { id: 'cr-p1', tenantId: T, operationId: 'op-palmiers', number: 1, date: '2026-05-15', author: 'MOE — Atelier Koffi', progress: 0.45, summary: 'Fondations achevées, démarrage élévations R+1', blockers: 1 },
+    { id: 'cr-p2', tenantId: T, operationId: 'op-palmiers', number: 2, date: '2026-06-05', author: 'MOE — Atelier Koffi', progress: 0.62, summary: 'Élévations R+2 en cours ; RFI-042 sur voile porteur', blockers: 2 },
+  ];
+  // Maîtrise des modifications (M15) — Palmiers : avenant lot 02 sous instruction.
+  const changeOrders: ChangeOrder[] = [
+    { id: 'co-p1', tenantId: T, operationId: 'op-palmiers', contractId: 'ct-p1', origin: 'aleas', description: 'Fondations spéciales — sol de portance insuffisante', impactCost: Money.of(42_000_000, 'XOF'), impactDays: 15, impactQuality: null, impactAnalyzed: true, status: 'under_review', avenantRef: null, decidedBy: null, rejectionReason: null, createdAt: '2026-06-01T08:00:00.000Z', updatedAt: '2026-06-10T08:00:00.000Z' },
+    { id: 'co-p2', tenantId: T, operationId: 'op-palmiers', contractId: 'ct-p1', origin: 'moa', description: 'Ajout d\u2019un local vélos', impactCost: Money.of(8_500_000, 'XOF'), impactDays: 0, impactQuality: null, impactAnalyzed: true, status: 'approved', avenantRef: null, decidedBy: 'MOA — Direction', rejectionReason: null, createdAt: '2026-05-20T08:00:00.000Z', updatedAt: '2026-05-28T08:00:00.000Z' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1124,6 +1143,62 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createSiteReportsRepo(db: MockDb, session: Session, deps: Deps): SiteReportsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.siteReports)
+        .filter((r) => r.operationId === opId)
+        .map((r) => ({ ...r }))
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.number - a.number));
+    },
+    async add(opId, input: SiteReportInput) {
+      const nextNo = db.siteReports.filter((r) => r.operationId === opId && r.tenantId === session.tenantId)
+        .reduce((max, r) => Math.max(max, r.number), 0) + 1;
+      const r: SiteReport = {
+        id: id(), tenantId: session.tenantId, operationId: opId, number: nextNo,
+        date: input.date, author: input.author.trim(), progress: input.progress,
+        summary: input.summary.trim(), blockers: input.blockers,
+      };
+      db.siteReports.push(r);
+      return { ...r };
+    },
+    async remove(rid) {
+      const i = db.siteReports.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.siteReports.splice(i, 1);
+    },
+  };
+}
+
+export function createChangeOrdersRepo(db: MockDb, session: Session, deps: Deps): ChangeOrdersRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  const currencyOf = (opId: string) =>
+    db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId)?.currency ?? 'XOF';
+  return {
+    async list(opId) {
+      return mine(db.changeOrders).filter((c) => c.operationId === opId).map((c) => ({ ...c }));
+    },
+    async add(opId, input: CreateChangeOrderInput) {
+      const co = buildNewChangeOrder(input, currencyOf(opId), { id: id(), tenantId: session.tenantId, operationId: opId, now: now() });
+      db.changeOrders.push(co);
+      return { ...co };
+    },
+    async update(cid, patch: ChangeOrderPatch) {
+      const co = db.changeOrders.find((x) => x.id === cid && x.tenantId === session.tenantId);
+      if (!co) throw new Error('not_found');
+      Object.assign(co, patch, { updatedAt: now() });
+      return { ...co };
+    },
+    async remove(cid) {
+      const i = db.changeOrders.findIndex((x) => x.id === cid && x.tenantId === session.tenantId);
+      if (i >= 0) db.changeOrders.splice(i, 1);
     },
   };
 }

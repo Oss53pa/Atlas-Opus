@@ -21,7 +21,9 @@ export type Route =
   | { name: 'reception'; id: string }
   | { name: 'cautions'; id: string }
   | { name: 'risques'; id: string }
-  | { name: 'journal'; id: string };
+  | { name: 'journal'; id: string }
+  | { name: 'pilotage'; id: string }
+  | { name: 'modifications'; id: string };
 
 interface NavApi {
   route: Route;
