@@ -47,6 +47,8 @@ import type { AuditEntry, AuditInput } from '../domain/m23/types';
 import type { SiteReport, SiteReportInput } from '../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
 import { buildNewChangeOrder } from '../domain/m14';
+import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
+import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -82,6 +84,8 @@ import type {
   SiteReportsRepo,
   ChangeOrdersRepo,
   ChangeOrderPatch,
+  DocumentsRepo,
+  RfisRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -127,6 +131,8 @@ export interface MockDb {
   auditLog: AuditEntry[];
   siteReports: SiteReport[];
   changeOrders: ChangeOrder[];
+  documents: Document[];
+  rfis: Rfi[];
 }
 
 interface Deps {
@@ -432,7 +438,19 @@ export function createMockDb(): MockDb {
     { id: 'co-p2', tenantId: T, operationId: 'op-palmiers', contractId: 'ct-p1', origin: 'moa', description: 'Ajout d\u2019un local vélos', impactCost: Money.of(8_500_000, 'XOF'), impactDays: 0, impactQuality: null, impactAnalyzed: true, status: 'approved', avenantRef: null, decidedBy: 'MOA — Direction', rejectionReason: null, createdAt: '2026-05-20T08:00:00.000Z', updatedAt: '2026-05-28T08:00:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders };
+  // Conception & GED (M11) — Palmiers : plans avec visas.
+  const documents: Document[] = [
+    { id: 'doc-p1', tenantId: T, operationId: 'op-palmiers', reference: 'ARC-EXE-045', title: 'Plan de niveau R+2', discipline: 'architecture', indice: 'B', status: 'vise_a' },
+    { id: 'doc-p2', tenantId: T, operationId: 'op-palmiers', reference: 'STR-EXE-118', title: 'Voile porteur file C', discipline: 'structure', indice: 'C', status: 'diffuse' },
+    { id: 'doc-p3', tenantId: T, operationId: 'op-palmiers', reference: 'FLU-EXE-032', title: 'Réseaux CVC R+1', discipline: 'fluides', indice: 'A', status: 'vise_b' },
+  ];
+  // RFI & collaboration (M12) — Palmiers : RFI-042 bloque le visa STR-EXE-118.
+  const rfis: Rfi[] = [
+    { id: 'rfi-p1', tenantId: T, operationId: 'op-palmiers', number: 'RFI-042', subject: 'Réservation gaine vs voile porteur', question: 'La réservation de gaine technique est incompatible avec le voile porteur file C ; arbitrage ?', raisedBy: 'BET Structures', priority: 'urgente', status: 'ouverte', dueDate: '2026-06-15', documentRef: 'STR-EXE-118', answer: null },
+    { id: 'rfi-p2', tenantId: T, operationId: 'op-palmiers', number: 'RFI-039', subject: 'Nuancier façade', question: 'Confirmation du nuancier RAL pour l\u2019enduit de façade.', raisedBy: 'Entreprise BTP Ivoire', priority: 'normale', status: 'repondue', dueDate: '2026-05-30', documentRef: null, answer: 'RAL 1015 validé' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1143,6 +1161,65 @@ export function createGovernanceRepo(db: MockDb, session: Session, deps: Deps): 
       };
       db.decisions.push(d);
       return { ...d };
+    },
+  };
+}
+
+export function createDocumentsRepo(db: MockDb, session: Session, deps: Deps): DocumentsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.documents).filter((d) => d.operationId === opId).map((d) => ({ ...d }));
+    },
+    async add(opId, input: DocumentInput) {
+      const d: Document = {
+        id: id(), tenantId: session.tenantId, operationId: opId, reference: input.reference.trim(),
+        title: input.title.trim(), discipline: input.discipline, indice: input.indice.trim() || 'A', status: 'en_cours',
+      };
+      db.documents.push(d);
+      return { ...d };
+    },
+    async setStatus(did, status: DocStatus) {
+      const d = db.documents.find((x) => x.id === did && x.tenantId === session.tenantId);
+      if (!d) throw new Error('not_found');
+      d.status = status;
+      return { ...d };
+    },
+    async remove(did) {
+      const i = db.documents.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
+      if (i >= 0) db.documents.splice(i, 1);
+    },
+  };
+}
+
+export function createRfisRepo(db: MockDb, session: Session, deps: Deps): RfisRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.rfis).filter((r) => r.operationId === opId).map((r) => ({ ...r }));
+    },
+    async add(opId, input: RfiInput) {
+      const r: Rfi = {
+        id: id(), tenantId: session.tenantId, operationId: opId, number: input.number.trim(),
+        subject: input.subject.trim(), question: input.question.trim(), raisedBy: input.raisedBy.trim(),
+        priority: input.priority, status: 'ouverte', dueDate: input.dueDate ?? null,
+        documentRef: input.documentRef ?? null, answer: null,
+      };
+      db.rfis.push(r);
+      return { ...r };
+    },
+    async setStatus(rid, status: RfiStatus, answer?: string | null) {
+      const r = db.rfis.find((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (!r) throw new Error('not_found');
+      r.status = status;
+      if (answer !== undefined) r.answer = answer;
+      return { ...r };
+    },
+    async remove(rid) {
+      const i = db.rfis.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (i >= 0) db.rfis.splice(i, 1);
     },
   };
 }

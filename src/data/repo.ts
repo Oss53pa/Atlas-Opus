@@ -69,6 +69,8 @@ import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
 import type { AuditEntry, AuditInput } from '../domain/m23/types';
 import type { SiteReport, SiteReportInput } from '../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
+import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
+import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 
 export interface Session {
   userId: string;
@@ -214,6 +216,22 @@ export interface GovernanceRepo {
   removeRaci(id: string): Promise<void>;
   decisions(operationId: string): Promise<Decision[]>;
   addDecision(operationId: string, input: DecisionInput): Promise<Decision>;
+}
+
+/** Conception & GED (M11) : documents & visas. */
+export interface DocumentsRepo {
+  list(operationId: string): Promise<Document[]>;
+  add(operationId: string, input: DocumentInput): Promise<Document>;
+  setStatus(id: string, status: DocStatus): Promise<Document>;
+  remove(id: string): Promise<void>;
+}
+
+/** RFI & collaboration (M12) : demandes d'information. */
+export interface RfisRepo {
+  list(operationId: string): Promise<Rfi[]>;
+  add(operationId: string, input: RfiInput): Promise<Rfi>;
+  setStatus(id: string, status: RfiStatus, answer?: string | null): Promise<Rfi>;
+  remove(id: string): Promise<void>;
 }
 
 /** Pilotage de réalisation (M13) : comptes rendus de chantier. */

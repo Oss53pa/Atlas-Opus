@@ -62,8 +62,8 @@ const FAMILIES: FamilyDef[] = [
     key: 'conception',
     labelKey: 'nav.family.conception',
     modules: [
-      { code: 'M11', labelKey: 'mod.m11' },
-      { code: 'M12', labelKey: 'mod.m12' },
+      { code: 'M11', labelKey: 'mod.m11', route: 'conception' },
+      { code: 'M12', labelKey: 'mod.m12', route: 'rfi' },
     ],
   },
   {

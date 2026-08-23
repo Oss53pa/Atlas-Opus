@@ -19,6 +19,8 @@ import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/typ
 import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
+import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
+import type { RfiStatus, RfiPriority } from '../../domain/rfi/types';
 
 const PHASE_KEY: Record<Phase, MessageKey> = {
   amont: 'operation.phase.amont',
@@ -511,6 +513,54 @@ export const CHANGE_STATUS_TONE: Record<ChangeStatus, BadgeTone> = {
 };
 export const changeOriginLabel = (o: ChangeOrigin) => t(CHANGE_ORIGIN_KEY[o]);
 export const changeStatusLabel = (s: ChangeStatus) => t(CHANGE_STATUS_KEY[s]);
+
+// ── Conception & GED (M11) ───────────────────────────────────────────────────
+const DOC_DISCIPLINE_KEY: Record<DocDiscipline, MessageKey> = {
+  architecture: 'doc.disc.architecture',
+  structure: 'doc.disc.structure',
+  fluides: 'doc.disc.fluides',
+  vrd: 'doc.disc.vrd',
+  electricite: 'doc.disc.electricite',
+  autre: 'doc.disc.autre',
+};
+const DOC_STATUS_KEY: Record<DocStatus, MessageKey> = {
+  en_cours: 'doc.status.en_cours',
+  diffuse: 'doc.status.diffuse',
+  vise_a: 'doc.status.vise_a',
+  vise_b: 'doc.status.vise_b',
+  vise_c: 'doc.status.vise_c',
+};
+export const DOC_STATUS_TONE: Record<DocStatus, BadgeTone> = {
+  en_cours: 'neutral',
+  diffuse: 'info',
+  vise_a: 'success',
+  vise_b: 'warning',
+  vise_c: 'danger',
+};
+export const docDisciplineLabel = (d: DocDiscipline) => t(DOC_DISCIPLINE_KEY[d]);
+export const docStatusLabel = (s: DocStatus) => t(DOC_STATUS_KEY[s]);
+
+// ── RFI & collaboration (M12) ────────────────────────────────────────────────
+const RFI_STATUS_KEY: Record<RfiStatus, MessageKey> = {
+  ouverte: 'rfi.status.ouverte',
+  repondue: 'rfi.status.repondue',
+  cloturee: 'rfi.status.cloturee',
+};
+export const RFI_STATUS_TONE: Record<RfiStatus, BadgeTone> = {
+  ouverte: 'warning',
+  repondue: 'info',
+  cloturee: 'success',
+};
+const RFI_PRIORITY_KEY: Record<RfiPriority, MessageKey> = {
+  normale: 'rfi.priority.normale',
+  urgente: 'rfi.priority.urgente',
+};
+export const RFI_PRIORITY_TONE: Record<RfiPriority, BadgeTone> = {
+  normale: 'neutral',
+  urgente: 'danger',
+};
+export const rfiStatusLabel = (s: RfiStatus) => t(RFI_STATUS_KEY[s]);
+export const rfiPriorityLabel = (p: RfiPriority) => t(RFI_PRIORITY_KEY[p]);
 
 export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);

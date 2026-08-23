@@ -22,6 +22,8 @@ import {
   createAuditRepo,
   createSiteReportsRepo,
   createChangeOrdersRepo,
+  createDocumentsRepo,
+  createRfisRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -49,6 +51,8 @@ import type {
   AuditRepo,
   SiteReportsRepo,
   ChangeOrdersRepo,
+  DocumentsRepo,
+  RfisRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -70,6 +74,8 @@ import type { Risk } from '../domain/m20/types';
 import type { AuditEntry } from '../domain/m23/types';
 import type { SiteReport } from '../domain/m13/types';
 import type { ChangeOrder } from '../domain/m14/types';
+import type { Document } from '../domain/ged/types';
+import type { Rfi } from '../domain/rfi/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -99,6 +105,8 @@ import {
   createSupabaseAuditRepo,
   createSupabaseSiteReportsRepo,
   createSupabaseChangeOrdersRepo,
+  createSupabaseDocumentsRepo,
+  createSupabaseRfisRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -126,6 +134,8 @@ interface DataApi {
   audit: AuditRepo;
   siteReports: SiteReportsRepo;
   changeOrders: ChangeOrdersRepo;
+  documents: DocumentsRepo;
+  rfis: RfisRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -165,6 +175,8 @@ function buildMockApi(): DataApi {
     audit: createAuditRepo(db, session, { telemetry }),
     siteReports: createSiteReportsRepo(db, session, { telemetry }),
     changeOrders: createChangeOrdersRepo(db, session, { telemetry }),
+    documents: createDocumentsRepo(db, session, { telemetry }),
+    rfis: createRfisRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -224,6 +236,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
           audit: createSupabaseAuditRepo(supabase, session),
           siteReports: createSupabaseSiteReportsRepo(supabase, session),
           changeOrders: createSupabaseChangeOrdersRepo(supabase, session),
+          documents: createSupabaseDocumentsRepo(supabase, session),
+          rfis: createSupabaseRfisRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -421,6 +435,16 @@ export function useSiteReports(operationId: string): AsyncState<SiteReport[]> {
 export function useChangeOrders(operationId: string): AsyncState<ChangeOrder[]> {
   const { changeOrders } = useData();
   return useAsync(() => changeOrders.list(operationId), [changeOrders, operationId]);
+}
+
+export function useDocuments(operationId: string): AsyncState<Document[]> {
+  const { documents } = useData();
+  return useAsync(() => documents.list(operationId), [documents, operationId]);
+}
+
+export function useRfis(operationId: string): AsyncState<Rfi[]> {
+  const { rfis } = useData();
+  return useAsync(() => rfis.list(operationId), [rfis, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {
