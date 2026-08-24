@@ -73,6 +73,7 @@ import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
+import type { HandoverFile } from '../domain/handover/types';
 
 export interface Session {
   userId: string;
@@ -234,6 +235,11 @@ export interface LibraryRepo {
   add(operationId: string, input: LibraryDocInput): Promise<LibraryDoc>;
   setStatus(id: string, status: LibraryStatus): Promise<LibraryDoc>;
   remove(id: string): Promise<void>;
+}
+
+/** Passation vers exploitation (bascule) : dossier de transfert par opération. */
+export interface HandoverRepo {
+  get(operationId: string): Promise<HandoverFile | null>;
 }
 
 /** Conception & GED (M11) : documents & visas. */

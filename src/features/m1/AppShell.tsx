@@ -82,8 +82,10 @@ const FAMILIES: FamilyDef[] = [
     labelKey: 'nav.family.transverse',
     modules: [
       { code: 'M20', labelKey: 'mod.m20', route: 'risques' },
+      { code: 'EXP', labelKey: 'mod.bascule', route: 'bascule' },
       { code: 'M21', labelKey: 'mod.m21', route: 'reporting' },
       { code: 'M22', labelKey: 'mod.m22', route: 'documents' },
+      { code: 'IA', labelKey: 'mod.copilote', route: 'copilote' },
       { code: 'M23', labelKey: 'mod.m23', route: 'journal' },
     ],
   },
@@ -206,6 +208,12 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       )}
 
       <div className="mt-auto" />
+      <button
+        className={cx('ax-nav-item', route.name === 'etats' && 'is-active')}
+        onClick={() => go({ name: 'etats' })}
+      >
+        <span className="flex-1 text-left">{t('etats.title')}</span>
+      </button>
       <UserCard />
     </nav>
   );
