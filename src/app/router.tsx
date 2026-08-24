@@ -28,7 +28,11 @@ export type Route =
   | { name: 'rfi'; id: string }
   | { name: 'raccordements'; id: string }
   | { name: 'documents'; id: string }
-  | { name: 'stakeholder'; id: string; sid: string };
+  | { name: 'stakeholder'; id: string; sid: string }
+  | { name: 'rfiDetail'; id: string; rid: string }
+  | { name: 'docVisa'; id: string; did: string }
+  | { name: 'offerDetail'; id: string; oid: string }
+  | { name: 'siteReport'; id: string; crid: string };
 
 interface NavApi {
   route: Route;

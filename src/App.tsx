@@ -33,6 +33,10 @@ import { RfiScreen } from './features/m1/RfiScreen';
 import { RaccordementsScreen } from './features/m1/RaccordementsScreen';
 import { DocumentsScreen } from './features/m1/DocumentsScreen';
 import { StakeholderDetailScreen } from './features/m1/StakeholderDetailScreen';
+import { RfiDetailScreen } from './features/m1/RfiDetailScreen';
+import { DocumentVisaScreen } from './features/m1/DocumentVisaScreen';
+import { OfferDetailScreen } from './features/m1/OfferDetailScreen';
+import { SiteReportDetailScreen } from './features/m1/SiteReportDetailScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -94,6 +98,14 @@ function RouteView() {
       return <DocumentsScreen id={route.id} />;
     case 'stakeholder':
       return <StakeholderDetailScreen id={route.id} sid={route.sid} />;
+    case 'rfiDetail':
+      return <RfiDetailScreen id={route.id} rid={route.rid} />;
+    case 'docVisa':
+      return <DocumentVisaScreen id={route.id} did={route.did} />;
+    case 'offerDetail':
+      return <OfferDetailScreen id={route.id} oid={route.oid} />;
+    case 'siteReport':
+      return <SiteReportDetailScreen id={route.id} crid={route.crid} />;
     default:
       return <DashboardScreen />;
   }

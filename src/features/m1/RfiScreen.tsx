@@ -62,6 +62,7 @@ export function RfiScreen({ id }: { id: string }) {
     const next = nextRfiStatus(r.status);
     const overdue = isOverdue(r, now);
     return {
+      onClick: () => navigate({ name: 'rfiDetail', id, rid: r.id }),
       cells: [
         <span className="mono text-[13px] font-medium">{r.number}</span>,
         <span>
@@ -71,7 +72,7 @@ export function RfiScreen({ id }: { id: string }) {
         <Badge tone={RFI_PRIORITY_TONE[r.priority]}>{rfiPriorityLabel(r.priority)}</Badge>,
         <span className="mono" style={overdue ? { color: 'var(--ax-danger)' } : { color: 'var(--ax-text-3)' }}>{r.dueDate ? formatDate(r.dueDate, locale) : '—'}</span>,
         <Badge tone={RFI_STATUS_TONE[r.status]}>{rfiStatusLabel(r.status)}</Badge>,
-        <span className="flex justify-end gap-1">
+        <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
           {canEdit && r.status === 'ouverte' && <Button variant="glass" size="sm" onClick={() => answer(r)}>{t('rfi.action.answer')}</Button>}
           {canEdit && r.status === 'repondue' && next && <Button variant="glass" size="sm" onClick={() => close(r)}>{t('rfi.action.close')}</Button>}
           {canEdit && <Button variant="ghost" size="sm" icon aria-label={t('rfi.removed')} onClick={() => remove(r.id)}><Trash2 size={15} /></Button>}
