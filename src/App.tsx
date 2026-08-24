@@ -41,6 +41,9 @@ import { TresorerieScreen } from './features/m1/TresorerieScreen';
 import { MarcheDetailScreen } from './features/m1/MarcheDetailScreen';
 import { SituationScreen } from './features/m1/SituationScreen';
 import { PosteBilanScreen } from './features/m1/PosteBilanScreen';
+import { ImpactSimScreen } from './features/m1/ImpactSimScreen';
+import { MilestonesScreen } from './features/m1/MilestonesScreen';
+import { ArreteBilanScreen } from './features/m1/ArreteBilanScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -118,6 +121,12 @@ function RouteView() {
       return <SituationScreen id={route.id} did={route.did} />;
     case 'bilanPoste':
       return <PosteBilanScreen id={route.id} poste={route.poste} />;
+    case 'impactSim':
+      return <ImpactSimScreen id={route.id} coid={route.coid} />;
+    case 'milestones':
+      return <MilestonesScreen id={route.id} />;
+    case 'arrete':
+      return <ArreteBilanScreen id={route.id} rid={route.rid} />;
     default:
       return <DashboardScreen />;
   }

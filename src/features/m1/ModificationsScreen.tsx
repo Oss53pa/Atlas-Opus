@@ -109,6 +109,7 @@ export function ModificationsScreen({ id }: { id: string }) {
       <span className="mono">{co.impactAnalyzed ? t('change.days.unit', { n: `${co.impactDays > 0 ? '+' : ''}${co.impactDays}` }) : '—'}</span>,
       <Badge tone={CHANGE_STATUS_TONE[co.status]}>{changeStatusLabel(co.status)}</Badge>,
       <span className="flex justify-end gap-1">
+        <Button variant="glass" size="sm" onClick={() => navigate({ name: 'impactSim', id, coid: co.id })}>{t('change.simulate')}</Button>
         {canEdit && co.status === 'requested' && (
           <Button variant="glass" size="sm" onClick={() => { setImpactFor(impactFor === co.id ? null : co.id); setImpactDraft({ cost: '', days: '' }); }}>{t('change.impact.save')}</Button>
         )}
