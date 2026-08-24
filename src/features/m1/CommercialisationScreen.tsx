@@ -130,7 +130,7 @@ export function CommercialisationScreen({ id }: { id: string }) {
 
       {/* ── Inventaire ── */}
       <Card tone="strong">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[16px] font-medium">{t('com.units.title')}</h2>
           {canEdit && <Button variant="primary" size="sm" onClick={() => setAddingUnit((a) => !a)}><Plus size={16} />{t('com.units.add')}</Button>}
         </div>
@@ -176,7 +176,7 @@ export function CommercialisationScreen({ id }: { id: string }) {
 
       {/* ── Ventes & baux ── */}
       <Card tone="strong">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[16px] font-medium">{t('com.sales.title')}</h2>
           {canEdit && <Button variant="primary" size="sm" onClick={() => setAddingSale((a) => !a)}><Plus size={16} />{t('com.sales.add')}</Button>}
         </div>

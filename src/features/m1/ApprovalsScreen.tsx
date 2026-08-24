@@ -72,7 +72,7 @@ export function ApprovalsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'dashboard' })}><ChevronLeft size={18} /></Button>
           <div>
@@ -80,7 +80,7 @@ export function ApprovalsScreen() {
             <h1 className="text-[24px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('appro.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm">{t('appro.delegations')}</Button>
           <Button variant="primary" size="sm">{t('appro.process')}</Button>
         </div>

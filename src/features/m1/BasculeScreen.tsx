@@ -80,7 +80,7 @@ export function BasculeScreen({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}><ChevronLeft size={18} /></Button>
           <div>
@@ -88,7 +88,7 @@ export function BasculeScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('bascule.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm" onClick={() => toast.push(t('bascule.inventory.soon'), 'info')}><PackageSearch size={15} />{t('bascule.inventory')}</Button>
           <Button variant="primary" size="sm" disabled={!ready} onClick={() => toast.push(t('bascule.prepare.done'), 'success')}><ArrowRightLeft size={15} />{t('bascule.prepare')}</Button>
         </div>

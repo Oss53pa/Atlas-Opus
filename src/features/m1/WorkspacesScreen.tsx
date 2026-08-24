@@ -27,9 +27,9 @@ export function WorkspacesScreen() {
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-16 items-center gap-3 border-b px-4 sm:px-8" style={{ borderColor: 'var(--ax-border)' }}>
         <Brand size={20} />
-        <div className="ml-auto flex items-center gap-4">
-          <span className="mono text-[12px] text-ink-3">{email}</span>
-          <button className="text-[13px]" style={{ color: 'var(--ax-accent)' }} onClick={() => void signOut()}>{t('auth.signout')}</button>
+        <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="mono hidden truncate text-[12px] text-ink-3 sm:block">{email}</span>
+          <button className="shrink-0 whitespace-nowrap text-[13px]" style={{ color: 'var(--ax-accent)' }} onClick={() => void signOut()}>{t('auth.signout')}</button>
         </div>
       </header>
 
@@ -58,7 +58,7 @@ export function WorkspacesScreen() {
 
         <div className="mt-6 flex items-center justify-between gap-3 border-t pt-6" style={{ borderColor: 'var(--ax-border)' }}>
           <p className="text-[13px] text-ink-3">{t('ws.missing')}</p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="glass" size="sm" onClick={() => navigate({ name: 'invitation' })}>{t('ws.viewInvite')}</Button>
             <Button variant="primary" size="sm" onClick={() => navigate({ name: 'onboarding' })}><Plus size={16} />{t('ws.create')}</Button>
           </div>

@@ -187,7 +187,7 @@ export function PortfolioScreen() {
           <div className="flex flex-col gap-3 sm:hidden">
             {data.map((op) => (
               <Card key={op.id} onClick={() => navigate({ name: 'cockpit', id: op.id })}>
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="font-medium">{op.name}</div>
                   <PhaseBadge phase={op.phase} />
                 </div>

@@ -78,7 +78,7 @@ export function OperationCockpit({ id }: { id: string }) {
             {countryLabel(op.countryCode)} · {op.currency} · {formatDate(op.startDate, locale)} → {formatDate(op.endDate, locale)}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm" onClick={() => navigate({ name: 'bilan', id: op.id })}>
             <Wallet size={16} />
             {t('bilan.edit')}
@@ -174,7 +174,7 @@ function TreasuryWidget({ flows, currency }: { flows: number[]; currency: string
   const max = Math.max(...cumule.map((v) => Math.abs(v)), 1);
   return (
     <div className="rounded-md p-3" style={{ background: 'var(--ax-glass-subtle)' }}>
-      <div className="flex items-center justify-between gap-2 text-[13px] text-ink-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-ink-2">
         <span className="flex items-center gap-2"><Wallet size={16} className="text-ink-3" />{t('cockpit.cashflow')}</span>
         <span className="text-[11px]" style={{ color: besoinMax < 0 ? 'var(--ax-danger)' : 'var(--ax-success)' }}>
           {t('cockpit.treasury.need')} {Money.of(Math.abs(besoinMax), currency).format(locale)}

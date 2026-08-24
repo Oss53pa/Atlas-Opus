@@ -28,7 +28,18 @@ interface DataTableProps {
  * sur l'en-tête et les lignes. En-tête mono 10px, filets 1px, alignement à droite
  * pour les nombres, ligne de total optionnelle.
  */
+/** Libellé texte d'une colonne pour le mode carte mobile (data-label). */
+function labelText(label: ReactNode): string {
+  return typeof label === 'string' ? label : '';
+}
+
+/**
+ * Sous 768 px, la grille bascule en liste de cartes (règle handoff « tableaux →
+ * cartes ») : chaque cellule affiche le libellé de sa colonne (via `data-label`)
+ * puis sa valeur. Aucun débordement horizontal de la page. Au-dessus, grille CSS.
+ */
 export function DataTable({ template, columns, rows, total, empty }: DataTableProps) {
+  const cellClass = (i: number) => ['ax-table__cell', columns[i]?.align === 'right' ? 'text-right' : ''].filter(Boolean).join(' ');
   return (
     <div className="ax-table">
       <div className="ax-table__head" style={{ gridTemplateColumns: template }}>
@@ -52,7 +63,7 @@ export function DataTable({ template, columns, rows, total, empty }: DataTablePr
             onKeyDown={r.onClick ? (e) => { if (e.key === 'Enter') r.onClick!(); } : undefined}
           >
             {r.cells.map((cell, ci) => (
-              <div key={ci} className={columns[ci]?.align === 'right' ? 'text-right' : undefined}>
+              <div key={ci} className={cellClass(ci)} data-label={labelText(columns[ci]?.label)}>
                 {cell}
               </div>
             ))}
@@ -62,7 +73,7 @@ export function DataTable({ template, columns, rows, total, empty }: DataTablePr
       {total && (
         <div className="ax-table__total" style={{ gridTemplateColumns: template }}>
           {total.cells.map((cell, i) => (
-            <div key={i} className={columns[i]?.align === 'right' ? 'text-right' : undefined}>
+            <div key={i} className={cellClass(i)} data-label={labelText(columns[i]?.label)}>
               {cell}
             </div>
           ))}

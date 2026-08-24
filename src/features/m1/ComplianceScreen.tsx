@@ -296,7 +296,7 @@ export function ComplianceScreen({ id }: { id: string }) {
 
 function SectionHead({ title, addLabel, canEdit, onAdd }: { title: string; addLabel: string; canEdit: boolean; onAdd: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="text-[16px] font-medium">{title}</h2>
       {canEdit && (
         <Button variant="primary" size="sm" onClick={onAdd}>

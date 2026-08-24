@@ -67,7 +67,7 @@ export function StakeholdersScreen({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}>
             <ChevronLeft size={18} />
@@ -77,7 +77,7 @@ export function StakeholdersScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-medium">{t('stakeholders.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm" onClick={() => navigate({ name: 'assurances', id })}>{t('assurances.title')}</Button>
           {canEdit && (
             <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
@@ -237,7 +237,7 @@ function RaciSection({
 
   return (
     <Card tone="strong">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-[18px] font-medium">{t('raci.title')}</h2>
           <p className="mt-0.5 text-[13px] text-ink-2">{t('raci.subtitle')}</p>
@@ -372,7 +372,7 @@ function DecisionsSection({ operationId, canRecord }: { operationId: string; can
 
   return (
     <Card tone="strong">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-[18px] font-medium">{t('decision.title')}</h2>
           <p className="mt-0.5 text-[13px] text-ink-2">{t('decision.subtitle')}</p>
