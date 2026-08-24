@@ -58,7 +58,7 @@ export function PlanningScreen({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}>
             <ChevronLeft size={18} />
@@ -68,7 +68,7 @@ export function PlanningScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-medium">{t('planning.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm" onClick={() => navigate({ name: 'milestones', id })}>{t('milestones.title')}</Button>
           {canEdit && (
             <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>

@@ -34,7 +34,7 @@ export function EtatsScreen() {
             <ShieldX size={28} style={{ color: 'var(--ax-danger)' }} />
             <h2 className="text-[18px] font-semibold">{t('etats.403.heading')}</h2>
             <p className="text-[13px] text-ink-2">{t('etats.403.body')}</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="primary" size="sm">{t('etats.403.request')}</Button>
               <Button variant="glass" size="sm">{t('etats.403.back')}</Button>
             </div>
@@ -47,7 +47,7 @@ export function EtatsScreen() {
             <SearchX size={28} style={{ color: 'var(--ax-text-3)' }} />
             <h2 className="text-[18px] font-semibold">{t('etats.404.heading')}</h2>
             <p className="text-[13px] text-ink-2">{t('etats.404.body')}</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="primary" size="sm" onClick={() => navigate({ name: 'dashboard' })}>{t('etats.404.home')}</Button>
               <Button variant="glass" size="sm">{t('etats.404.search')}</Button>
             </div>

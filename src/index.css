@@ -118,12 +118,16 @@
   .ax-kpi__sub { font-size: 12px; color: var(--ax-text-3); margin-top: 3px; }
   @media (max-width: 900px) { .ax-kpirow { display: flex; flex-wrap: wrap; }
     .ax-kpi { flex: 1 1 40%; } }
+  @media (max-width: 767px) {
+    .ax-kpi { flex: 1 1 44%; }
+    /* Les nombres longs (FCFA) ne doivent pas être tronqués : réduire et autoriser le retour */
+    .ax-kpi__value { font-size: 18px; overflow: visible; white-space: normal; overflow-wrap: anywhere; } }
 
   /* Carte à en-tête (titre + métadonnée / actions) */
   .ax-panel { border: 1px solid var(--ax-border); background: var(--ax-glass); }
-  .ax-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 12px 18px; border-bottom: 1px solid var(--ax-border); }
-  .ax-panel__title { font-size: 15px; font-weight: 600; color: var(--ax-text); }
+  .ax-panel__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 8px 12px; padding: 12px 18px; border-bottom: 1px solid var(--ax-border); }
+  .ax-panel__title { font-size: 15px; font-weight: 600; color: var(--ax-text); min-width: 0; overflow-wrap: anywhere; }
   .ax-panel__meta { font-size: 11px; color: var(--ax-text-faint); }
   .ax-panel__body { padding: 14px 18px; }
 
@@ -143,6 +147,26 @@
     background: var(--ax-surface-total); font-size: 14px; font-weight: 600; color: var(--ax-text);
     border-top: 1px solid var(--ax-border); }
   .ax-table__empty { padding: 18px; font-size: 13px; color: var(--ax-text-3); }
+  .ax-table__cell { min-width: 0; }
+
+  /* Sous 768 px : tableau → liste de cartes (règle handoff) */
+  @media (max-width: 767px) {
+    .ax-table__head { display: none !important; }
+    .ax-table__row, .ax-table__total {
+      display: block !important; padding: 12px 16px;
+      border-bottom: 1px solid var(--ax-border-subtle); }
+    .ax-table__total { background: var(--ax-surface-total); border-top: 1px solid var(--ax-border); }
+    .ax-table__cell {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+      padding: 2px 0; text-align: left !important; }
+    .ax-table__cell[data-label]:not([data-label=""])::before {
+      content: attr(data-label); flex: none; align-self: baseline;
+      font-family: var(--ax-font-mono); font-size: 10px; font-weight: 400;
+      letter-spacing: 0.1em; text-transform: uppercase; color: var(--ax-text-faint); }
+    /* Cellule sans libellé (actions) : pleine largeur */
+    .ax-table__cell[data-label=""] { display: block; padding-top: 6px; }
+    .ax-table__cell[data-label=""] > span { justify-content: flex-start !important; }
+  }
 
   /* Liste de faits (colonne de droite) */
   .ax-facts { display: flex; flex-direction: column; }

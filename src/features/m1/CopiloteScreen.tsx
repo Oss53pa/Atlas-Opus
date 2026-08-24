@@ -55,7 +55,7 @@ export function CopiloteScreen({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}><ChevronLeft size={18} /></Button>
           <div>
@@ -63,7 +63,7 @@ export function CopiloteScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('copilote.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm" onClick={() => toast.push(t('copilote.history.soon'), 'info')}><History size={15} />{t('copilote.history')}</Button>
           <Button variant="primary" size="sm" onClick={() => toast.push(t('copilote.new.soon'), 'info')}><MessageSquarePlus size={15} />{t('copilote.new')}</Button>
         </div>

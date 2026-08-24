@@ -84,9 +84,9 @@ export function OnboardingScreen() {
             <p className="mt-1 text-[13px] text-ink-3">{t('onb.holidays.body', { n: 14 })}</p>
           </div>
 
-          <div className="mt-6 flex items-center justify-between gap-2">
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
             <Button variant="glass" size="sm" onClick={() => navigate({ name: 'workspaces' })}>{t('onb.back')}</Button>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="glass" size="sm" onClick={() => { toast.push(t('onb.saved'), 'info'); navigate({ name: 'workspaces' }); }}>{t('onb.saveExit')}</Button>
               <Button variant="primary" size="sm" onClick={() => { toast.push(t('onb.continued'), 'success'); navigate({ name: 'create' }); }}>{t('onb.continue')}</Button>
             </div>

@@ -67,7 +67,7 @@ export function NotificationsScreen() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'dashboard' })}><ChevronLeft size={18} /></Button>
           <div>
@@ -75,7 +75,7 @@ export function NotificationsScreen() {
             <h1 className="text-[24px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('notif.title')}</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm">{t('notif.preferences')}</Button>
           <Button variant="primary" size="sm" onClick={() => toast.push(t('notif.allRead'), 'success')}>{t('notif.markAll')}</Button>
         </div>
