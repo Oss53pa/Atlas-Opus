@@ -46,6 +46,7 @@ export function PilotageScreen({ id }: { id: string }) {
   }
 
   const tableRows: TableRowData[] = rows.map((r) => ({
+    onClick: () => navigate({ name: 'siteReport', id, crid: r.id }),
     cells: [
       <span className="mono text-[13px]">#{r.number}</span>,
       <span className="mono text-ink-3">{formatDate(r.date, locale)}</span>,
@@ -56,7 +57,7 @@ export function PilotageScreen({ id }: { id: string }) {
       </span>,
       r.blockers > 0 ? <Badge tone="warning">{r.blockers}</Badge> : <span className="text-ink-3">—</span>,
       <span>{r.summary || '—'}</span>,
-      <span className="flex justify-end">
+      <span className="flex justify-end" onClick={(e) => e.stopPropagation()}>
         {canEdit && <Button variant="ghost" size="sm" icon aria-label={t('site.removed')} onClick={() => remove(r.id)}><Trash2 size={15} /></Button>}
       </span>,
     ],

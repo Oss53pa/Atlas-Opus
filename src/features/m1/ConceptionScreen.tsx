@@ -46,13 +46,14 @@ export function ConceptionScreen({ id }: { id: string }) {
   }
 
   const tableRows: TableRowData[] = rows.map((d) => ({
+    onClick: () => navigate({ name: 'docVisa', id, did: d.id }),
     cells: [
       <span className="mono text-[13px] font-medium">{d.reference}</span>,
       <span>{d.title}</span>,
       <span className="text-ink-2">{docDisciplineLabel(d.discipline)}</span>,
       <span className="mono">{d.indice}</span>,
       <Badge tone={DOC_STATUS_TONE[d.status]}>{docStatusLabel(d.status)}</Badge>,
-      <span className="flex justify-end gap-1">
+      <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
         {canEdit && d.status === 'en_cours' && (
           <Button variant="glass" size="sm" onClick={() => setStatus(d.id, 'diffuse')}>{t('doc.action.diffuse')}</Button>
         )}

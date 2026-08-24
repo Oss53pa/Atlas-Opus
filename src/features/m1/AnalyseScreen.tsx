@@ -69,6 +69,7 @@ export function AnalyseScreen({ id }: { id: string }) {
       if (o.status === 'recu') { actions.push({ s: 'conforme', key: 'offer.action.conforme' }, { s: 'ecarte', key: 'offer.action.ecarte' }); }
       else if (o.status === 'conforme') { actions.push({ s: 'retenu', key: 'offer.action.retenu' }, { s: 'ecarte', key: 'offer.action.ecarte' }); }
       return {
+        onClick: () => navigate({ name: 'offerDetail', id, oid: o.id }),
         cells: [
           <span className="mono">{r ? r.rank : '—'}</span>,
           <span className="font-medium">{o.bidder}</span>,
@@ -76,7 +77,7 @@ export function AnalyseScreen({ id }: { id: string }) {
           <span className="mono">{o.scoreTechnical}</span>,
           <span className="mono">{r ? r.scoreGlobal.toFixed(1) : '—'}</span>,
           <Badge tone={OFFER_STATUS_TONE[o.status]}>{offerStatusLabel(o.status)}</Badge>,
-          <span className="flex justify-end gap-1">
+          <span className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
             {canEdit && actions.map((a) => (
               <Button key={a.s} variant="glass" size="sm" onClick={() => setStatus(o.id, a.s)}>{t(a.key)}</Button>
             ))}
