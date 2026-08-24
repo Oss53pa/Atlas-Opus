@@ -42,7 +42,10 @@ export type Route =
   | { name: 'arrete'; id: string; rid: string }
   | { name: 'assurances'; id: string }
   | { name: 'registreRisques'; id: string }
-  | { name: 'reserves'; id: string };
+  | { name: 'reserves'; id: string }
+  | { name: 'bascule'; id: string }
+  | { name: 'copilote'; id: string }
+  | { name: 'etats' };
 
 interface NavApi {
   route: Route;

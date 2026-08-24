@@ -26,6 +26,7 @@ import {
   createRfisRepo,
   createConnectionsRepo,
   createLibraryRepo,
+  createHandoverRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -57,6 +58,7 @@ import type {
   RfisRepo,
   ConnectionsRepo,
   LibraryRepo,
+  HandoverRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -82,6 +84,7 @@ import type { Document } from '../domain/ged/types';
 import type { Rfi } from '../domain/rfi/types';
 import type { Connection } from '../domain/m18/types';
 import type { LibraryDoc } from '../domain/m22/types';
+import type { HandoverFile } from '../domain/handover/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -115,6 +118,7 @@ import {
   createSupabaseRfisRepo,
   createSupabaseConnectionsRepo,
   createSupabaseLibraryRepo,
+  createSupabaseHandoverRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -146,6 +150,7 @@ interface DataApi {
   rfis: RfisRepo;
   connections: ConnectionsRepo;
   library: LibraryRepo;
+  handover: HandoverRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -189,6 +194,7 @@ function buildMockApi(): DataApi {
     rfis: createRfisRepo(db, session, { telemetry }),
     connections: createConnectionsRepo(db, session, { telemetry }),
     library: createLibraryRepo(db, session, { telemetry }),
+    handover: createHandoverRepo(db),
     session,
     countries: COUNTRIES,
   };
@@ -252,6 +258,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           rfis: createSupabaseRfisRepo(supabase, session),
           connections: createSupabaseConnectionsRepo(supabase, session),
           library: createSupabaseLibraryRepo(supabase, session),
+          handover: createSupabaseHandoverRepo(supabase),
           session,
           countries: COUNTRIES,
         });
@@ -469,6 +476,11 @@ export function useConnections(operationId: string): AsyncState<Connection[]> {
 export function useLibrary(operationId: string): AsyncState<LibraryDoc[]> {
   const { library } = useData();
   return useAsync(() => library.list(operationId), [library, operationId]);
+}
+
+export function useHandover(operationId: string): AsyncState<HandoverFile | null> {
+  const { handover } = useData();
+  return useAsync(() => handover.get(operationId), [handover, operationId]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

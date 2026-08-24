@@ -56,7 +56,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo } from '../repo';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -69,6 +69,7 @@ import type { ChangeOrder, CreateChangeOrderInput, ChangeOrigin, ChangeStatus } 
 import type { Document, DocumentInput, DocStatus, DocDiscipline } from '../../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus, RfiPriority } from '../../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus, UtilityType } from '../../domain/m18/types';
+import type { HandoverFile, DoeCategory, TransferEquipment } from '../../domain/handover/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus, DocCategory } from '../../domain/m22/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
@@ -1259,6 +1260,34 @@ export function createSupabaseLibraryRepo(client: SupabaseClient, session: Sessi
     async remove(id) {
       const { error } = await client.from(LB).delete().eq('id', id);
       if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── Passation vers exploitation (bascule) ────────────────────────────────────
+interface HandoverRow {
+  operation_id: string; doe: DoeCategory[]; equipment: TransferEquipment[];
+  equipment_count: number; guarantees_count: number; guarantees_without_end: number;
+  transfer_state: string; export_ready: boolean;
+}
+function toHandover(r: HandoverRow): HandoverFile {
+  return {
+    operationId: r.operation_id,
+    doe: r.doe ?? [],
+    equipment: r.equipment ?? [],
+    equipmentCount: Number(r.equipment_count),
+    guaranteesCount: Number(r.guarantees_count),
+    guaranteesWithoutEnd: Number(r.guarantees_without_end),
+    transferState: r.transfer_state as HandoverFile['transferState'],
+    exportReady: r.export_ready,
+  };
+}
+export function createSupabaseHandoverRepo(client: SupabaseClient): HandoverRepo {
+  const HX = 'ao_handover';
+  return {
+    async get(opId) {
+      const row = unwrap(await client.from(HX).select('*').eq('operation_id', opId).maybeSingle()) as HandoverRow | null;
+      return row ? toHandover(row) : null;
     },
   };
 }

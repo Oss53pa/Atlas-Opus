@@ -51,6 +51,7 @@ import type { Document, DocumentInput, DocStatus } from '../domain/ged/types';
 import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
+import type { HandoverFile } from '../domain/handover/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -90,6 +91,7 @@ import type {
   RfisRepo,
   ConnectionsRepo,
   LibraryRepo,
+  HandoverRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -139,6 +141,7 @@ export interface MockDb {
   rfis: Rfi[];
   connections: Connection[];
   library: LibraryDoc[];
+  handover: HandoverFile[];
 }
 
 interface Deps {
@@ -469,7 +472,31 @@ export function createMockDb(): MockDb {
     { id: 'lb-p3', tenantId: T, operationId: 'op-palmiers', name: 'Plan de financement', category: 'financier', reference: 'FIN-2026-01', version: 3, status: 'brouillon', updatedAt: '2026-06-08T08:00:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library };
+  // Passation vers exploitation (bascule) — Palmiers.
+  const handover: HandoverFile[] = [
+    {
+      operationId: 'op-palmiers',
+      doe: [
+        { key: 'plans_asbuilt', responsible: 'Atelier Nord', expected: 86, received: 34 },
+        { key: 'notices', responsible: 'Entreprises', expected: 42, received: 18 },
+        { key: 'garanties', responsible: 'Entreprises', expected: 96, received: 64 },
+        { key: 'pv_controle', responsible: 'CT', expected: 24, received: 24 },
+      ],
+      equipment: [
+        { label: 'Ascenseurs (4)', detail: 'Garantie constructeur jusqu’au 03.2029', target: 'keystone' },
+        { label: 'Groupe électrogène 250 kVA', detail: 'Contrat de maintenance à souscrire', target: 'keystone' },
+        { label: '96 lots résidentiels', detail: 'Dont 12 en location', target: 'lease' },
+        { label: '2 commerces RDC', detail: 'Baux commerciaux actifs', target: 'lease' },
+      ],
+      equipmentCount: 128,
+      guaranteesCount: 96,
+      guaranteesWithoutEnd: 32,
+      transferState: 'preparation',
+      exportReady: true,
+    },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1239,6 +1266,15 @@ export function createLibraryRepo(db: MockDb, session: Session, deps: Deps): Lib
     async remove(did) {
       const i = db.library.findIndex((x) => x.id === did && x.tenantId === session.tenantId);
       if (i >= 0) db.library.splice(i, 1);
+    },
+  };
+}
+
+export function createHandoverRepo(db: MockDb): HandoverRepo {
+  return {
+    async get(opId) {
+      const f = db.handover.find((h) => h.operationId === opId);
+      return f ? { ...f, doe: f.doe.map((c) => ({ ...c })), equipment: f.equipment.map((e) => ({ ...e })) } : null;
     },
   };
 }

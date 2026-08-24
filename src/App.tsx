@@ -47,6 +47,9 @@ import { ArreteBilanScreen } from './features/m1/ArreteBilanScreen';
 import { AssurancesScreen } from './features/m1/AssurancesScreen';
 import { RegistreRisquesScreen } from './features/m1/RegistreRisquesScreen';
 import { ReservesScreen } from './features/m1/ReservesScreen';
+import { BasculeScreen } from './features/m1/BasculeScreen';
+import { CopiloteScreen } from './features/m1/CopiloteScreen';
+import { EtatsScreen } from './features/m1/EtatsScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -136,6 +139,12 @@ function RouteView() {
       return <RegistreRisquesScreen id={route.id} />;
     case 'reserves':
       return <ReservesScreen id={route.id} />;
+    case 'bascule':
+      return <BasculeScreen id={route.id} />;
+    case 'copilote':
+      return <CopiloteScreen id={route.id} />;
+    case 'etats':
+      return <EtatsScreen />;
     default:
       return <DashboardScreen />;
   }
