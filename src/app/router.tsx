@@ -36,7 +36,10 @@ export type Route =
   | { name: 'tresorerie'; id: string }
   | { name: 'marche'; id: string; cid: string }
   | { name: 'situation'; id: string; did: string }
-  | { name: 'bilanPoste'; id: string; poste: string };
+  | { name: 'bilanPoste'; id: string; poste: string }
+  | { name: 'impactSim'; id: string; coid: string }
+  | { name: 'milestones'; id: string }
+  | { name: 'arrete'; id: string; rid: string };
 
 interface NavApi {
   route: Route;

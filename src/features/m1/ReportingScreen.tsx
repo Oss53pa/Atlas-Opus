@@ -141,6 +141,7 @@ export function ReportingScreen({ id }: { id: string }) {
                 }
                 actions={
                   <>
+                    <Button variant="glass" size="sm" onClick={() => navigate({ name: 'arrete', id, rid: snap.id })}>{t('common.detail')}</Button>
                     <Button variant="glass" size="sm" onClick={() => openExport(snap)}><FileDown size={14} />{t('reporting.export')}</Button>
                     {canEdit && <Button variant="ghost" size="sm" icon aria-label={t('reporting.removed')} onClick={() => remove(snap.id)}><Trash2 size={15} /></Button>}
                   </>

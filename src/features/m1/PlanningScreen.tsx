@@ -68,12 +68,15 @@ export function PlanningScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-medium">{t('planning.title')}</h1>
           </div>
         </div>
-        {canEdit && (
-          <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
-            <Plus size={16} />
-            {t('planning.add')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Button variant="glass" size="sm" onClick={() => navigate({ name: 'milestones', id })}>{t('milestones.title')}</Button>
+          {canEdit && (
+            <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
+              <Plus size={16} />
+              {t('planning.add')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {readOnly && <Banner tone="warning">{t('planning.readonly')}</Banner>}
