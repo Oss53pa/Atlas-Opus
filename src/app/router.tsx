@@ -39,7 +39,10 @@ export type Route =
   | { name: 'bilanPoste'; id: string; poste: string }
   | { name: 'impactSim'; id: string; coid: string }
   | { name: 'milestones'; id: string }
-  | { name: 'arrete'; id: string; rid: string };
+  | { name: 'arrete'; id: string; rid: string }
+  | { name: 'assurances'; id: string }
+  | { name: 'registreRisques'; id: string }
+  | { name: 'reserves'; id: string };
 
 interface NavApi {
   route: Route;

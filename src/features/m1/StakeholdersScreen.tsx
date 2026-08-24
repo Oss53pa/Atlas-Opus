@@ -77,12 +77,15 @@ export function StakeholdersScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-medium">{t('stakeholders.title')}</h1>
           </div>
         </div>
-        {canEdit && (
-          <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
-            <Plus size={16} />
-            {t('stakeholders.add')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Button variant="glass" size="sm" onClick={() => navigate({ name: 'assurances', id })}>{t('assurances.title')}</Button>
+          {canEdit && (
+            <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
+              <Plus size={16} />
+              {t('stakeholders.add')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {readOnly && <Banner tone="warning">{t('stakeholders.readonly')}</Banner>}
