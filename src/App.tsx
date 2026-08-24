@@ -53,6 +53,9 @@ import { EtatsScreen } from './features/m1/EtatsScreen';
 import { WorkspacesScreen } from './features/m1/WorkspacesScreen';
 import { InvitationScreen } from './features/m1/InvitationScreen';
 import { OnboardingScreen } from './features/m1/OnboardingScreen';
+import { MembresScreen } from './features/m1/MembresScreen';
+import { NotificationsScreen } from './features/m1/NotificationsScreen';
+import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -154,6 +157,12 @@ function RouteView() {
       return <InvitationScreen />;
     case 'onboarding':
       return <OnboardingScreen />;
+    case 'membres':
+      return <MembresScreen />;
+    case 'notifications':
+      return <NotificationsScreen />;
+    case 'approbations':
+      return <ApprovalsScreen />;
     default:
       return <DashboardScreen />;
   }

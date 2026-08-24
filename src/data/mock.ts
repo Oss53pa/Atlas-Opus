@@ -52,6 +52,7 @@ import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
+import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
 import { decompteNet } from '../domain/payments/decompte';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
@@ -92,6 +93,7 @@ import type {
   ConnectionsRepo,
   LibraryRepo,
   HandoverRepo,
+  AdminRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -142,6 +144,9 @@ export interface MockDb {
   connections: Connection[];
   library: LibraryDoc[];
   handover: HandoverFile[];
+  members: Member[];
+  notifications: NotificationItem[];
+  approvals: ApprovalTask[];
 }
 
 interface Deps {
@@ -496,7 +501,34 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover };
+  // Administration transverse (F1/F4/F7) — tenant Atlas Immobilier CI.
+  const members: Member[] = [
+    { id: 'mb-1', tenantId: T, name: 'Kouassi Traoré', email: 'k.traore@atlas-mo.ci', role: 'moa_director', scope: 'toutes opérations', status: 'actif', lastActivity: 'à l’instant' },
+    { id: 'mb-2', tenantId: T, name: 'Awa Diallo', email: 'a.diallo@atlas-mo.ci', role: 'finance', scope: 'toutes opérations', status: 'actif', lastActivity: 'hier' },
+    { id: 'mb-3', tenantId: T, name: 'Bakary Konan', email: 'b.konan@ateliernord.ci', role: 'amo', scope: 'Palmiers · Plateau', status: 'actif', lastActivity: '19.08' },
+    { id: 'mb-4', tenantId: T, name: 'Thierry Bamba', email: 't.bamba@atlas-mo.ci', role: 'site', scope: 'Palmiers', status: 'actif', lastActivity: '19.08' },
+    { id: 'mb-5', tenantId: T, name: 'Sofia Renard', email: 's.renard@atlas-mo.ci', role: 'procurement', scope: 'Plateau · Bouaké', status: 'actif', lastActivity: '18.08' },
+    { id: 'mb-6', tenantId: T, name: 'invitation@exemple.ci', email: 'invitation@exemple.ci', role: 'viewer', scope: 'Palmiers', status: 'en_attente', lastActivity: null },
+  ];
+  const notifications: NotificationItem[] = [
+    { id: 'nt-1', tenantId: T, severity: 'danger', title: 'Écart physique / financier de 6 points — lot 02', context: 'Palmiers · M13 · RG-M13-06', at: '2026-08-19T14:02:00.000Z', read: false },
+    { id: 'nt-2', tenantId: T, severity: 'danger', title: 'Attestation décennale expirée — EGCI Bâtiment', context: 'Palmiers · intervention bloquée · M7 · RG-M7-03', at: '2026-08-19T11:40:00.000Z', read: false },
+    { id: 'nt-3', tenantId: T, severity: 'echeance', title: 'Situation lot 02 visée par la MOE, à valider', context: 'Palmiers · 184,0 M FCFA', at: '2026-08-19T09:12:00.000Z', read: false },
+    { id: 'nt-4', tenantId: T, severity: 'info', title: 'RFI-031 escaladée pour dépassement de délai', context: 'Palmiers · Atelier Nord', at: '2026-08-19T08:05:00.000Z', read: true },
+    { id: 'nt-5', tenantId: T, severity: 'danger', title: 'ETA ascenseurs reculée de 15 jours', context: 'chemin critique impacté', at: '2026-08-18T00:00:00.000Z', read: true },
+    { id: 'nt-6', tenantId: T, severity: 'echeance', title: 'Caution de bonne exécution à échoir dans 21 jours', context: 'lot 02 · prorogation à demander', at: '2026-08-17T00:00:00.000Z', read: true },
+    { id: 'nt-7', tenantId: T, severity: 'info', title: 'Rapport hebdomadaire S34 diffusé', context: '6 destinataires', at: '2026-08-18T00:00:00.000Z', read: true },
+  ];
+  const approvals: ApprovalTask[] = [
+    { id: 'ap-1', tenantId: T, module: 'M13', object: 'Situation n° 7 — gros œuvre lot 02', detail: 'visa MOE obtenu le 18.08', amount: 184_000_000, status: 'a_valider', requiredRole: 'owner', forMe: true },
+    { id: 'ap-2', tenantId: T, module: 'M13', object: 'Situation — électricité lot 09', detail: 'visa MOE obtenu', amount: 47_800_000, status: 'a_valider', requiredRole: 'moa_director', forMe: true },
+    { id: 'ap-3', tenantId: T, module: 'M14', object: 'Reprise de fondations zone B', detail: '+12 j sur chemin critique', amount: 20_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true },
+    { id: 'ap-4', tenantId: T, module: 'M14', object: 'Ajout GE de secours 250 kVA', detail: 'exigence programme v3', amount: 44_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true },
+    { id: 'ap-5', tenantId: T, module: 'M8', object: 'Attribution lot 03 — Ivoire Élec', detail: 'rapport M23 disponible', amount: 398_000_000, status: 'a_decider', requiredRole: 'owner', forMe: true },
+    { id: 'ap-6', tenantId: T, module: 'M13', object: 'Situation — VRD lot 05', detail: 'en attente de visa MOE', amount: 61_500_000, status: 'visa_moe', requiredRole: 'amo', forMe: false },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1275,6 +1307,21 @@ export function createHandoverRepo(db: MockDb): HandoverRepo {
     async get(opId) {
       const f = db.handover.find((h) => h.operationId === opId);
       return f ? { ...f, doe: f.doe.map((c) => ({ ...c })), equipment: f.equipment.map((e) => ({ ...e })) } : null;
+    },
+  };
+}
+
+export function createAdminRepo(db: MockDb, session: Session): AdminRepo {
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async members() {
+      return mine(db.members).map((m) => ({ ...m }));
+    },
+    async notifications() {
+      return mine(db.notifications).map((n) => ({ ...n }));
+    },
+    async approvals() {
+      return mine(db.approvals).map((a) => ({ ...a }));
     },
   };
 }
