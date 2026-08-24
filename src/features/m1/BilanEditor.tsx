@@ -108,6 +108,7 @@ export function BilanEditor({ id }: { id: string }) {
                   <span className="mono w-[150px] text-right text-[13px]">{formatAmount(r.amountPlanned, locale)}</span>
                 )}
                 <span className="mono w-[150px] text-right text-[13px] text-ink-3">{formatAmount(r.amountActual, locale)}</span>
+                <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'bilanPoste', id, poste: r.poste })}>{t('common.detail')}</Button>
                 {canEdit && (
                   <Button variant="ghost" size="sm" icon aria-label={t('bilan.line.removed')} onClick={() => removeLine(r.id)}>
                     <Trash2 size={15} />
@@ -123,14 +124,17 @@ export function BilanEditor({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}>
-          <ChevronLeft size={18} />
-        </Button>
-        <div>
-          <div className="text-[13px] text-ink-3">{op?.name}</div>
-          <h1 className="text-[24px] font-medium">{t('bilan.editTitle')}</h1>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" icon aria-label={t('common.back')} onClick={() => navigate({ name: 'cockpit', id })}>
+            <ChevronLeft size={18} />
+          </Button>
+          <div>
+            <div className="text-[13px] text-ink-3">{op?.name}</div>
+            <h1 className="text-[24px] font-medium">{t('bilan.editTitle')}</h1>
+          </div>
         </div>
+        <Button variant="glass" size="sm" onClick={() => navigate({ name: 'tresorerie', id })}>{t('tresorerie.title')}</Button>
       </div>
 
       {readOnly && <Banner tone="warning">{t('bilan.readonly')}</Banner>}

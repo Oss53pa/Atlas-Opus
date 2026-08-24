@@ -32,7 +32,11 @@ export type Route =
   | { name: 'rfiDetail'; id: string; rid: string }
   | { name: 'docVisa'; id: string; did: string }
   | { name: 'offerDetail'; id: string; oid: string }
-  | { name: 'siteReport'; id: string; crid: string };
+  | { name: 'siteReport'; id: string; crid: string }
+  | { name: 'tresorerie'; id: string }
+  | { name: 'marche'; id: string; cid: string }
+  | { name: 'situation'; id: string; did: string }
+  | { name: 'bilanPoste'; id: string; poste: string };
 
 interface NavApi {
   route: Route;
