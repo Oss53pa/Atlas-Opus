@@ -37,6 +37,10 @@ import { RfiDetailScreen } from './features/m1/RfiDetailScreen';
 import { DocumentVisaScreen } from './features/m1/DocumentVisaScreen';
 import { OfferDetailScreen } from './features/m1/OfferDetailScreen';
 import { SiteReportDetailScreen } from './features/m1/SiteReportDetailScreen';
+import { TresorerieScreen } from './features/m1/TresorerieScreen';
+import { MarcheDetailScreen } from './features/m1/MarcheDetailScreen';
+import { SituationScreen } from './features/m1/SituationScreen';
+import { PosteBilanScreen } from './features/m1/PosteBilanScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -106,6 +110,14 @@ function RouteView() {
       return <OfferDetailScreen id={route.id} oid={route.oid} />;
     case 'siteReport':
       return <SiteReportDetailScreen id={route.id} crid={route.crid} />;
+    case 'tresorerie':
+      return <TresorerieScreen id={route.id} />;
+    case 'marche':
+      return <MarcheDetailScreen id={route.id} cid={route.cid} />;
+    case 'situation':
+      return <SituationScreen id={route.id} did={route.did} />;
+    case 'bilanPoste':
+      return <PosteBilanScreen id={route.id} poste={route.poste} />;
     default:
       return <DashboardScreen />;
   }

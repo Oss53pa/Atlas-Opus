@@ -138,17 +138,20 @@ export function PaymentsScreen({ id }: { id: string }) {
                 </span>
               }
               actions={
-                canEdit && (
-                  <>
-                    <Button variant="glass" size="sm" onClick={() => { setDecFor(decFor === c.id ? null : c.id); setDDraft({ gross: '', retentionPct: '5' }); }}>
-                      <Plus size={15} />
-                      {t('payments.addDecompte')}
-                    </Button>
-                    <Button variant="ghost" size="sm" icon aria-label={t('payments.contract.removed')} onClick={() => removeContract(c.id)}>
-                      <Trash2 size={15} />
-                    </Button>
-                  </>
-                )
+                <>
+                  <Button variant="glass" size="sm" onClick={() => navigate({ name: 'marche', id, cid: c.id })}>{t('common.detail')}</Button>
+                  {canEdit && (
+                    <>
+                      <Button variant="glass" size="sm" onClick={() => { setDecFor(decFor === c.id ? null : c.id); setDDraft({ gross: '', retentionPct: '5' }); }}>
+                        <Plus size={15} />
+                        {t('payments.addDecompte')}
+                      </Button>
+                      <Button variant="ghost" size="sm" icon aria-label={t('payments.contract.removed')} onClick={() => removeContract(c.id)}>
+                        <Trash2 size={15} />
+                      </Button>
+                    </>
+                  )}
+                </>
               }
             >
               {decFor === c.id && canEdit && (
@@ -183,6 +186,7 @@ export function PaymentsScreen({ id }: { id: string }) {
                         </span>
                         <MoneyView amount={d.amountNet} currency={currency} className="w-[150px] text-right text-[13px]" />
                         <Badge tone={DECOMPTE_TONE[d.status]}>{decompteStatusLabel(d.status)}</Badge>
+                        <Button variant="ghost" size="sm" onClick={() => navigate({ name: 'situation', id, did: d.id })}>{t('common.detail')}</Button>
                         {canEdit && next && (
                           <Button variant="glass" size="sm" onClick={() => advance(d)}>
                             {t('payments.advance')}
