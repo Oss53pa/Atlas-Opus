@@ -208,12 +208,20 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       )}
 
       <div className="mt-auto" />
-      <button
-        className={cx('ax-nav-item', route.name === 'etats' && 'is-active')}
-        onClick={() => go({ name: 'etats' })}
-      >
-        <span className="flex-1 text-left">{t('etats.title')}</span>
-      </button>
+      {([
+        { name: 'approbations', labelKey: 'appro.title' },
+        { name: 'notifications', labelKey: 'notif.title' },
+        { name: 'membres', labelKey: 'membres.title' },
+        { name: 'etats', labelKey: 'etats.title' },
+      ] as const).map((link) => (
+        <button
+          key={link.name}
+          className={cx('ax-nav-item', route.name === link.name && 'is-active')}
+          onClick={() => go({ name: link.name })}
+        >
+          <span className="flex-1 text-left">{t(link.labelKey)}</span>
+        </button>
+      ))}
       <UserCard />
     </nav>
   );

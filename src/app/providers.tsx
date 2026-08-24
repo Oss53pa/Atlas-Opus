@@ -27,6 +27,7 @@ import {
   createConnectionsRepo,
   createLibraryRepo,
   createHandoverRepo,
+  createAdminRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -59,6 +60,7 @@ import type {
   ConnectionsRepo,
   LibraryRepo,
   HandoverRepo,
+  AdminRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -85,6 +87,7 @@ import type { Rfi } from '../domain/rfi/types';
 import type { Connection } from '../domain/m18/types';
 import type { LibraryDoc } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
+import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -119,6 +122,7 @@ import {
   createSupabaseConnectionsRepo,
   createSupabaseLibraryRepo,
   createSupabaseHandoverRepo,
+  createSupabaseAdminRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { EmptyState } from '../ui';
@@ -151,6 +155,7 @@ interface DataApi {
   connections: ConnectionsRepo;
   library: LibraryRepo;
   handover: HandoverRepo;
+  admin: AdminRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -195,6 +200,7 @@ function buildMockApi(): DataApi {
     connections: createConnectionsRepo(db, session, { telemetry }),
     library: createLibraryRepo(db, session, { telemetry }),
     handover: createHandoverRepo(db),
+    admin: createAdminRepo(db, session),
     session,
     countries: COUNTRIES,
   };
@@ -259,6 +265,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           connections: createSupabaseConnectionsRepo(supabase, session),
           library: createSupabaseLibraryRepo(supabase, session),
           handover: createSupabaseHandoverRepo(supabase),
+          admin: createSupabaseAdminRepo(supabase),
           session,
           countries: COUNTRIES,
         });
@@ -481,6 +488,21 @@ export function useLibrary(operationId: string): AsyncState<LibraryDoc[]> {
 export function useHandover(operationId: string): AsyncState<HandoverFile | null> {
   const { handover } = useData();
   return useAsync(() => handover.get(operationId), [handover, operationId]);
+}
+
+export function useMembers(): AsyncState<Member[]> {
+  const { admin } = useData();
+  return useAsync(() => admin.members(), [admin]);
+}
+
+export function useNotifications(): AsyncState<NotificationItem[]> {
+  const { admin } = useData();
+  return useAsync(() => admin.notifications(), [admin]);
+}
+
+export function useApprovals(): AsyncState<ApprovalTask[]> {
+  const { admin } = useData();
+  return useAsync(() => admin.approvals(), [admin]);
 }
 
 export function useRaci(operationId: string): AsyncState<RaciAssignment[]> {

@@ -74,6 +74,7 @@ import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
+import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
 
 export interface Session {
   userId: string;
@@ -240,6 +241,13 @@ export interface LibraryRepo {
 /** Passation vers exploitation (bascule) : dossier de transfert par opération. */
 export interface HandoverRepo {
   get(operationId: string): Promise<HandoverFile | null>;
+}
+
+/** Administration transverse (F1/F4/F7) : membres, notifications, approbations — tenant. */
+export interface AdminRepo {
+  members(): Promise<Member[]>;
+  notifications(): Promise<NotificationItem[]>;
+  approvals(): Promise<ApprovalTask[]>;
 }
 
 /** Conception & GED (M11) : documents & visas. */
