@@ -50,6 +50,9 @@ import { ReservesScreen } from './features/m1/ReservesScreen';
 import { BasculeScreen } from './features/m1/BasculeScreen';
 import { CopiloteScreen } from './features/m1/CopiloteScreen';
 import { EtatsScreen } from './features/m1/EtatsScreen';
+import { WorkspacesScreen } from './features/m1/WorkspacesScreen';
+import { InvitationScreen } from './features/m1/InvitationScreen';
+import { OnboardingScreen } from './features/m1/OnboardingScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -145,9 +148,29 @@ function RouteView() {
       return <CopiloteScreen id={route.id} />;
     case 'etats':
       return <EtatsScreen />;
+    case 'workspaces':
+      return <WorkspacesScreen />;
+    case 'invitation':
+      return <InvitationScreen />;
+    case 'onboarding':
+      return <OnboardingScreen />;
     default:
       return <DashboardScreen />;
   }
+}
+
+/** Routes plein cadre (pré-contexte) : rendues sans la barre latérale. */
+const CHROMELESS = new Set(['workspaces', 'invitation', 'onboarding']);
+
+/** Enveloppe le contenu de la barre latérale, sauf pour les écrans plein cadre. */
+function Shell() {
+  const { route } = useNav();
+  if (CHROMELESS.has(route.name)) return <RouteView />;
+  return (
+    <AppShell>
+      <RouteView />
+    </AppShell>
+  );
 }
 
 /** Décide login / chargement / app selon le mode d'auth. */
@@ -171,9 +194,7 @@ export default function App() {
             <AuthGate>
               <DataProvider>
                 <NavProvider>
-                  <AppShell>
-                    <RouteView />
-                  </AppShell>
+                  <Shell />
                 </NavProvider>
               </DataProvider>
             </AuthGate>

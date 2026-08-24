@@ -45,7 +45,10 @@ export type Route =
   | { name: 'reserves'; id: string }
   | { name: 'bascule'; id: string }
   | { name: 'copilote'; id: string }
-  | { name: 'etats' };
+  | { name: 'etats' }
+  | { name: 'workspaces' }
+  | { name: 'invitation' }
+  | { name: 'onboarding' };
 
 interface NavApi {
   route: Route;
