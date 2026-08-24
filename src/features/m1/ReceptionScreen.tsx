@@ -80,11 +80,14 @@ export function ReceptionScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-semibold" style={{ letterSpacing: '-0.02em' }}>{t('reception.title')}</h1>
           </div>
         </div>
-        {canEdit && (
-          <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
-            <Plus size={16} />{t('reception.add')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Button variant="glass" size="sm" onClick={() => navigate({ name: 'reserves', id })}>{t('reserves.title')}</Button>
+          {canEdit && (
+            <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
+              <Plus size={16} />{t('reception.add')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {readOnly && <Banner tone="warning">{t('financing.readonly')}</Banner>}

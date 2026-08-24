@@ -98,11 +98,14 @@ export function RisquesScreen({ id }: { id: string }) {
             <h1 className="text-[24px] font-semibold" style={{ letterSpacing: '-0.02em' }}>{t('risk.title')}</h1>
           </div>
         </div>
-        {canEdit && (
-          <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
-            <Plus size={16} />{t('risk.add')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Button variant="glass" size="sm" onClick={() => navigate({ name: 'registreRisques', id })}>{t('registre.title')}</Button>
+          {canEdit && (
+            <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}>
+              <Plus size={16} />{t('risk.add')}
+            </Button>
+          )}
+        </div>
       </div>
 
       {readOnly && <Banner tone="warning">{t('financing.readonly')}</Banner>}
