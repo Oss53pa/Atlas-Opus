@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Plus, Menu, X, LogOut, ChevronRight, Search } from 'lucide-react';
+import { Plus, Menu, X, LogOut, ChevronRight, Search, Users } from 'lucide-react';
 import { Brand, Button } from '../../ui';
 import { useNav, type Route } from '../../app/router';
 import { useAuth } from '../../app/auth';
@@ -221,6 +221,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function UserCard() {
   const { mode, user, signOut } = useAuth();
+  const { navigate } = useNav();
   const [open, setOpen] = useState(false);
   const name = mode === 'supabase' ? (user?.email ?? t('shell.workspace.name')) : t('nav.demoUser');
 
@@ -237,6 +238,10 @@ function UserCard() {
         <>
           <div className="fixed inset-0 z-[55]" onClick={() => setOpen(false)} aria-hidden="true" />
           <div className="ax-menu" role="menu" style={{ right: 12, left: 12, bottom: 64, top: 'auto' }}>
+            <button className="ax-menu-item" onClick={() => { setOpen(false); navigate({ name: 'workspaces' }); }}>
+              <Users size={16} />
+              {t('shell.switchWorkspace')}
+            </button>
             {mode === 'supabase' ? (
               <button className="ax-menu-item" onClick={() => { setOpen(false); void signOut(); }}>
                 <LogOut size={16} />
