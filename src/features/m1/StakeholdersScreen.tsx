@@ -160,6 +160,7 @@ export function StakeholdersScreen({ id }: { id: string }) {
                   )}
                 </span>
                 <MoneyView amount={s.feeAmount} currency={currency} className="w-[150px] shrink-0 text-right text-[13px]" />
+                <Button variant="glass" size="sm" onClick={() => navigate({ name: 'stakeholder', id, sid: s.id })}>{t('stakeholders.view')}</Button>
                 {canEdit && (
                   <Button variant="ghost" size="sm" icon aria-label={t('stakeholders.removed')} onClick={() => remove(s.id)}>
                     <Trash2 size={15} />

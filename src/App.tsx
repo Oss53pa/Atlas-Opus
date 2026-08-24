@@ -32,6 +32,7 @@ import { ConceptionScreen } from './features/m1/ConceptionScreen';
 import { RfiScreen } from './features/m1/RfiScreen';
 import { RaccordementsScreen } from './features/m1/RaccordementsScreen';
 import { DocumentsScreen } from './features/m1/DocumentsScreen';
+import { StakeholderDetailScreen } from './features/m1/StakeholderDetailScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -91,6 +92,8 @@ function RouteView() {
       return <RaccordementsScreen id={route.id} />;
     case 'documents':
       return <DocumentsScreen id={route.id} />;
+    case 'stakeholder':
+      return <StakeholderDetailScreen id={route.id} sid={route.sid} />;
     default:
       return <DashboardScreen />;
   }
