@@ -27,7 +27,8 @@ export type Route =
   | { name: 'conception'; id: string }
   | { name: 'rfi'; id: string }
   | { name: 'raccordements'; id: string }
-  | { name: 'documents'; id: string };
+  | { name: 'documents'; id: string }
+  | { name: 'stakeholder'; id: string; sid: string };
 
 interface NavApi {
   route: Route;
