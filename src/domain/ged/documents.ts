@@ -10,6 +10,21 @@ export function canVisa(status: DocStatus): boolean {
   return status === 'diffuse';
 }
 
+/**
+ * Machine documentaire : en_cours → diffusé → visa A/B/C. Un visé se reprend
+ * en repassant « en_cours » (nouvel indice, cf. nextIndice). RG-M11.
+ */
+const DOC_TRANSITIONS: Record<DocStatus, DocStatus[]> = {
+  en_cours: ['diffuse'],
+  diffuse: ['vise_a', 'vise_b', 'vise_c'],
+  vise_a: ['en_cours'],
+  vise_b: ['en_cours'],
+  vise_c: ['en_cours'],
+};
+export function canTransitionDocument(from: DocStatus, to: DocStatus): boolean {
+  return DOC_TRANSITIONS[from].includes(to);
+}
+
 /** Le document est-il « bon pour exécution » (visa A ou B) ? */
 export function isApproved(status: DocStatus): boolean {
   return status === 'vise_a' || status === 'vise_b';

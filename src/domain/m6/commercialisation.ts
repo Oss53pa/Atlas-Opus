@@ -7,7 +7,18 @@
  */
 import { Money, sumMoney, type Currency } from '../money/Money';
 import { echeancierVefa, type AppelDeFonds, type StadeVefa } from '../finance/vefa';
-import type { Receipt, ScheduleStage, UnitStatus } from './types';
+import type { Receipt, SaleStatus, ScheduleStage, UnitStatus } from './types';
+
+// ── Machine vente/bail (§4) : brouillon → active → soldée / résiliée ─────────
+const SALE_TRANSITIONS: Record<SaleStatus, SaleStatus[]> = {
+  draft: ['active'],
+  active: ['soldee', 'resiliee'],
+  soldee: [],
+  resiliee: [],
+};
+export function canTransitionSale(from: SaleStatus, to: SaleStatus): boolean {
+  return SALE_TRANSITIONS[from].includes(to);
+}
 
 // ── Machine unit (§4) ───────────────────────────────────────────────────────
 const UNIT_TRANSITIONS: Record<UnitStatus, UnitStatus[]> = {
