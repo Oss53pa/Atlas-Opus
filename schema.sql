@@ -126,7 +126,7 @@ create trigger trg_operations_upd before update on public.operations for each ro
 alter table public.operations enable row level security;
 create policy operations_iso on public.operations using (tenant_id in (select public.user_tenants()) and id in (select public.user_operations())) with check (tenant_id in (select public.user_tenants()));
 -- Écriture réservée à owner/moa_director (création/modification d'opération) :
-create policy operations_write on public.operations for insert with check (public.has_role(array['owner','moa_director']) and tenant_id in (select public.user_tenants()));
+create policy operations_write on public.operations as restrictive for insert with check (public.has_role(array['owner','moa_director']));
 
 -- Macro d'ISO OP répétée sur les tables à operation_id (voir conventions).
 create table public.program_items (
@@ -158,7 +158,7 @@ create table public.budget_lines (
 create index on public.budget_lines(operation_id);
 alter table public.budget_lines enable row level security;
 create policy budget_lines_iso on public.budget_lines using (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations())) with check (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations()));
-create policy budget_lines_write on public.budget_lines for update using (public.has_role(array['finance','moa_director']));
+create policy budget_lines_write on public.budget_lines as restrictive for update using (public.has_role(array['finance','moa_director']));
 
 create table public.ouvrages (
   id uuid primary key default gen_random_uuid(),
@@ -623,7 +623,7 @@ create table public.bilan_lines (
 create index on public.bilan_lines(operation_id);
 alter table public.bilan_lines enable row level security;
 create policy bilan_iso on public.bilan_lines using (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations())) with check (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations()));
-create policy bilan_write on public.bilan_lines for update using (public.has_role(array['finance','moa_director']));
+create policy bilan_write on public.bilan_lines as restrictive for update using (public.has_role(array['finance','moa_director']));
 
 create table public.bilan_snapshots (
   id uuid primary key default gen_random_uuid(),
@@ -645,7 +645,7 @@ create table public.decomptes (
 create index on public.decomptes(operation_id);
 alter table public.decomptes enable row level security;
 create policy decomptes_iso on public.decomptes using (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations())) with check (tenant_id in (select public.user_tenants()) and operation_id in (select public.user_operations()));
-create policy decomptes_write on public.decomptes for update using (public.has_role(array['finance','moa_director']));
+create policy decomptes_write on public.decomptes as restrictive for update using (public.has_role(array['finance','moa_director']));
 
 create table public.tax_lines (       -- F6 fiscalité (TVA + retenues)
   id uuid primary key default gen_random_uuid(),
@@ -674,7 +674,7 @@ create table public.payments (
   created_at timestamptz not null default now());
 alter table public.payments enable row level security;
 create policy payments_iso on public.payments using (tenant_id in (select public.user_tenants())) with check (tenant_id in (select public.user_tenants()));
-create policy payments_write on public.payments for insert with check (public.has_role(array['finance']));
+create policy payments_write on public.payments as restrictive for insert with check (public.has_role(array['finance']));
 
 create table public.engagements (
   id uuid primary key default gen_random_uuid(),
