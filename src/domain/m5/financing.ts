@@ -25,6 +25,11 @@ const DRAWDOWN_TRANSITIONS: Record<DrawdownStatus, DrawdownStatus[]> = {
   refuse: [],
 };
 
+/** Garde structurelle d'une transition de tranche (hors condition d'avancement). */
+export function canTransitionDrawdown(from: DrawdownStatus, to: DrawdownStatus): boolean {
+  return DRAWDOWN_TRANSITIONS[from].includes(to);
+}
+
 export type DrawdownDecision =
   | { ok: true; to: DrawdownStatus }
   | { ok: false; code: 'invalid_transition' }

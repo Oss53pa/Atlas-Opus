@@ -16,7 +16,7 @@ import type {
 import type { TransitionContext } from '../domain/m1/stateMachine';
 import { getCountry } from '../domain/country';
 import type { Stakeholder, StakeholderInput, StakeholderPatch, StakeholderType } from '../domain/m2/types';
-import { permitGate, type Authorization, type AuthorizationInput, type AuthorizationStatus } from '../domain/m2/authorizations';
+import { permitGate, canTransitionAuthorization, type Authorization, type AuthorizationInput, type AuthorizationStatus } from '../domain/m2/authorizations';
 import { ddGate, type DueDiligenceItem, type DueDiligenceInput, type DueDiligenceStatus } from '../domain/m2/dueDiligence';
 import type {
   LandParcel,
@@ -26,12 +26,13 @@ import type {
   TitleDocumentInput,
   TitleDocStatus,
 } from '../domain/m2/foncier';
+import { nextAcquisitionStatus } from '../domain/m2/foncier';
 import { doGate, honorairesFromStakeholders } from '../domain/m7/rules';
 import { canAssignAccountable } from '../domain/m7/validation';
-import { fraisFinanciersFromDrawdowns } from '../domain/m5/financing';
+import { fraisFinanciersFromDrawdowns, canTransitionDrawdown, canTransitionFinancing } from '../domain/m5/financing';
 import type { Financing, FinancingInput, FinancingStatus, Drawdown, DrawdownInput, DrawdownStatus } from '../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, Receipt, ReceiptInput, ReceiptStatus } from '../domain/m6/types';
-import { recettesEncaissees } from '../domain/m6/commercialisation';
+import { recettesEncaissees, canTransitionUnit, canTransitionSale } from '../domain/m6/commercialisation';
 import type { ReportSnapshot, ReportInput } from '../domain/m21/reporting';
 import type { Insurance, InsuranceInput, RaciAssignment, RaciInput, Decision, DecisionInput } from '../domain/m7/types';
 import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus } from '../domain/payments/types';
@@ -53,7 +54,17 @@ import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m1
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
-import { decompteNet } from '../domain/payments/decompte';
+import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
+import { nextTenderStatus } from '../domain/m8/tender';
+import { canTransitionStudy } from '../domain/m3/studies';
+import { canTransitionOffer } from '../domain/m9/analysis';
+import { canTransitionPurchase } from '../domain/m10/purchasing';
+import { canTransitionGuarantee } from '../domain/m17/guarantees';
+import { canTransitionRisk } from '../domain/m20/risks';
+import { canTransitionDocument } from '../domain/ged/documents';
+import { nextRfiStatus } from '../domain/rfi/rfi';
+import { nextConnectionStatus } from '../domain/m18/connections';
+import { nextLibraryStatus } from '../domain/m22/library';
 import { Money } from '../domain/money/Money';
 import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
 import { tri } from '../domain/finance/tri';
@@ -153,6 +164,16 @@ interface Deps {
   telemetry: Telemetry;
   id?: () => string;
   now?: () => string;
+}
+
+/**
+ * Garde de machine à états au point de mutation : rejette toute transition
+ * non autorisée par la machine du domaine. Une transition idempotente (même
+ * état) est un no-op accepté. Reflète l'enforcement RLS/edge-function côté
+ * serveur (CLAUDE.md §5 : machines à états gardées, pas seulement par l'UI).
+ */
+function guardTransition<S>(from: S, to: S, allowed: (from: S, to: S) => boolean): void {
+  if (from !== to && !allowed(from, to)) throw new Error('invalid_transition');
 }
 
 const defaultCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
@@ -866,6 +887,7 @@ export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): 
     async setAuthorizationStatus(aid, status: AuthorizationStatus) {
       const a = db.authorizations.find((x) => x.id === aid && x.tenantId === session.tenantId);
       if (!a) throw new Error('not_found');
+      guardTransition(a.status, status, canTransitionAuthorization);
       a.status = status;
       return { ...a };
     },
@@ -928,6 +950,7 @@ export function createComplianceRepo(db: MockDb, session: Session, deps: Deps): 
     async setAcquisitionStatus(pid, status: AcquisitionStatus) {
       const p = db.landParcels.find((x) => x.id === pid && x.tenantId === session.tenantId);
       if (!p) throw new Error('not_found');
+      guardTransition(p.acquisitionStatus, status, (f, t) => nextAcquisitionStatus(f) === t);
       p.acquisitionStatus = status;
       return { ...p };
     },
@@ -980,6 +1003,7 @@ export function createCommercialisationRepo(db: MockDb, session: Session, deps: 
     async setUnitStatus(uid, status: UnitStatus) {
       const u = db.units.find((x) => x.id === uid && x.tenantId === session.tenantId);
       if (!u) throw new Error('not_found');
+      guardTransition(u.status, status, canTransitionUnit);
       u.status = status;
       return { ...u };
     },
@@ -1001,6 +1025,7 @@ export function createCommercialisationRepo(db: MockDb, session: Session, deps: 
     async setSaleStatus(sid, status: SaleStatus) {
       const s = db.sales.find((x) => x.id === sid && x.tenantId === session.tenantId);
       if (!s) throw new Error('not_found');
+      guardTransition(s.status, status, canTransitionSale);
       s.status = status;
       return { ...s };
     },
@@ -1077,6 +1102,7 @@ export function createFinancingRepo(db: MockDb, session: Session, deps: Deps): F
     async setStatus(fid, status: FinancingStatus) {
       const f = db.financings.find((x) => x.id === fid && x.tenantId === session.tenantId);
       if (!f) throw new Error('not_found');
+      guardTransition(f.status, status, canTransitionFinancing);
       f.status = status;
       return { ...f };
     },
@@ -1099,6 +1125,7 @@ export function createFinancingRepo(db: MockDb, session: Session, deps: Deps): F
     async setDrawdownStatus(did, status: DrawdownStatus, date?: string | null) {
       const d = db.drawdowns.find((x) => x.id === did && x.tenantId === session.tenantId);
       if (!d) throw new Error('not_found');
+      guardTransition(d.status, status, canTransitionDrawdown);
       d.status = status;
       if (status === 'debloque') d.date = date ?? (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
       return { ...d };
@@ -1151,6 +1178,7 @@ export function createPaymentsRepo(db: MockDb, session: Session, deps: Deps): Pa
     async setDecompteStatus(did, status: DecompteStatus) {
       const d = db.decomptes.find((x) => x.id === did && x.tenantId === session.tenantId);
       if (!d) throw new Error('not_found');
+      guardTransition(d.status, status, (from, to) => nextDecompteStatus(from) === to);
       d.status = status;
       d.updatedAt = now();
       return { ...d };
@@ -1262,6 +1290,7 @@ export function createConnectionsRepo(db: MockDb, session: Session, deps: Deps):
     async setStatus(cid, status: ConnectionStatus) {
       const c = db.connections.find((x) => x.id === cid && x.tenantId === session.tenantId);
       if (!c) throw new Error('not_found');
+      guardTransition(c.status, status, (from, to) => nextConnectionStatus(from) === to);
       c.status = status;
       return { ...c };
     },
@@ -1291,6 +1320,7 @@ export function createLibraryRepo(db: MockDb, session: Session, deps: Deps): Lib
     async setStatus(did, status: LibraryStatus) {
       const d = db.library.find((x) => x.id === did && x.tenantId === session.tenantId);
       if (!d) throw new Error('not_found');
+      guardTransition(d.status, status, (from, to) => nextLibraryStatus(from) === to);
       d.status = status;
       d.updatedAt = now();
       return { ...d };
@@ -1344,6 +1374,7 @@ export function createDocumentsRepo(db: MockDb, session: Session, deps: Deps): D
     async setStatus(did, status: DocStatus) {
       const d = db.documents.find((x) => x.id === did && x.tenantId === session.tenantId);
       if (!d) throw new Error('not_found');
+      guardTransition(d.status, status, canTransitionDocument);
       d.status = status;
       return { ...d };
     },
@@ -1374,6 +1405,7 @@ export function createRfisRepo(db: MockDb, session: Session, deps: Deps): RfisRe
     async setStatus(rid, status: RfiStatus, answer?: string | null) {
       const r = db.rfis.find((x) => x.id === rid && x.tenantId === session.tenantId);
       if (!r) throw new Error('not_found');
+      guardTransition(r.status, status, (from, to) => nextRfiStatus(from) === to);
       r.status = status;
       if (answer !== undefined) r.answer = answer;
       return { ...r };
@@ -1460,6 +1492,7 @@ export function createRisksRepo(db: MockDb, session: Session, deps: Deps): Risks
     async setStatus(rid, status: RiskStatus) {
       const r = db.risks.find((x) => x.id === rid && x.tenantId === session.tenantId);
       if (!r) throw new Error('not_found');
+      guardTransition(r.status, status, canTransitionRisk);
       r.status = status;
       return { ...r };
     },
@@ -1512,6 +1545,7 @@ export function createGuaranteesRepo(db: MockDb, session: Session, deps: Deps): 
     async setStatus(gid, status: GuaranteeStatus) {
       const g = db.guarantees.find((x) => x.id === gid && x.tenantId === session.tenantId);
       if (!g) throw new Error('not_found');
+      guardTransition(g.status, status, canTransitionGuarantee);
       g.status = status;
       return { ...g };
     },
@@ -1572,6 +1606,7 @@ export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): 
     async setStatus(oid, status: PurchaseStatus) {
       const o = db.purchaseOrders.find((x) => x.id === oid && x.tenantId === session.tenantId);
       if (!o) throw new Error('not_found');
+      guardTransition(o.status, status, canTransitionPurchase);
       o.status = status;
       return { ...o };
     },
@@ -1600,6 +1635,7 @@ export function createOffersRepo(db: MockDb, session: Session, deps: Deps): Offe
     async setStatus(oid, status: OfferStatus) {
       const o = db.offers.find((x) => x.id === oid && x.tenantId === session.tenantId);
       if (!o) throw new Error('not_found');
+      guardTransition(o.status, status, canTransitionOffer);
       o.status = status;
       return { ...o };
     },
@@ -1629,6 +1665,7 @@ export function createStudiesRepo(db: MockDb, session: Session, deps: Deps): Stu
     async setStatus(sid, status: StudyStatus) {
       const s = db.studies.find((x) => x.id === sid && x.tenantId === session.tenantId);
       if (!s) throw new Error('not_found');
+      guardTransition(s.status, status, canTransitionStudy);
       s.status = status;
       return { ...s };
     },
@@ -1661,6 +1698,7 @@ export function createTendersRepo(db: MockDb, session: Session, deps: Deps): Ten
     async setStatus(tid, status: TenderStatus) {
       const td = owned(tid);
       if (!td) throw new Error('not_found');
+      guardTransition(td.status, status, (from, to) => nextTenderStatus(from) === to);
       td.status = status;
       td.updatedAt = now();
       return { ...td };

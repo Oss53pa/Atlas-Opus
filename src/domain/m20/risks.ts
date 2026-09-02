@@ -21,6 +21,16 @@ export function isOpen(status: RiskStatus): boolean {
   return status === 'ouvert';
 }
 
+/** Machine d'un risque : ouvert → maîtrisé → clos, avec réouverture. */
+const RISK_TRANSITIONS: Record<RiskStatus, RiskStatus[]> = {
+  ouvert: ['maitrise', 'clos'],
+  maitrise: ['clos', 'ouvert'],
+  clos: ['ouvert'],
+};
+export function canTransitionRisk(from: RiskStatus, to: RiskStatus): boolean {
+  return RISK_TRANSITIONS[from].includes(to);
+}
+
 export function openRisksCount(risks: Pick<Risk, 'status'>[]): number {
   return risks.filter((r) => isOpen(r.status)).length;
 }

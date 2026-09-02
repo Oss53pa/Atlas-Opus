@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, createGovernanceRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, createGovernanceRepo, createOffersRepo, createRisksRepo, type MockDb } from './mock';
 import { Money } from '../domain/money/Money';
 import { recettesEncaissees } from '../domain/m6';
 import type { Session } from './repo';
@@ -170,6 +170,8 @@ describe('Couche données mock — Gherkin §12', () => {
     expect(ctx.doInsuranceValid).toBe(false);
 
     const permit = await compliance.addAuthorization('op-cosmos', { type: 'permis_construire', authority: 'Mairie', validity: '2031-01-01' });
+    // Machine à états gardée : draft → submitted → granted (pas de saut direct).
+    await compliance.setAuthorizationStatus(permit.id, 'submitted');
     await compliance.setAuthorizationStatus(permit.id, 'granted');
     await compliance.addInsurance('op-cosmos', { type: 'DO', insurer: 'NSIA', validFrom: '2026-01-01', validTo: '2031-01-01' });
 
@@ -351,5 +353,43 @@ describe('Couche données mock — Gherkin §12', () => {
     const other = createGovernanceRepo(db, sessionFor('tenant-other'), deps(tel));
     expect(await other.decisions('op-palmiers')).toEqual([]);
     expect(await other.raci('op-palmiers')).toEqual([]);
+  });
+});
+
+describe('Machines à états gardées au point de mutation (RG CLAUDE.md §5)', () => {
+  let db: MockDb;
+  let tel: Telemetry;
+  beforeEach(() => { n = 0; db = createMockDb(); tel = createTelemetry(); });
+
+  it('autorisation : draft→granted rejeté, chemin draft→submitted→granted accepté', async () => {
+    const c = createComplianceRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const a = await c.addAuthorization('op-cosmos', { type: 'permis_construire', authority: 'Mairie', validity: null });
+    await expect(c.setAuthorizationStatus(a.id, 'granted')).rejects.toThrow('invalid_transition');
+    const submitted = await c.setAuthorizationStatus(a.id, 'submitted');
+    expect(submitted.status).toBe('submitted');
+    const granted = await c.setAuthorizationStatus(a.id, 'granted');
+    expect(granted.status).toBe('granted');
+    // Depuis un état terminal, plus aucune transition.
+    await expect(c.setAuthorizationStatus(a.id, 'submitted')).rejects.toThrow('invalid_transition');
+  });
+
+  it('offre : reçue→retenue rejeté (doit passer par conforme)', async () => {
+    const offers = createOffersRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const o = await offers.add('op-palmiers', { tenderId: null, bidder: 'ACME', amount: 1000, scoreTechnical: 80 });
+    await expect(offers.setStatus(o.id, 'retenu')).rejects.toThrow('invalid_transition');
+    const conforme = await offers.setStatus(o.id, 'conforme');
+    expect(conforme.status).toBe('conforme');
+    const retenu = await offers.setStatus(o.id, 'retenu');
+    expect(retenu.status).toBe('retenu');
+  });
+
+  it('risque : clos→maîtrisé rejeté, réouverture clos→ouvert acceptée', async () => {
+    const risks = createRisksRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const r = await risks.add('op-palmiers', { code: 'R-99', label: 'Test', category: 'technique', probability: 3, impact: 3 });
+    const clos = await risks.setStatus(r.id, 'clos'); // ouvert→clos autorisé
+    expect(clos.status).toBe('clos');
+    await expect(risks.setStatus(r.id, 'maitrise')).rejects.toThrow('invalid_transition');
+    const reopened = await risks.setStatus(r.id, 'ouvert');
+    expect(reopened.status).toBe('ouvert');
   });
 });

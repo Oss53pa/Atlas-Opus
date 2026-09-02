@@ -65,4 +65,18 @@ export function rankOffers(offers: Offer[], w: Weights = DEFAULT_WEIGHTS): Ranke
     .map((r, i) => ({ ...r, rank: i + 1 }));
 }
 
+/**
+ * Machine d'une offre (M9) : reçue → conforme / écartée ; une conforme peut
+ * être retenue ou écartée ; une écartée peut être réintégrée. Retenue = terminal.
+ */
+const OFFER_TRANSITIONS: Record<OfferStatus, OfferStatus[]> = {
+  recu: ['conforme', 'ecarte'],
+  conforme: ['retenu', 'ecarte'],
+  ecarte: ['conforme'],
+  retenu: [],
+};
+export function canTransitionOffer(from: OfferStatus, to: OfferStatus): boolean {
+  return OFFER_TRANSITIONS[from].includes(to);
+}
+
 export { OFFER_STATUSES } from './types';
