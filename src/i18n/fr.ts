@@ -923,6 +923,7 @@ export const fr = {
   'common.all': 'Tous',
   'common.soon': 'à venir',
   'common.menu': 'Menu',
+  'a11y.skip': 'Aller au contenu',
 
   // ── Pays ────────────────────────────────────────────────────────────────
   'country.CI': 'Côte d’Ivoire',
