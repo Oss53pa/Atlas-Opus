@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, Menu, X, LogOut, ChevronRight, Search, Users } from 'lucide-react';
 import { Brand, Button } from '../../ui';
 import { useNav, type Route } from '../../app/router';
@@ -155,10 +155,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Pilotage — toujours visible */}
       <div className="ax-nav-group">{t('nav.group.pilotage')}</div>
-      <button className={cx('ax-nav-item', route.name === 'dashboard' && 'is-active')} onClick={() => go({ name: 'dashboard' })}>
+      <button className={cx('ax-nav-item', route.name === 'dashboard' && 'is-active')} aria-current={route.name === 'dashboard' ? 'page' : undefined} onClick={() => go({ name: 'dashboard' })}>
         {t('nav.dashboard')}
       </button>
-      <button className={cx('ax-nav-item', route.name === 'portfolio' && 'is-active')} onClick={() => go({ name: 'portfolio' })}>
+      <button className={cx('ax-nav-item', route.name === 'portfolio' && 'is-active')} aria-current={route.name === 'portfolio' ? 'page' : undefined} onClick={() => go({ name: 'portfolio' })}>
         {t('nav.portfolio')}
       </button>
 
@@ -166,7 +166,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       {opId && (
         <>
           <div className="ax-nav-group">{t('nav.group.operation')}</div>
-          <button className={cx('ax-nav-item', route.name === 'cockpit' && 'is-active')} onClick={() => go({ name: 'cockpit', id: opId })}>
+          <button className={cx('ax-nav-item', route.name === 'cockpit' && 'is-active')} aria-current={route.name === 'cockpit' ? 'page' : undefined} onClick={() => go({ name: 'cockpit', id: opId })}>
             {t('nav.cockpit')}
           </button>
 
@@ -192,6 +192,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                       <button
                         key={mod.code}
                         className={cx('ax-nav-item ax-nav-item--child', isActive && 'is-active')}
+                        aria-current={isActive ? 'page' : undefined}
                         disabled={disabled}
                         onClick={() => mod.route && go({ name: mod.route, id: opId } as Route)}
                       >
@@ -217,6 +218,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         <button
           key={link.name}
           className={cx('ax-nav-item', route.name === link.name && 'is-active')}
+          aria-current={route.name === link.name ? 'page' : undefined}
           onClick={() => go({ name: link.name })}
         >
           <span className="flex-1 text-left">{t(link.labelKey)}</span>
@@ -269,8 +271,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { navigate } = useNav();
   const [drawer, setDrawer] = useState(false);
 
+  // Ferme le tiroir mobile à la touche Échap (WCAG 2.1.2 — pas de piège clavier).
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawer(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawer]);
+
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main-content" className="ax-skip">{t('a11y.skip')}</a>
       {/* Topbar 64 px */}
       <header className="sticky top-0 z-[50] flex h-16 items-center gap-3 border-b bg-bg px-4 sm:px-8"
         style={{ borderColor: 'var(--ax-border)' }}>
@@ -297,7 +308,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Contenu — padding handoff 18px 32px */}
-        <main className="min-w-0 flex-1" style={{ padding: '18px 32px' }}>
+        <main id="main-content" tabIndex={-1} className="min-w-0 flex-1" style={{ padding: '18px 32px', outline: 'none' }}>
           <div className="mx-auto max-w-[1200px]">{children}</div>
         </main>
       </div>
@@ -306,7 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {drawer && (
         <div className="fixed inset-0 z-[100] md:hidden">
           <div className="absolute inset-0" style={{ background: 'var(--ax-overlay)' }} onClick={() => setDrawer(false)} aria-hidden="true" />
-          <aside className="absolute left-0 top-0 flex h-full w-[270px] flex-col overflow-auto bg-bg p-3" style={{ borderRight: '1px solid var(--ax-border)' }}>
+          <aside role="dialog" aria-modal="true" aria-label={t('common.menu')} className="absolute left-0 top-0 flex h-full w-[270px] flex-col overflow-auto bg-bg p-3" style={{ borderRight: '1px solid var(--ax-border)' }}>
             <div className="mb-2 flex items-center justify-between px-2">
               <Brand size={21} />
               <Button variant="ghost" size="sm" icon aria-label={t('common.close')} onClick={() => setDrawer(false)}>
