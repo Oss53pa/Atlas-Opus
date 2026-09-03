@@ -6,7 +6,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { buildNewOperation } from '../../domain/m1/rules';
 import { Money } from '../../domain/money/Money';
-import { bilanSummary, type BilanLine } from '../../domain/finance/bilan';
+import { type BilanLine } from '../../domain/finance/bilan';
+import { recomputeBilan, type BilanRecomputeInput } from '../../domain/finance/recompute';
 import type {
   CreateOperationInput,
   Operation,
@@ -441,37 +442,53 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
     ].filter((l) => !l.amount.isZero());
   };
 
+  // Entrées du moteur de recalcul (source unique, partagée par summary/recompute).
+  const buildInput = async (opId: string): Promise<BilanRecomputeInput | null> => {
+    const { data: op } = await client.from(OPS).select('currency, budget_bac').eq('id', opId).maybeSingle();
+    if (!op) return null;
+    const currency = (op as { currency: string }).currency;
+    const rows = unwrap(await client.from(BL).select('kind, poste, amount_planned').eq('operation_id', opId)) as {
+      kind: 'cost' | 'revenue';
+      poste: string;
+      amount_planned: number | string;
+    }[];
+    const lines: BilanLine[] = rows
+      .filter((r) => !(r.kind === 'cost' && DERIVED_POSTES.includes(r.poste)))
+      .map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
+    for (const d of await derivedCostLines(opId, currency)) lines.push({ kind: 'cost', amount: d.amount });
+    // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
+    const { data: saleRows } = await client.from('ao_sales').select('id').eq('operation_id', opId);
+    const saleIds = (saleRows ?? []).map((s: { id: string }) => s.id);
+    let realized = Money.zero(currency);
+    if (saleIds.length > 0) {
+      const { data: recRows } = await client.from('ao_receipts').select('amount, status').in('sale_id', saleIds);
+      realized = recettesEncaissees(
+        (recRows ?? []).map((r: { amount: number | string; status: 'pending' | 'settled' }) => ({ amount: Money.of(Number(r.amount), currency), status: r.status })),
+        currency,
+      );
+    }
+    return {
+      currency,
+      lines,
+      recettesRealisees: realized,
+      // Flux de trésorerie datés non encore modélisés côté base → TRI indéterminé.
+      cashflow: [],
+      bac: Money.of(Number((op as { budget_bac: number | string }).budget_bac), currency),
+      computedAt: new Date().toISOString(),
+    };
+  };
+
   return {
     async summary(opId): Promise<BilanView | null> {
-      const { data: op } = await client.from(OPS).select('currency, budget_bac').eq('id', opId).maybeSingle();
-      if (!op) return null;
-      const currency = (op as { currency: string }).currency;
-      const rows = unwrap(await client.from(BL).select('kind, poste, amount_planned').eq('operation_id', opId)) as {
-        kind: 'cost' | 'revenue';
-        poste: string;
-        amount_planned: number | string;
-      }[];
-      const lines: BilanLine[] = rows
-        .filter((r) => !(r.kind === 'cost' && DERIVED_POSTES.includes(r.poste)))
-        .map((r) => ({ kind: r.kind, amount: Money.of(Number(r.amount_planned), currency) }));
-      for (const d of await derivedCostLines(opId, currency)) lines.push({ kind: 'cost', amount: d.amount });
-      // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
-      const { data: saleRows } = await client.from('ao_sales').select('id').eq('operation_id', opId);
-      const saleIds = (saleRows ?? []).map((s: { id: string }) => s.id);
-      let realized = Money.zero(currency);
-      if (saleIds.length > 0) {
-        const { data: recRows } = await client.from('ao_receipts').select('amount, status').in('sale_id', saleIds);
-        realized = recettesEncaissees(
-          (recRows ?? []).map((r: { amount: number | string; status: 'pending' | 'settled' }) => ({ amount: Money.of(Number(r.amount), currency), status: r.status })),
-          currency,
-        );
-      }
-      return {
-        summary: bilanSummary(lines, currency, realized),
-        tri: null,
-        bac: Money.of(Number((op as { budget_bac: number | string }).budget_bac), currency),
-        cashflow: [],
-      };
+      const input = await buildInput(opId);
+      if (!input) return null;
+      const r = recomputeBilan(input);
+      return { summary: r.summary, tri: r.tri, bac: r.bac, cashflow: r.cashflow };
+    },
+
+    async recompute(opId) {
+      const input = await buildInput(opId);
+      return input ? recomputeBilan(input) : null;
     },
 
     async lines(opId) {
