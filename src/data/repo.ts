@@ -17,6 +17,7 @@ import type {
 } from '../domain/m1/types';
 import type { TransitionContext } from '../domain/m1/stateMachine';
 import type { BilanSummary } from '../domain/finance/bilan';
+import type { BilanRecompute } from '../domain/finance/recompute';
 import type { Money } from '../domain/money/Money';
 import type { Stakeholder, StakeholderInput, StakeholderPatch } from '../domain/m2/types';
 import type { Authorization, AuthorizationInput, AuthorizationStatus } from '../domain/m2/authorizations';
@@ -135,6 +136,12 @@ export type BilanLinePatch = Partial<Pick<BilanLineRecord, 'poste' | 'amountPlan
 export interface BilanRepo {
   /** Synthèse bilan d'une opération (coût/recettes/marge/taux + BAC + TRI). */
   summary(operationId: string): Promise<BilanView | null>;
+  /**
+   * Recalcul complet (moteur M4) : mêmes entrées que `summary` plus le besoin de
+   * trésorerie. Source unique du calcul, réutilisée par le job pg_cron « recalcul
+   * bilan » qui fige ensuite les indicateurs dans un cliché M21.
+   */
+  recompute(operationId: string): Promise<BilanRecompute | null>;
   /** Lignes de bilan détaillées (M4 CRUD). */
   lines(operationId: string): Promise<BilanLineRecord[]>;
   addLine(operationId: string, input: BilanLineInput): Promise<BilanLineRecord>;

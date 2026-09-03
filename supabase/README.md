@@ -66,6 +66,23 @@ where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'ao\_%'
 order by 1;
 ```
 
+## Recalcul du bilan (M4) — job asynchrone
+
+Le calcul du bilan (coût/recettes/marge/taux, TRI, besoin de trésorerie) a **un
+seul moteur**, `src/domain/finance/recompute.ts` (`recomputeBilan`), utilisé à la
+fois par l'écran (`BilanRepo.summary`) et par le job de fond (`BilanRepo.recompute`).
+Tout montant passe par **Money.ts** (invariant §5) : le recalcul reste donc en
+**TypeScript** — jamais en SQL, jamais côté LLM. Il ne peut pas vivre dans une Edge
+Function Deno (qui dupliquerait la logique monétaire).
+
+Le job `recomputePortfolio` (`src/app/recompute.ts`) recalcule chaque opération puis
+**fige** les indicateurs dans un cliché M21 (`ao_report_snapshots`, RG-M21-01 : le
+reporting ne recalcule rien, il consomme ce résultat).
+
+Planification (CLAUDE.md §3) : `pg_cron` déclenche le back métier **NestJS** (ou un
+runner Node/BullMQ) qui exécute `recomputePortfolio`. Aucune tâche n'est imposée sur
+la base partagée ; l'ordonnanceur appelle le runtime TS, pas une fonction SQL.
+
 ## Garde-fous
 
 - Aucun secret committé : `.env.example` ne contient que l'URL et la clé **publiable**.

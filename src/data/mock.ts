@@ -67,8 +67,8 @@ import { nextRfiStatus } from '../domain/rfi/rfi';
 import { nextConnectionStatus } from '../domain/m18/connections';
 import { nextLibraryStatus } from '../domain/m22/library';
 import { Money } from '../domain/money/Money';
-import { bilanSummary, type BilanLine } from '../domain/finance/bilan';
-import { tri } from '../domain/finance/tri';
+import { type BilanLine } from '../domain/finance/bilan';
+import { recomputeBilan, type BilanRecomputeInput } from '../domain/finance/recompute';
 import type { Telemetry } from '../lib/telemetry';
 import type {
   BilanLineInput,
@@ -799,24 +799,39 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
   const nonDerivedSeeds = (opId: string) =>
     seeds(opId).filter((b) => !(b.kind === 'cost' && DERIVED_POSTES.includes(b.poste)));
 
+  // Entrées du moteur de recalcul (source unique, partagée par summary/recompute).
+  const buildInput = (opId: string): BilanRecomputeInput | null => {
+    const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
+    if (!op) return null;
+    const lines: BilanLine[] = nonDerivedSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
+    for (const d of derivedCostLines(opId, op.currency)) lines.push({ kind: 'cost', amount: d.amount });
+    // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
+    const saleIds = new Set(db.sales.filter((s) => s.operationId === opId && s.tenantId === session.tenantId).map((s) => s.id));
+    const realized = recettesEncaissees(
+      db.receipts.filter((r) => r.tenantId === session.tenantId && saleIds.has(r.saleId)),
+      op.currency,
+    );
+    return {
+      currency: op.currency,
+      lines,
+      recettesRealisees: realized,
+      cashflow: db.cashflows[opId] ?? [],
+      bac: Money.of(op.budgetBac, op.currency),
+      computedAt: deps.now?.() ?? new Date().toISOString(),
+    };
+  };
+
   return {
     async summary(opId): Promise<BilanView | null> {
-      const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
-      if (!op) return null;
-      const lines: BilanLine[] = nonDerivedSeeds(opId).map((b) => ({ kind: b.kind, amount: Money.of(b.amountPlanned, op.currency) }));
-      for (const d of derivedCostLines(opId, op.currency)) lines.push({ kind: 'cost', amount: d.amount });
-      // RG-M6-02 — recettes réalisées = encaissements « settled » des ventes de l'opération.
-      const saleIds = new Set(db.sales.filter((s) => s.operationId === opId && s.tenantId === session.tenantId).map((s) => s.id));
-      const realized = recettesEncaissees(
-        db.receipts.filter((r) => r.tenantId === session.tenantId && saleIds.has(r.saleId)),
-        op.currency,
-      );
-      return {
-        summary: bilanSummary(lines, op.currency, realized),
-        tri: tri(db.cashflows[opId] ?? []),
-        bac: Money.of(op.budgetBac, op.currency),
-        cashflow: db.cashflows[opId] ?? [],
-      };
+      const input = buildInput(opId);
+      if (!input) return null;
+      const r = recomputeBilan(input);
+      return { summary: r.summary, tri: r.tri, bac: r.bac, cashflow: r.cashflow };
+    },
+
+    async recompute(opId) {
+      const input = buildInput(opId);
+      return input ? recomputeBilan(input) : null;
     },
 
     async lines(opId) {
