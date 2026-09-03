@@ -57,6 +57,21 @@ describe('F5 — reprise (backoff) et machine de livraison', () => {
     expect(isDue(r, at(1_000))).toBe(true);
     expect(isDue(msg(), T0)).toBe(true); // pending toujours dû
   });
+
+  // Contrat du worker (supabase/functions/_shared/f5.ts) : séquence d'échecs
+  // retriables successifs → retrying×4 (backoff 1s,2s,4s,8s) puis dead au 5e.
+  it('vecteur d’or — séquence de reprise complète jusqu’à la lettre morte', () => {
+    const delays: (number | null)[] = [];
+    const states: string[] = [];
+    let m = msg();
+    for (let i = 0; i < 5; i++) {
+      m = applyOutcome(m, boom, T0);
+      states.push(m.status);
+      delays.push(m.nextAttemptAt ? Date.parse(m.nextAttemptAt) - Date.parse(T0) : null);
+    }
+    expect(states).toEqual(['retrying', 'retrying', 'retrying', 'retrying', 'dead']);
+    expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, null]);
+  });
 });
 
 describe('F5 — disjoncteur (circuit breaker)', () => {
