@@ -21,6 +21,10 @@ export interface AuditEntry {
   /** Objet concerné (référence, id métier). */
   object: string;
   summary: string | null;
+  /** Hash de l'entrée précédente de la chaîne (genesis = 64 zéros). */
+  hashPrev: string;
+  /** Empreinte SHA-256 chaînée de cette entrée (rend le journal rejouable). */
+  hash: string;
 }
 
 export interface AuditInput {

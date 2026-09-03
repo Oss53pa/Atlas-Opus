@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, createGovernanceRepo, createOffersRepo, createRisksRepo, type MockDb } from './mock';
+import { createMockDb, createOperationsRepo, createProgramRepo, createComplianceRepo, createBilanRepo, createStakeholdersRepo, createFinancingRepo, createCommercialisationRepo, createGovernanceRepo, createOffersRepo, createRisksRepo, createAuditRepo, type MockDb } from './mock';
+import { verifyAuditChain } from '../domain/m23';
 import { Money } from '../domain/money/Money';
 import { recettesEncaissees } from '../domain/m6';
 import type { Session } from './repo';
@@ -391,5 +392,36 @@ describe('Machines à états gardées au point de mutation (RG CLAUDE.md §5)', 
     await expect(risks.setStatus(r.id, 'maitrise')).rejects.toThrow('invalid_transition');
     const reopened = await risks.setStatus(r.id, 'ouvert');
     expect(reopened.status).toBe('ouvert');
+  });
+});
+
+describe('Journal d’audit rejouable (chaîne SHA-256 au point de mutation)', () => {
+  let db: MockDb;
+  let tel: Telemetry;
+  beforeEach(() => { n = 0; db = createMockDb(); tel = createTelemetry(); });
+
+  it('le journal seedé se rejoue et vérifie', async () => {
+    const audit = createAuditRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const entries = await audit.list('op-palmiers');
+    expect(entries.length).toBeGreaterThan(0);
+    expect(verifyAuditChain(entries)).toEqual({ ok: true, brokenAt: null, reason: 'ok' });
+  });
+
+  it('une entrée ajoutée prolonge la chaîne et reste vérifiable', async () => {
+    const audit = createAuditRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const before = await audit.list('op-palmiers');
+    const added = await audit.append('op-palmiers', { action: 'approve', module: 'M15', object: 'Décompte n°3', summary: 'Validation' });
+    // Chaînage : la nouvelle entrée référence le hash de la précédente (tip).
+    const tipHash = before.map((e) => e).sort((a, b) => (a.at < b.at ? 1 : -1))[0].hash;
+    expect(added.hashPrev).toBe(tipHash);
+    const after = await audit.list('op-palmiers');
+    expect(verifyAuditChain(after)).toEqual({ ok: true, brokenAt: null, reason: 'ok' });
+  });
+
+  it('altérer une entrée du journal est détecté', async () => {
+    const audit = createAuditRepo(db, sessionFor('tenant-demo'), deps(tel));
+    const entries = await audit.list('op-palmiers');
+    const tampered = entries.map((e, i) => (i === 0 ? { ...e, summary: 'FALSIFIÉ' } : e));
+    expect(verifyAuditChain(tampered).ok).toBe(false);
   });
 });

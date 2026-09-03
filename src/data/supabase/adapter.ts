@@ -64,6 +64,7 @@ import type { Reserve, ReserveInput, ReserveStatus, ReserveSeverity } from '../.
 import type { Guarantee, GuaranteeInput, GuaranteeStatus, GuaranteeType } from '../../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus, RiskCategory } from '../../domain/m20/types';
 import type { AuditEntry, AuditInput, AuditAction } from '../../domain/m23/types';
+import { computeAuditHash, GENESIS_HASH } from '../../domain/m23/audit';
 import type { SiteReport, SiteReportInput } from '../../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput, ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { Document, DocumentInput, DocStatus, DocDiscipline } from '../../domain/ged/types';
@@ -1542,11 +1543,13 @@ export function createSupabaseRisksRepo(client: SupabaseClient, session: Session
 interface AuditRow {
   id: string; tenant_id: string; operation_id: string; at: string; actor: string;
   action: string; module: string; object: string; summary: string | null;
+  hash_prev: string | null; hash: string | null;
 }
 function toAudit(r: AuditRow): AuditEntry {
   return {
     id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, at: r.at, actor: r.actor,
     action: r.action as AuditAction, module: r.module, object: r.object, summary: r.summary,
+    hashPrev: r.hash_prev ?? GENESIS_HASH, hash: r.hash ?? '',
   };
 }
 export function createSupabaseAuditRepo(client: SupabaseClient, session: Session): AuditRepo {
@@ -1557,11 +1560,20 @@ export function createSupabaseAuditRepo(client: SupabaseClient, session: Session
       return rows.map(toAudit);
     },
     async append(opId, input: AuditInput) {
+      // Chaîne SHA-256 rejouable. NB : en production, sceller côté serveur (Edge
+      // Function) pour éviter toute course entre deux insertions concurrentes.
+      const tip = unwrap(await client.from(AL).select('hash').eq('operation_id', opId).order('at', { ascending: false }).limit(1).maybeSingle()) as { hash: string | null } | null;
+      const hashPrev = tip?.hash ?? GENESIS_HASH;
+      const base = {
+        id: crypto.randomUUID(), operation_id: opId, at: new Date().toISOString(), actor: session.userId,
+        action: input.action, module: input.module, object: input.object, summary: input.summary ?? null,
+      };
+      const hash = computeAuditHash(hashPrev, {
+        id: base.id, operationId: opId, at: base.at, actor: base.actor,
+        action: base.action, module: base.module, object: base.object, summary: base.summary,
+      });
       const row = unwrap(
-        await client.from(AL).insert({
-          tenant_id: session.tenantId, operation_id: opId, actor: session.userId,
-          action: input.action, module: input.module, object: input.object, summary: input.summary ?? null,
-        }).select('*').single(),
+        await client.from(AL).insert({ ...base, tenant_id: session.tenantId, hash_prev: hashPrev, hash }).select('*').single(),
       ) as AuditRow;
       return toAudit(row);
     },
