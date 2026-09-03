@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft, Lock } from 'lucide-react';
+import { ChevronLeft, Lock, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, KpiRow, Panel, Skeleton, type TableRowData } from '../../ui';
 import { auditActionLabel, AUDIT_ACTION_TONE } from './labels';
 import { useOperation, useAudit } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatDate } from '../../lib/format';
-import { distinctModules, groupByDay, type AuditEntry } from '../../domain/m23';
+import { distinctModules, groupByDay, verifyAuditChain, type AuditEntry } from '../../domain/m23';
 
 /** Heure « HH h MM » (format handoff). */
 function formatTime(iso: string): string {
@@ -25,6 +25,7 @@ export function JournalScreen({ id }: { id: string }) {
 
   const groups = groupByDay(rows);
   const actors = new Set(rows.map((e) => e.actor)).size;
+  const integrity = verifyAuditChain(rows);
 
   const dayRows = (entries: AuditEntry[]): TableRowData[] =>
     entries.map((e) => ({
@@ -54,11 +55,18 @@ export function JournalScreen({ id }: { id: string }) {
 
       <Banner tone="info" icon={<Lock size={16} />}>{t('audit.appendOnly')}</Banner>
 
+      {!loading && rows.length > 0 && (
+        integrity.ok
+          ? <Banner tone="success" icon={<ShieldCheck size={16} />}>{t('audit.integrity.ok', { n: rows.length })}</Banner>
+          : <Banner tone="danger" icon={<ShieldAlert size={16} />}>{t('audit.integrity.broken', { n: (integrity.brokenAt ?? 0) + 1 })}</Banner>
+      )}
+
       <KpiRow
         items={[
           { label: t('audit.kpi.count'), value: rows.length },
           { label: t('audit.kpi.modules'), value: distinctModules(rows) },
           { label: t('audit.kpi.actors'), value: actors },
+          { label: t('audit.kpi.integrity'), value: integrity.ok ? t('audit.integrity.verified') : t('audit.integrity.alert'), accent: !integrity.ok },
         ]}
       />
 

@@ -45,6 +45,7 @@ import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
 import type { AuditEntry, AuditInput } from '../domain/m23/types';
+import { computeAuditHash, GENESIS_HASH, chronological } from '../domain/m23/audit';
 import type { SiteReport, SiteReportInput } from '../domain/m13/types';
 import type { ChangeOrder, CreateChangeOrderInput } from '../domain/m14/types';
 import { buildNewChangeOrder } from '../domain/m14';
@@ -174,6 +175,18 @@ interface Deps {
  */
 function guardTransition<S>(from: S, to: S, allowed: (from: S, to: S) => boolean): void {
   if (from !== to && !allowed(from, to)) throw new Error('invalid_transition');
+}
+
+/** Regroupe une liste par clé, en conservant l'ordre d'apparition des clés. */
+function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const it of items) {
+    const k = key(it);
+    const bucket = map.get(k);
+    if (bucket) bucket.push(it);
+    else map.set(k, [it]);
+  }
+  return map;
 }
 
 const defaultCtx = (over: Partial<TransitionContext> = {}): TransitionContext => ({
@@ -456,11 +469,21 @@ export function createMockDb(): MockDb {
     { id: 'rk-p4', tenantId: T, operationId: 'op-palmiers', code: 'R-02', label: 'Intempéries saison des pluies', category: 'externe', probability: 3, impact: 2, status: 'ouvert', mitigation: 'Planning avec marge météo' },
   ];
   // Journal d'audit (M23) — Palmiers : quelques traces (append-only).
-  const auditLog: AuditEntry[] = [
+  const auditRaw: Omit<AuditEntry, 'hashPrev' | 'hash'>[] = [
     { id: 'au-l1', tenantId: T, operationId: 'op-palmiers', at: '2026-06-08T10:12:00.000Z', actor: 'MOA — Direction', action: 'approve', module: 'M16', object: 'Décompte n°2', summary: 'Validation décompte 285 M' },
     { id: 'au-l2', tenantId: T, operationId: 'op-palmiers', at: '2026-06-05T14:30:00.000Z', actor: 'AMO', action: 'update', module: 'M19', object: 'Réserve étanchéité', summary: 'Réserve majeure ouverte' },
     { id: 'au-l3', tenantId: T, operationId: 'op-palmiers', at: '2026-05-20T09:00:00.000Z', actor: 'MOA — Direction', action: 'transition', module: 'M1', object: 'Opération', summary: 'Passage en réalisation' },
   ];
+  // Scelle la chaîne de hachage par opération, dans l'ordre chronologique.
+  const auditLog: AuditEntry[] = [];
+  for (const [, group] of groupBy(auditRaw, (e) => e.operationId)) {
+    let prev = GENESIS_HASH;
+    for (const base of chronological(group)) {
+      const sealed: AuditEntry = { ...base, hashPrev: prev, hash: computeAuditHash(prev, base) };
+      auditLog.push(sealed);
+      prev = sealed.hash;
+    }
+  }
 
   // Pilotage de réalisation (M13) — Palmiers : comptes rendus de chantier.
   const siteReports: SiteReport[] = [
@@ -1515,12 +1538,15 @@ export function createAuditRepo(db: MockDb, session: Session, deps: Deps): Audit
         .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     },
     async append(opId, input: AuditInput) {
-      // RG-M23 — append-only : uniquement une insertion.
-      const e: AuditEntry = {
+      // RG-M23 — append-only + chaîne de hachage rejouable (SHA-256).
+      const chain = chronological(db.auditLog.filter((x) => x.operationId === opId && x.tenantId === session.tenantId));
+      const hashPrev = chain.length ? chain[chain.length - 1].hash : GENESIS_HASH;
+      const base = {
         id: id(), tenantId: session.tenantId, operationId: opId, at: now(),
         actor: session.userId, action: input.action, module: input.module.trim(),
         object: input.object.trim(), summary: input.summary?.trim() || null,
       };
+      const e: AuditEntry = { ...base, hashPrev, hash: computeAuditHash(hashPrev, base) };
       db.auditLog.push(e);
       return { ...e };
     },
