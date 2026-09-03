@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // supabase/functions : runtime Deno (imports jsr:/https:, global Deno) — outillage
+  // et lint propres (deno check), hors du périmètre ESLint navigateur de l'app.
+  { ignores: ['dist', 'supabase/functions'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

@@ -84,4 +84,15 @@ describe('M23 — journal rejouable (chaîne de hachage)', () => {
   it('journal vide : intégrité triviale', () => {
     expect(verifyAuditChain([]).ok).toBe(true);
   });
+
+  // Vecteur d'or : fige la formule de hachage. Les Edge Functions (service_role)
+  // scellent le journal côté serveur et DOIVENT reproduire exactement cette valeur
+  // (cf. supabase/functions/_shared/audit.ts et son README).
+  it('vecteur d’or — contrat de scellement serveur', () => {
+    const entry = {
+      id: '11111111-1111-4111-8111-111111111111', operationId: 'op-1', at: '2026-09-03T00:00:00.000Z',
+      actor: 'u-1', action: 'transition' as const, module: 'M15', object: 'decompte:7', summary: 'validated→mandated',
+    };
+    expect(computeAuditHash(GENESIS_HASH, entry)).toBe('53a6e03c89d304171b401cdaa7df5e6ef0c6e3111c19df75c16b00130bb72a3f');
+  });
 });
