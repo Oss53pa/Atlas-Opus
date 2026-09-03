@@ -31,6 +31,7 @@ code HTTP ; le préflight CORS est géré.
 | `ao-passation` | M8 | `owner`, `moa_director`, `procurement` | avance un marché `planned→published→opened→evaluated→awarded→notified` (titulaire requis dès `awarded`) |
 | `ao-mandatement` | M15 | `owner`, `moa_director`, `finance` | avance un décompte `draft→validated→mandated→paid` (mandatement + mise en paiement) |
 | `ao-integrations` | F5 | `owner`, `moa_director`, `finance` | dépose une intention sortante dans `ao_outbox`, **idempotente** (clé `system:kind:businessId`) |
+| `ao-outbox-worker` | F5 | **service_role uniquement** (pilotée par cron) | draine `ao_outbox`, appelle le tiers, applique backoff + disjoncteur |
 
 ### Exemple d'appel
 
@@ -51,6 +52,53 @@ Réponse : `{ "ok": true, "id": "…", "status": "mandated" }`.
 - Une course perdue sur la contrainte unique (`23505`) est traitée en idempotent.
 - La livraison (backoff, disjoncteur, lettre morte) est portée par l'outbox et
   un worker distinct (F5 `contract.ts`) — l'Edge Function ne fait que **déposer**.
+
+## Worker de livraison (`ao-outbox-worker`)
+
+`ao-integrations` ne fait que **déposer** ; le worker **livre**. À chaque tick il :
+
+1. sélectionne un lot de messages **dus** (`pending`, ou `retrying` échu) — tous
+   tenants confondus (service_role) ;
+2. lit l'endpoint `ao_integration_endpoints` du couple (tenant, système) : s'il est
+   absent, `paused` ou sans `config.url`, le message est **laissé intact** (aucune
+   tentative consommée) ;
+3. respecte le **disjoncteur** : `open` (cooldown non écoulé) → message différé ;
+4. **réclame** le message (`pending|retrying → inflight`) par update conditionnel :
+   seul le worker qui gagne la bascule le traite (sûr en cas d'invocations
+   concurrentes) ;
+5. appelle le tiers (`POST config.url`, en-tête `Idempotency-Key`), traduit la
+   réponse en issue (2xx → succès ; 408/429/5xx/réseau → retriable ; autres 4xx →
+   fatal) ;
+6. applique la machine de livraison (`delivered` / `retrying`+backoff / `dead`) et
+   met à jour le disjoncteur (`recordCircuit`).
+
+La logique pure (`_shared/f5.ts`) est le **miroir Deno** de `src/domain/f5/contract.ts`
+(mêmes constantes, mêmes transitions), figée par les vecteurs d'or de `f5.test.ts`
+(séquence de backoff `1s,2s,4s,8s` puis lettre morte au 5ᵉ essai).
+
+Réservé au **service_role** (`requireServiceRole`) : un utilisateur authentifié
+est refusé (403), car le worker traite tous les tenants.
+
+### Planification (au choix, non imposée sur la base partagée)
+
+Aucune tâche cron n'est déployée automatiquement. Pour l'activer, planifier un
+appel HTTP au worker (par ex. toutes les minutes) avec la clé service_role :
+
+```sql
+-- pg_cron + pg_net ; stocker la clé dans Vault, ne PAS l'écrire en clair.
+select cron.schedule('ao-outbox-drain', '* * * * *', $$
+  select net.http_post(
+    url     := 'https://<project>.supabase.co/functions/v1/ao-outbox-worker',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'service_role_key')
+    )
+  );
+$$);
+```
+
+Alternative « lourde » (CLAUDE.md §3) : un worker **BullMQ + Redis** côté NestJS
+appelant les mêmes fonctions pures — même contrat, autre ordonnanceur.
 
 ## Contrat d'audit (à ne pas casser)
 
@@ -73,7 +121,7 @@ hash      = 53a6e03c89d304171b401cdaa7df5e6ef0c6e3111c19df75c16b00130bb72a3f
 ## Déploiement
 
 ```bash
-supabase functions deploy ao-passation ao-mandatement ao-integrations
+supabase functions deploy ao-passation ao-mandatement ao-integrations ao-outbox-worker
 ```
 
 Variables injectées par le runtime : `SUPABASE_URL`, `SUPABASE_ANON_KEY`,

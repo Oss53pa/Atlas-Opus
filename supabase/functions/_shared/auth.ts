@@ -47,3 +47,14 @@ export function requireString(body: unknown, key: string): string {
   if (typeof v !== 'string' || v.length === 0) throw new HttpError(422, `missing_${key}`);
   return v;
 }
+
+/**
+ * Réserve une fonction au porteur de la clé service_role (worker piloté par
+ * cron / appel serveur). Un simple utilisateur authentifié est refusé : le
+ * worker traite TOUS les tenants (RLS contournée). 403 sinon.
+ */
+export function requireServiceRole(req: Request): void {
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const auth = req.headers.get('Authorization') ?? '';
+  if (!key || auth !== `Bearer ${key}`) throw new HttpError(403, 'service_role_required');
+}
