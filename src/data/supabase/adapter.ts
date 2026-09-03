@@ -1547,7 +1547,10 @@ interface AuditRow {
 }
 function toAudit(r: AuditRow): AuditEntry {
   return {
-    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, at: r.at, actor: r.actor,
+    // `at` canonicalisé en ISO : le hash est calculé sur cette forme (aussi bien
+    // côté Edge que dans append), or Postgres renvoie le timestamptz en « +00:00 ».
+    // Sans normalisation, la vérification de chaîne échouerait sur le round-trip.
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, at: new Date(r.at).toISOString(), actor: r.actor,
     action: r.action as AuditAction, module: r.module, object: r.object, summary: r.summary,
     hashPrev: r.hash_prev ?? GENESIS_HASH, hash: r.hash ?? '',
   };
