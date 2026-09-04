@@ -7,6 +7,7 @@ import { useOperation, useOperations } from '../../app/providers';
 import { t, locale, type MessageKey } from '../../i18n';
 import { formatPercent } from '../../lib/format';
 import { phaseLabel } from './labels';
+import { OfflineBanner } from './OfflineBanner';
 import type { Role } from '../../domain/m1/types';
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ');
@@ -309,7 +310,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Contenu — padding handoff 18px 32px */}
         <main id="main-content" tabIndex={-1} className="min-w-0 flex-1" style={{ padding: '18px 32px', outline: 'none' }}>
-          <div className="mx-auto max-w-[1200px]">{children}</div>
+          <div className="mx-auto max-w-[1200px]">
+            <OfflineBanner />
+            {children}
+          </div>
         </main>
       </div>
 

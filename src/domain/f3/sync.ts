@@ -130,6 +130,53 @@ export function pending(queue: PendingMutation[]): PendingMutation[] {
   return orderQueue(queue.filter((m) => m.status === 'queued'));
 }
 
+/** Transport de rejeu : exécute une mutation contre le backend (repo/Edge Fn). */
+export type OfflineTransport = (mutation: PendingMutation) => Promise<SettleResult>;
+
+export interface DrainResult {
+  queue: PendingMutation[];
+  synced: number;
+  conflicts: number;
+  failed: number;
+}
+
+/**
+ * Vide la file de façon déterministe : établit le plan (planSync), exécute les
+ * mutations « apply » via le transport et fait progresser chaque statut (settle).
+ * Les conflits détectés par le plan sont actés sans appeler le transport. Par
+ * défaut la détection de version est déléguée au transport (client_wins,
+ * `serverVersions` vide) ; passez `serverVersions`/`strategy` pour l'activer.
+ */
+export async function drainQueue(
+  queue: PendingMutation[],
+  transport: OfflineTransport,
+  opts: Partial<PlanOptions> & { serverVersions?: Record<string, number> } = {},
+): Promise<DrainResult> {
+  const strategy = opts.strategy ?? 'client_wins';
+  const plan = planSync(queue, opts.serverVersions ?? {}, { strategy, serverTimes: opts.serverTimes });
+  const byId = new Map(queue.map((m) => [m.id, m]));
+  let synced = 0;
+  let conflicts = 0;
+  let failed = 0;
+
+  for (const entry of plan) {
+    if (entry.action === 'skip') continue;
+    if (entry.action === 'conflict') {
+      byId.set(entry.mutation.id, settle(entry.mutation, { ok: false, retriable: false, error: 'conflict' }));
+      conflicts++;
+      continue;
+    }
+    const result = await transport(entry.mutation);
+    const next = settle(entry.mutation, result);
+    byId.set(entry.mutation.id, next);
+    if (next.status === 'synced') synced++;
+    else if (next.status === 'conflict') conflicts++;
+    else if (next.status === 'rejected') failed++;
+  }
+
+  return { queue: [...byId.values()], synced, conflicts, failed };
+}
+
 // ── Persistance (sérialisation déterministe pour IndexedDB/localStorage) ──────
 
 /** Sérialise la file dans l'ordre de rejeu (JSON stable). */
