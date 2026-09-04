@@ -564,12 +564,12 @@ export function createMockDb(): MockDb {
     { id: 'nt-7', tenantId: T, severity: 'info', title: 'Rapport hebdomadaire S34 diffusé', context: '6 destinataires', at: '2026-08-18T00:00:00.000Z', read: true },
   ];
   const approvals: ApprovalTask[] = [
-    { id: 'ap-1', tenantId: T, module: 'M13', object: 'Situation n° 7 — gros œuvre lot 02', detail: 'visa MOE obtenu le 18.08', amount: 184_000_000, status: 'a_valider', requiredRole: 'owner', forMe: true },
-    { id: 'ap-2', tenantId: T, module: 'M13', object: 'Situation — électricité lot 09', detail: 'visa MOE obtenu', amount: 47_800_000, status: 'a_valider', requiredRole: 'moa_director', forMe: true },
-    { id: 'ap-3', tenantId: T, module: 'M14', object: 'Reprise de fondations zone B', detail: '+12 j sur chemin critique', amount: 20_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true },
-    { id: 'ap-4', tenantId: T, module: 'M14', object: 'Ajout GE de secours 250 kVA', detail: 'exigence programme v3', amount: 44_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true },
-    { id: 'ap-5', tenantId: T, module: 'M8', object: 'Attribution lot 03 — Ivoire Élec', detail: 'rapport M23 disponible', amount: 398_000_000, status: 'a_decider', requiredRole: 'owner', forMe: true },
-    { id: 'ap-6', tenantId: T, module: 'M13', object: 'Situation — VRD lot 05', detail: 'en attente de visa MOE', amount: 61_500_000, status: 'visa_moe', requiredRole: 'amo', forMe: false },
+    { id: 'ap-1', tenantId: T, module: 'M13', object: 'Situation n° 7 — gros œuvre lot 02', detail: 'visa MOE obtenu le 18.08', amount: 184_000_000, status: 'a_valider', requiredRole: 'owner', forMe: true, createdAt: '2026-08-20T09:00:00.000Z' },
+    { id: 'ap-2', tenantId: T, module: 'M13', object: 'Situation — électricité lot 09', detail: 'visa MOE obtenu', amount: 47_800_000, status: 'a_valider', requiredRole: 'moa_director', forMe: true, createdAt: '2026-08-28T09:00:00.000Z' },
+    { id: 'ap-3', tenantId: T, module: 'M14', object: 'Reprise de fondations zone B', detail: '+12 j sur chemin critique', amount: 20_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true, createdAt: '2026-09-02T09:00:00.000Z' },
+    { id: 'ap-4', tenantId: T, module: 'M14', object: 'Ajout GE de secours 250 kVA', detail: 'exigence programme v3', amount: 44_000_000, status: 'a_arbitrer', requiredRole: 'moa_director', forMe: true, createdAt: '2026-08-30T09:00:00.000Z' },
+    { id: 'ap-5', tenantId: T, module: 'M8', object: 'Attribution lot 03 — Ivoire Élec', detail: 'rapport M23 disponible', amount: 398_000_000, status: 'a_decider', requiredRole: 'owner', forMe: true, createdAt: '2026-08-15T09:00:00.000Z' },
+    { id: 'ap-6', tenantId: T, module: 'M13', object: 'Situation — VRD lot 05', detail: 'en attente de visa MOE', amount: 61_500_000, status: 'visa_moe', requiredRole: 'amo', forMe: false, createdAt: '2026-09-03T09:00:00.000Z' },
   ];
 
   return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals };

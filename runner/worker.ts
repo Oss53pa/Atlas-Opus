@@ -11,11 +11,13 @@ import { Queue, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { recomputeAllTenants, type RunnerSummary } from './recomputeAllTenants.ts';
 import { scanEcheancesAllTenants, type EcheanceRunnerSummary } from './scanEcheancesAllTenants.ts';
+import { scanEscalationsAllTenants, type EscalationRunnerSummary } from './scanEscalationsAllTenants.ts';
 import type { ReportType } from '../src/domain/m21/reporting';
 
 const QUEUE = 'ao-scheduled-jobs';
 const RECOMPUTE_CRON = process.env.RECOMPUTE_CRON ?? '0 2 * * *';
 const RELANCES_CRON = process.env.RELANCES_CRON ?? '0 6 * * *';
+const ESCALATIONS_CRON = process.env.ESCALATIONS_CRON ?? '0 */4 * * *';
 
 function connection(): IORedis {
   // maxRetriesPerRequest: null requis par BullMQ.
@@ -46,12 +48,22 @@ function runRelances(): Promise<EcheanceRunnerSummary> {
   });
 }
 
+function runEscalations(): Promise<EscalationRunnerSummary> {
+  return scanEscalationsAllTenants({
+    url: requireEnv('SUPABASE_URL'),
+    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    now: process.env.ESCALATION_NOW,
+    levels: process.env.ESCALATION_LEVELS ? process.env.ESCALATION_LEVELS.split(',').map((s) => Number(s.trim())) : undefined,
+  });
+}
+
 /** Enregistre (ou met à jour) les planificateurs de jobs répétables (BullMQ v6). */
 export async function schedule(): Promise<void> {
   const queue = new Queue(QUEUE, { connection: connection() });
   const opts = { removeOnComplete: true, removeOnFail: 100 };
   await queue.upsertJobScheduler('nightly-recompute', { pattern: RECOMPUTE_CRON }, { name: 'recompute', opts });
   await queue.upsertJobScheduler('daily-relances', { pattern: RELANCES_CRON }, { name: 'relances', opts });
+  await queue.upsertJobScheduler('escalations', { pattern: ESCALATIONS_CRON }, { name: 'escalations', opts });
   await queue.close();
 }
 
@@ -60,7 +72,8 @@ export function startWorker(): Worker {
   const worker = new Worker(
     QUEUE,
     async (job: Job) => {
-      const summary = job.name === 'relances' ? await runRelances() : await runRecompute();
+      const summary =
+        job.name === 'relances' ? await runRelances() : job.name === 'escalations' ? await runEscalations() : await runRecompute();
       console.log(`[worker:${job.name}]`, job.id, JSON.stringify(summary));
       return summary;
     },
@@ -75,7 +88,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   schedule()
     .then(() => {
       startWorker();
-      console.log(`[worker] prêt — recompute « ${RECOMPUTE_CRON} », relances « ${RELANCES_CRON} »`);
+      console.log(`[worker] prêt — recompute « ${RECOMPUTE_CRON} », relances « ${RELANCES_CRON} », escalades « ${ESCALATIONS_CRON} »`);
     })
     .catch((e) => {
       console.error('[recompute:worker] démarrage impossible', e);
