@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "typecheck:runner": "tsc -p runner/tsconfig.json",
     "recompute:once": "tsx runner/once.ts",
+    "relances:once": "tsx runner/relances.ts",
     "recompute:worker": "tsx runner/worker.ts"
   },
   "dependencies": {

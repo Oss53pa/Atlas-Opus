@@ -1313,13 +1313,13 @@ export function createSupabaseHandoverRepo(client: SupabaseClient): HandoverRepo
 
 // ── Administration transverse (F1/F4/F7) ─────────────────────────────────────
 interface MemberRow { id: string; tenant_id: string; name: string; email: string; role: string; scope: string; status: string; last_activity: string | null }
-interface NotifRow { id: string; tenant_id: string; severity: string; title: string; context: string; at: string; read: boolean }
+interface NotifRow { id: string; tenant_id: string; severity: string; title: string; context: string; at: string; read: boolean; dedup_key?: string | null }
 interface ApprovalRow { id: string; tenant_id: string; module: string; object: string; detail: string; amount: number; status: string; required_role: string; for_me: boolean }
 function toMember(r: MemberRow): Member {
   return { id: r.id, tenantId: r.tenant_id, name: r.name, email: r.email, role: r.role as Member['role'], scope: r.scope, status: r.status as Member['status'], lastActivity: r.last_activity };
 }
 function toNotif(r: NotifRow): NotificationItem {
-  return { id: r.id, tenantId: r.tenant_id, severity: r.severity as NotificationItem['severity'], title: r.title, context: r.context, at: r.at, read: r.read };
+  return { id: r.id, tenantId: r.tenant_id, severity: r.severity as NotificationItem['severity'], title: r.title, context: r.context, at: r.at, read: r.read, dedupKey: r.dedup_key ?? null };
 }
 function toApproval(r: ApprovalRow): ApprovalTask {
   return { id: r.id, tenantId: r.tenant_id, module: r.module, object: r.object, detail: r.detail, amount: Number(r.amount), status: r.status as ApprovalTask['status'], requiredRole: r.required_role as ApprovalTask['requiredRole'], forMe: r.for_me };
@@ -1337,6 +1337,18 @@ export function createSupabaseAdminRepo(client: SupabaseClient): AdminRepo {
     async approvals() {
       const rows = unwrap(await client.from('ao_approvals').select('*').order('amount', { ascending: false })) as ApprovalRow[];
       return rows.map(toApproval);
+    },
+    async upsertNotification(input) {
+      // Idempotence : unique(tenant_id, dedup_key) → un rejeu ne réinsère pas.
+      const { data, error } = await client
+        .from('ao_notifications')
+        .upsert(
+          { tenant_id: input.tenantId, severity: input.severity, title: input.title, context: input.context, at: input.at, read: false, dedup_key: input.dedupKey },
+          { onConflict: 'tenant_id,dedup_key', ignoreDuplicates: true },
+        )
+        .select('id');
+      if (error) throw new Error(error.message);
+      return { created: (data ?? []).length > 0 };
     },
   };
 }

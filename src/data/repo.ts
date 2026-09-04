@@ -76,6 +76,7 @@ import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m1
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
+import type { NotificationUpsert } from '../domain/f4/echeances';
 
 export interface Session {
   userId: string;
@@ -255,6 +256,12 @@ export interface AdminRepo {
   members(): Promise<Member[]>;
   notifications(): Promise<NotificationItem[]>;
   approvals(): Promise<ApprovalTask[]>;
+  /**
+   * Émet une notification idempotente (relances/échéances F4). Un même
+   * `dedupKey` n'insère qu'une fois par tenant → le cron peut repasser sans
+   * dupliquer. Renvoie `created:false` si la relance existait déjà.
+   */
+  upsertNotification(input: NotificationUpsert): Promise<{ created: boolean }>;
 }
 
 /** Conception & GED (M11) : documents & visas. */
