@@ -60,6 +60,8 @@ export interface ApprovalTask {
   requiredRole: Role;
   /** Assigné à l'utilisateur courant (file « pour vous »). */
   forMe: boolean;
+  /** Date ISO de mise en file — base de l'ancienneté (escalade F7). */
+  createdAt: string;
 }
 
 /** Palier de routage par seuil (RG-M14-03). */
