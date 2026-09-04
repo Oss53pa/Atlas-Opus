@@ -47,6 +47,7 @@ sur 100 % d'entre elles.
 | 0021–0028 | Comptes rendus M13 · modifications M15 · GED M11 · RFI M12 · raccordements M18 · bibliothèque M22 · bascule exploitation M20 · transverse (membres, notifications, approbations) |
 | 0029 | Chaîne de hachage d'audit (SHA-256 chaîné, journal rejouable) |
 | 0030 | F5 intégrations : `ao_integration_endpoints` + `ao_outbox` (idempotence, backoff, disjoncteur) |
+| 0031 | F4 relances : `ao_notifications.dedup_key` + unicité `(tenant_id, dedup_key)` (idempotence du cron) |
 
 Application via l'outillage Supabase (MCP `apply_migration` / CLI `supabase db push`).
 Les fichiers étant idempotents, un rejeu sur une base déjà à jour est sans effet.

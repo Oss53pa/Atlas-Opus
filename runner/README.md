@@ -5,13 +5,14 @@ autorisé à faire tourner le calcul monétaire (Money.ts, invariant §5 — jam
 SQL, jamais en Edge Deno). Réutilise le moteur `recomputeBilan` et
 l'orchestrateur `recomputePortfolio` : **aucune logique métier n'est dupliquée**.
 
-## Ce que fait le runner
+Deux jobs planifiés (CLAUDE.md §3), même patron (service_role → `groupByTenant`
+→ session par tenant → moteur du domaine) :
 
-1. Client **service_role** → liste toutes les opérations (RLS contournée).
-2. Regroupe par tenant (`groupByTenant`).
-3. Pour chaque tenant : session dédiée (`tenant_id` correct pour l'écriture),
-   recalcul de chaque opération, puis gel des indicateurs dans un cliché M21
-   (`ao_report_snapshots`).
+- **Recalcul du bilan** (M4) : recalcule chaque opération, fige un cliché M21
+  (`ao_report_snapshots`).
+- **Relances & échéances** (F4) : dérive les échéances imminentes/dépassées des
+  assurances (M7) et cautions (M17), émet des notifications **idempotentes**
+  (`ao_notifications.dedup_key`) — le cron repasse sans dupliquer.
 
 ## Configuration (environnement — jamais committé)
 
@@ -21,8 +22,11 @@ l'orchestrateur `recomputePortfolio` : **aucune logique métier n'est dupliquée
 | `SUPABASE_SERVICE_ROLE_KEY` | clé service_role | — (requis) |
 | `RECOMPUTE_TYPE` | `hebdo` \| `mensuel` \| `deep_dive` | `mensuel` |
 | `RECOMPUTE_PERIOD` | période du cliché | mois courant `AAAA-MM` |
+| `RELANCES_TODAY` | date de référence des échéances | aujourd'hui `AAAA-MM-JJ` |
+| `RELANCES_WINDOW_DAYS` | fenêtre d'alerte (jours) | `30` |
 | `REDIS_URL` | worker BullMQ | `redis://127.0.0.1:6379` |
-| `RECOMPUTE_CRON` | cron du worker | `0 2 * * *` |
+| `RECOMPUTE_CRON` | cron recalcul (worker) | `0 2 * * *` |
+| `RELANCES_CRON` | cron relances (worker) | `0 6 * * *` |
 
 La `service_role` se fournit par l'environnement (secret d'ops / Vault), jamais
 dans le dépôt.
@@ -32,10 +36,12 @@ dans le dépôt.
 **One-shot** (cron simple, CI, ou pg_cron via wrapper) :
 
 ```bash
-SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run recompute:once
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run recompute:once   # recalcul du bilan
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run relances:once    # relances & échéances
 ```
 
-**Worker BullMQ + Redis** (file, reprises, observabilité — CLAUDE.md §3) :
+**Worker BullMQ + Redis** (file, reprises, observabilité — CLAUDE.md §3). Un seul
+worker héberge les deux jobs planifiés (recalcul + relances) :
 
 ```bash
 REDIS_URL=redis://… SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npm run recompute:worker

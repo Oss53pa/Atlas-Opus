@@ -1391,6 +1391,23 @@ export function createAdminRepo(db: MockDb, session: Session): AdminRepo {
     async approvals() {
       return mine(db.approvals).map((a) => ({ ...a }));
     },
+    async upsertNotification(input) {
+      const exists =
+        input.dedupKey != null &&
+        db.notifications.some((n) => n.tenantId === input.tenantId && n.dedupKey === input.dedupKey);
+      if (exists) return { created: false };
+      db.notifications.unshift({
+        id: crypto.randomUUID(),
+        tenantId: input.tenantId,
+        severity: input.severity,
+        title: input.title,
+        context: input.context,
+        at: input.at,
+        read: false,
+        dedupKey: input.dedupKey,
+      });
+      return { created: true };
+    },
   };
 }
 

@@ -37,6 +37,8 @@ export interface NotificationItem {
   /** Date ISO du fait. */
   at: string;
   read: boolean;
+  /** Clé de dédoublonnage des relances automatiques (F4) ; absente si ad hoc. */
+  dedupKey?: string | null;
 }
 
 // ── Boîte d'approbations (F7) ────────────────────────────────────────────────

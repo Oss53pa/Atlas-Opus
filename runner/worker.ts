@@ -10,10 +10,12 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { recomputeAllTenants, type RunnerSummary } from './recomputeAllTenants.ts';
+import { scanEcheancesAllTenants, type EcheanceRunnerSummary } from './scanEcheancesAllTenants.ts';
 import type { ReportType } from '../src/domain/m21/reporting';
 
-const QUEUE = 'ao-bilan-recompute';
-const CRON = process.env.RECOMPUTE_CRON ?? '0 2 * * *';
+const QUEUE = 'ao-scheduled-jobs';
+const RECOMPUTE_CRON = process.env.RECOMPUTE_CRON ?? '0 2 * * *';
+const RELANCES_CRON = process.env.RELANCES_CRON ?? '0 6 * * *';
 
 function connection(): IORedis {
   // maxRetriesPerRequest: null requis par BullMQ.
@@ -26,7 +28,7 @@ function requireEnv(name: string): string {
   return v;
 }
 
-async function runJob(): Promise<RunnerSummary> {
+function runRecompute(): Promise<RunnerSummary> {
   return recomputeAllTenants({
     url: requireEnv('SUPABASE_URL'),
     serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
@@ -35,29 +37,36 @@ async function runJob(): Promise<RunnerSummary> {
   });
 }
 
-/** Enregistre (ou met à jour) le planificateur de job répétable (BullMQ v6). */
+function runRelances(): Promise<EcheanceRunnerSummary> {
+  return scanEcheancesAllTenants({
+    url: requireEnv('SUPABASE_URL'),
+    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    today: process.env.RELANCES_TODAY,
+    warningDays: process.env.RELANCES_WINDOW_DAYS ? Number(process.env.RELANCES_WINDOW_DAYS) : undefined,
+  });
+}
+
+/** Enregistre (ou met à jour) les planificateurs de jobs répétables (BullMQ v6). */
 export async function schedule(): Promise<void> {
   const queue = new Queue(QUEUE, { connection: connection() });
-  await queue.upsertJobScheduler(
-    'nightly',
-    { pattern: CRON },
-    { name: 'recompute', opts: { removeOnComplete: true, removeOnFail: 100 } },
-  );
+  const opts = { removeOnComplete: true, removeOnFail: 100 };
+  await queue.upsertJobScheduler('nightly-recompute', { pattern: RECOMPUTE_CRON }, { name: 'recompute', opts });
+  await queue.upsertJobScheduler('daily-relances', { pattern: RELANCES_CRON }, { name: 'relances', opts });
   await queue.close();
 }
 
-/** Démarre le worker qui exécute les jobs de la file. */
+/** Démarre le worker qui exécute les jobs planifiés (recalcul + relances). */
 export function startWorker(): Worker {
   const worker = new Worker(
     QUEUE,
     async (job: Job) => {
-      const summary = await runJob();
-      console.log('[recompute:worker]', job.id, JSON.stringify(summary));
+      const summary = job.name === 'relances' ? await runRelances() : await runRecompute();
+      console.log(`[worker:${job.name}]`, job.id, JSON.stringify(summary));
       return summary;
     },
     { connection: connection() },
   );
-  worker.on('failed', (job, err) => console.error('[recompute:worker] échec', job?.id, err));
+  worker.on('failed', (job, err) => console.error(`[worker:${job?.name}] échec`, job?.id, err));
   return worker;
 }
 
@@ -66,7 +75,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   schedule()
     .then(() => {
       startWorker();
-      console.log(`[recompute:worker] prêt — cron « ${CRON} »`);
+      console.log(`[worker] prêt — recompute « ${RECOMPUTE_CRON} », relances « ${RELANCES_CRON} »`);
     })
     .catch((e) => {
       console.error('[recompute:worker] démarrage impossible', e);
