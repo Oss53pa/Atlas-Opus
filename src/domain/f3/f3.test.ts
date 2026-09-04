@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  admitOffline, enqueue, orderQueue, planSync, settle, pending, serializeQueue, deserializeQueue,
+  admitOffline, enqueue, orderQueue, planSync, settle, pending, serializeQueue, deserializeQueue, drainQueue,
 } from './sync';
 import type { PendingMutation } from './types';
 
@@ -105,6 +105,39 @@ describe('F3 — settle & reprise', () => {
   it('pending ne renvoie que les queued, ordonnés', () => {
     const q = [base({ id: 'a', status: 'synced' }), base({ id: 'b', status: 'queued', createdAt: '2026-09-04T09:00:00.000Z' })];
     expect(pending(q).map((m) => m.id)).toEqual(['b']);
+  });
+});
+
+describe('F3 — drainQueue (rejeu via transport)', () => {
+  it('applique les mutations dans l’ordre et marque synced', async () => {
+    const seen: string[] = [];
+    const q = [
+      base({ id: 'b', createdAt: '2026-09-04T11:00:00.000Z' }),
+      base({ id: 'a', createdAt: '2026-09-04T10:00:00.000Z' }),
+    ];
+    const res = await drainQueue(q, async (m) => { seen.push(m.id); return { ok: true }; });
+    expect(seen).toEqual(['a', 'b']); // ordre de rejeu déterministe
+    expect(res.synced).toBe(2);
+    expect(res.queue.every((m) => m.status === 'synced')).toBe(true);
+  });
+
+  it('échec retriable → reste queued ; définitif → rejected', async () => {
+    const q = [base({ id: 'r' }), base({ id: 'x' })];
+    const res = await drainQueue(q, async (m) =>
+      m.id === 'r' ? { ok: false, retriable: true, error: 'network' } : { ok: false, retriable: false, error: 'bad' });
+    const byId = Object.fromEntries(res.queue.map((m) => [m.id, m.status]));
+    expect(byId).toMatchObject({ r: 'queued', x: 'rejected' });
+    expect(res.failed).toBe(1);
+  });
+
+  it('conflit détecté par le plan → acté sans appeler le transport', async () => {
+    let called = 0;
+    const res = await drainQueue([base({ entityId: 'e1', baseVersion: 0 })], async () => { called++; return { ok: true }; }, {
+      strategy: 'server_wins', serverVersions: { e1: 9 },
+    });
+    expect(called).toBe(0);
+    expect(res.conflicts).toBe(1);
+    expect(res.queue[0].status).toBe('conflict');
   });
 });
 

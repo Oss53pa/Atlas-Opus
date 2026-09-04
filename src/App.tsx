@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Aurora, ToastProvider } from './ui';
 import { AuthProvider, useAuth } from './app/auth';
 import { DataProvider } from './app/providers';
+import { OfflineProvider } from './app/offline';
 import { NavProvider, useNav } from './app/router';
 import { LoginScreen } from './features/auth/LoginScreen';
 import { AppShell } from './features/m1/AppShell';
@@ -202,9 +203,11 @@ export default function App() {
           <AuthProvider>
             <AuthGate>
               <DataProvider>
-                <NavProvider>
-                  <Shell />
-                </NavProvider>
+                <OfflineProvider>
+                  <NavProvider>
+                    <Shell />
+                  </NavProvider>
+                </OfflineProvider>
               </DataProvider>
             </AuthGate>
           </AuthProvider>
