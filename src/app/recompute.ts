@@ -14,6 +14,21 @@ import { bilanRecomputeToReportData, type BilanRecompute, type RecomputeExtras }
 
 const NO_EXTRAS: RecomputeExtras = { progress: 0, alertsDanger: 0, alertsEcheance: 0 };
 
+/**
+ * Regroupe des éléments par tenant (ordre d'apparition préservé). Le runner
+ * service_role parcourt toutes les opérations puis recalcule tenant par tenant,
+ * chaque session portant le bon `tenantId` pour l'écriture du cliché.
+ */
+export function groupByTenant<T extends { tenantId: string }>(items: T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const bucket = map.get(item.tenantId);
+    if (bucket) bucket.push(item);
+    else map.set(item.tenantId, [item]);
+  }
+  return map;
+}
+
 export interface RecomputeDeps {
   ops: Operation[];
   bilan: Pick<BilanRepo, 'recompute'>;
