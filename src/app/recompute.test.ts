@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { recomputePortfolio } from './recompute';
+import { recomputePortfolio, groupByTenant } from './recompute';
 import { recomputeBilan, type BilanRecompute } from '../domain/finance/recompute';
 import { Money } from '../domain/money/Money';
 import type { Operation } from '../domain/m1/types';
@@ -62,5 +62,21 @@ describe('recomputePortfolio — job « recalcul du bilan »', () => {
     await recomputePortfolio({ ops: [op('op-x')], bilan, reporting }, { type: 'hebdo', period: 'W36' });
     expect(captured!.data.progress).toBe(0);
     expect(captured!.data.alertsDanger).toBe(0);
+  });
+});
+
+describe('groupByTenant', () => {
+  it('regroupe par tenant en préservant l’ordre', () => {
+    const g = groupByTenant([
+      { id: '1', tenantId: 'A' },
+      { id: '2', tenantId: 'B' },
+      { id: '3', tenantId: 'A' },
+    ]);
+    expect([...g.keys()]).toEqual(['A', 'B']);
+    expect(g.get('A')!.map((x) => x.id)).toEqual(['1', '3']);
+    expect(g.get('B')!.map((x) => x.id)).toEqual(['2']);
+  });
+  it('liste vide → map vide', () => {
+    expect(groupByTenant([]).size).toBe(0);
   });
 });

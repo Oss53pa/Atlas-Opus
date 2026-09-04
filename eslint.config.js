@@ -7,7 +7,9 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   // supabase/functions : runtime Deno (imports jsr:/https:, global Deno) — outillage
   // et lint propres (deno check), hors du périmètre ESLint navigateur de l'app.
-  { ignores: ['dist', 'supabase/functions'] },
+  // runner/ (Node : BullMQ, service_role) et supabase/functions (Deno) ont leur
+  // propre validation — tsc -p runner/tsconfig.json / deno — hors ESLint navigateur.
+  { ignores: ['dist', 'supabase/functions', 'runner'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
