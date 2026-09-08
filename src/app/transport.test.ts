@@ -158,6 +158,21 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { type: 'moe', name: 'Atelier Koffi', feeAmount: 180_000_000 } });
   });
 
+  it('drawdowns.create → reconstruit Money et appelle addDrawdown', async () => {
+    const calls: { financingId: string; input: { amount: { toMajorNumber(): number }; condition: number } }[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      financing: { addDrawdown: async (financingId: string, input: { amount: { toMajorNumber(): number }; condition: number }) => { calls.push({ financingId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'drawdowns', op: 'create', payload: { financingId: 'f1', amountMajor: 40_000_000, currency: 'XOF', condition: 0.3 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0].financingId).toBe('f1');
+    expect(calls[0].input.amount.toMajorNumber()).toBe(40_000_000);
+    expect(calls[0].input.condition).toBe(0.3);
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));

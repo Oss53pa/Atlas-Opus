@@ -17,7 +17,7 @@ import type { StakeholderType } from '../domain/m2/types';
 import type { RevisionTerm } from '../domain/f6/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -104,6 +104,14 @@ interface PriceRevisionCreatePayload {
   terms: RevisionTerm[];
   coefficient: number;
   revisedAmount: number;
+}
+
+// M5 — déblocage (tranche) : le montant alimente les frais financiers du bilan.
+interface DrawdownCreatePayload {
+  financingId: string;
+  amountMajor: number;
+  currency: string;
+  condition: number;
 }
 
 // M7 — intervenant : ses honoraires (feeAmount, number) alimentent le poste
@@ -223,6 +231,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
       type: p.type, name: p.name, email: p.email ?? null, phone: p.phone ?? null,
       mission: p.mission ?? null, feeAmount: p.feeAmount ?? 0,
     });
+    return { ok: true };
+  }
+  // M5 — déblocage d'une tranche de financement (alimente les frais financiers).
+  if (m.entity === 'drawdowns' && m.op === 'create') {
+    const p = m.payload as unknown as DrawdownCreatePayload;
+    await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
     return { ok: true };
   }
   return { ok: false, retriable: false, error: `unsupported:${m.entity}.${m.op}` };

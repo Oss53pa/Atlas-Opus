@@ -9,6 +9,7 @@ import {
   DRAWDOWN_STATUS_TONE,
 } from './labels';
 import { useData, useOperation, useFinancings, useDrawdowns } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale, type MessageKey } from '../../i18n';
 import { formatPercent } from '../../lib/format';
@@ -145,11 +146,13 @@ function FinancingCard({
   financing: Financing; currency: string; progress: number; canEdit: boolean;
   onStatus: (s: FinancingStatus) => void; onRemove: () => void;
 }) {
-  const { financing } = useData();
+  const { financing, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const toast = useToast();
-  const { data: loaded, loading } = useDrawdowns(f.id);
+  const { data: loaded, loading, refetch } = useDrawdowns(f.id);
   const [rows, setRows] = useState<Drawdown[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const [addingDraw, setAddingDraw] = useState(false);
   const [drawDraft, setDrawDraft] = useState<{ amountText: string; conditionText: string }>({ amountText: '', conditionText: '' });
@@ -164,8 +167,23 @@ function FinancingCard({
   }
 
   async function addDraw() {
-    const amount = Money.of(Number(drawDraft.amountText.replace(/[^\d]/g, '')) || 0, currency);
+    const amountMajor = Number(drawDraft.amountText.replace(/[^\d]/g, '')) || 0;
+    const amount = Money.of(amountMajor, currency);
     const condition = (Number(drawDraft.conditionText.replace(/[^\d]/g, '')) || 0) / 100;
+    // Offline-first (F3) : déblocage (M5), planifié — alimente les frais financiers.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'drawdowns', op: 'create', entityId: null,
+        payload: { financingId: f.id, amountMajor, currency, condition }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: true,
+      });
+      const optimistic: Drawdown = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, financingId: f.id, amount, condition, status: 'planifie', date: null };
+      setRows((r) => [...r, optimistic]);
+      setDrawDraft({ amountText: '', conditionText: '' });
+      setAddingDraw(false);
+      toast.push(t('draw.added.offline'), 'info');
+      return;
+    }
     const rec = await financing.addDrawdown(f.id, { amount, condition });
     setRows((r) => [...r, rec]);
     setDrawDraft({ amountText: '', conditionText: '' });
