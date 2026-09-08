@@ -66,6 +66,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'Fissure', severity: 'majeure' } });
   });
 
+  it('purchaseOrders.create → appelle purchasing.add (brouillon) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      purchasing: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'purchaseOrders', op: 'create', payload: { operationId: 'op-1', reference: 'BC-01', supplier: 'Fournitex', item: 'Ciment', quantity: 200, unit: 't', amount: 12_000_000 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { reference: 'BC-01', supplier: 'Fournitex', amount: 12_000_000 } });
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
