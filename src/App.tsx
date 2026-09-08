@@ -56,6 +56,7 @@ import { InvitationScreen } from './features/m1/InvitationScreen';
 import { OnboardingScreen } from './features/m1/OnboardingScreen';
 import { MembresScreen } from './features/m1/MembresScreen';
 import { NotificationsScreen } from './features/m1/NotificationsScreen';
+import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
 import { t } from './i18n';
 
@@ -164,6 +165,8 @@ function RouteView() {
       return <NotificationsScreen />;
     case 'approbations':
       return <ApprovalsScreen />;
+    case 'syncQueue':
+      return <SyncQueueScreen />;
     default:
       return <DashboardScreen />;
   }

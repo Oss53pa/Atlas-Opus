@@ -51,7 +51,8 @@ export type Route =
   | { name: 'onboarding' }
   | { name: 'membres' }
   | { name: 'notifications' }
-  | { name: 'approbations' };
+  | { name: 'approbations' }
+  | { name: 'syncQueue' };
 
 interface NavApi {
   route: Route;
