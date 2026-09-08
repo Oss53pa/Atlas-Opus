@@ -298,6 +298,7 @@ export const fr = {
   'change.add': 'Nouvelle demande',
   'change.empty': 'Aucune modification. Enregistrez les demandes d’évolution (aléas, MOA, réglementaire…).',
   'change.added': 'Demande créée.',
+  'change.added.offline': 'Demande de modification saisie hors-ligne — en attente de synchronisation.',
   'change.removed': 'Demande supprimée.',
   'change.impact.save': 'Instruire l’impact',
   'change.impact.saved': 'Impact instruit.',

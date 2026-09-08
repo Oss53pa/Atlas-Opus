@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('changeOrders.create → appelle changeOrders.add (requested) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      changeOrders: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'changeOrders', op: 'create', payload: { operationId: 'op-1', contractId: 'c1', origin: 'aleas', description: 'Sujétion imprévue fondations' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { contractId: 'c1', origin: 'aleas', description: 'Sujétion imprévue fondations' } });
+  });
+
   it('guarantees.create → appelle guarantees.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {
