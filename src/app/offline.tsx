@@ -39,6 +39,10 @@ interface OfflineApi {
   flush(): Promise<void>;
   /** Retire les mutations terminales en échec (conflit/rejet), une fois tranchées. */
   discardResolved(): void;
+  /** Re-tente une mutation en échec (conflit/rejet → queued) puis draine si possible. */
+  retry(id: string): void;
+  /** Retire une mutation précise de la file. */
+  discard(id: string): void;
   admits(input: Pick<PendingMutation, 'financial' | 'payload' | 'op'>): boolean;
 }
 
@@ -93,6 +97,17 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
     setQueue((q) => q.filter((m) => m.status !== 'conflict' && m.status !== 'rejected'));
   }, []);
 
+  const discard = useCallback((id: string) => {
+    setQueue((q) => q.filter((m) => m.id !== id));
+  }, []);
+
+  const retry = useCallback((id: string) => {
+    setQueue((q) =>
+      q.map((m) => (m.id === id && (m.status === 'conflict' || m.status === 'rejected') ? { ...m, status: 'queued', lastError: null } : m)),
+    );
+    // Le drainage opportuniste (effet sur `queue`) reprendra la mutation remise en file.
+  }, []);
+
   const capture = useCallback((input: CaptureInput) => {
     const verdict = admitOffline(input);
     setQueue((q) => enqueueMutation(q, input).queue);
@@ -136,9 +151,11 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
       capture,
       flush,
       discardResolved,
+      retry,
+      discard,
       admits: (input) => admitOffline(input).ok,
     };
-  }, [online, queue, transport, syncedAt, capture, flush, discardResolved]);
+  }, [online, queue, transport, syncedAt, capture, flush, discardResolved, retry, discard]);
 
   return <OfflineCtx.Provider value={value}>{children}</OfflineCtx.Provider>;
 }
