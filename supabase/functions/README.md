@@ -29,7 +29,7 @@ code HTTP ; le préflight CORS est géré.
 | Slug | Module | Rôles autorisés | Action |
 |------|--------|-----------------|--------|
 | `ao-passation` | M8 | `owner`, `moa_director`, `procurement` | avance un marché `planned→published→opened→evaluated→awarded→notified` (titulaire requis dès `awarded`) |
-| `ao-mandatement` | M15 | `owner`, `moa_director`, `finance` | avance un décompte `draft→validated→mandated→paid` (mandatement + mise en paiement) |
+| `ao-mandatement` | M15 | `owner`, `moa_director`, `finance` | avance un décompte `draft→validated→mandated→paid` ; **scelle la fiscalité F6** au mandatement |
 | `ao-integrations` | F5 | `owner`, `moa_director`, `finance` | dépose une intention sortante dans `ao_outbox`, **idempotente** (clé `system:kind:businessId`) |
 | `ao-outbox-worker` | F5 | **service_role uniquement** (pilotée par cron) | draine `ao_outbox`, appelle le tiers, applique backoff + disjoncteur |
 
@@ -52,6 +52,32 @@ Réponse : `{ "ok": true, "id": "…", "status": "mandated" }`.
 - Une course perdue sur la contrainte unique (`23505`) est traitée en idempotent.
 - La livraison (backoff, disjoncteur, lettre morte) est portée par l'outbox et
   un worker distinct (F5 `contract.ts`) — l'Edge Function ne fait que **déposer**.
+
+## Scellement fiscal F6 (`ao-mandatement` → `mandated`)
+
+Au passage d'un décompte à **`mandated`**, la décomposition fiscale (F6) est **figée**
+sur `ao_decomptes` (colonnes `vat_rate`, `wht_rate`, `tva`, `retenue_source`,
+`net_a_payer`, `sealed_at`) et le net entre dans le journal d'audit chaîné.
+
+Le **calcul monétaire reste en TypeScript** (`src/domain/f6` + Money.ts, invariant §5) :
+l'appelant fournit les composantes (unités majeures), l'Edge Function **ne recalcule
+rien en monnaie** — elle vérifie la cohérence en **centimes entiers** puis persiste :
+
+- `baseHT` doit égaler le brut enregistré (`amount_gross`) → sinon `422 seal_base_mismatch` ;
+- `netAPayer == baseHT + tva − retenue_source − retenue_garantie − avance − pénalités`
+  (comparaison en centimes) → sinon `422 seal_inconsistent` ;
+- composantes manquantes → `422 seal_incomplete` ; absence de `seal` sur `→ mandated` → `422 seal_required`.
+
+Corps attendu :
+
+```json
+{ "decompteId": "…", "targetStatus": "mandated",
+  "seal": { "baseHT": 100000000, "tva": 18000000, "retenueSource": 5000000,
+            "retenueGarantie": 5000000, "avanceRemboursee": 10000000, "penalites": 2000000,
+            "netAPayer": 96000000, "vatRate": 0.18, "whtRate": 0.05 } }
+```
+
+Les autres transitions (`draft→validated`, `mandated→paid`) n'exigent pas de `seal`.
 
 ## Worker de livraison (`ao-outbox-worker`)
 
