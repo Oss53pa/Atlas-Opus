@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, Check, ShieldCheck, AlertTriangle } from 'lu
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { reserveSeverityLabel, reserveStatusLabel, RESERVE_SEVERITY_TONE, RESERVE_STATUS_TONE } from './labels';
 import { useData, useOperation, useReserves } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatDate } from '../../lib/format';
@@ -14,6 +15,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function ReceptionScreen({ id }: { id: string }) {
   const { reception, session } = useData();
+  const { online, capture } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
@@ -34,7 +36,22 @@ export function ReceptionScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.label.trim()) return;
-    const rec = await reception.addReserve(id, { label: draft.label, location: draft.location, severity: draft.severity, raisedAt: draft.raised || today() });
+    const input = { label: draft.label, location: draft.location, severity: draft.severity, raisedAt: draft.raised || today() };
+    // Offline-first (F3) : réserve non financière → capture admise hors-ligne (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'reserves', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Reserve = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'ouverte', clearedAt: null };
+      setRows((r) => [optimistic, ...r]);
+      setDraft({ label: '', location: '', severity: 'mineure', raised: today() });
+      setAdding(false);
+      toast.push(t('reception.added.offline'), 'info');
+      return;
+    }
+    const rec = await reception.addReserve(id, input);
     setRows((r) => [rec, ...r]);
     setDraft({ label: '', location: '', severity: 'mineure', raised: today() });
     setAdding(false);

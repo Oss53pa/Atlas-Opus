@@ -8,8 +8,10 @@
  */
 import type { OfflineTransport, PendingMutation, SettleResult } from '../domain/f3';
 import type { DataApi } from './providers';
+import type { RfiPriority } from '../domain/rfi/types';
+import type { ReserveSeverity } from '../domain/m19/types';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -28,6 +30,25 @@ interface DecompteCreatePayload {
   retentionRate?: number;
 }
 
+interface RfiCreatePayload {
+  operationId: string;
+  number: string;
+  subject: string;
+  question: string;
+  raisedBy: string;
+  priority: RfiPriority;
+  dueDate?: string | null;
+  documentRef?: string | null;
+}
+
+interface ReserveCreatePayload {
+  operationId: string;
+  label: string;
+  location: string;
+  severity: ReserveSeverity;
+  raisedAt: string;
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
@@ -43,6 +64,23 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     const p = m.payload as unknown as DecompteCreatePayload;
     await api.payments.addDecompte(p.operationId, {
       contractId: p.contractId, number: p.number, amountGross: p.amountGross, retentionRate: p.retentionRate,
+    });
+    return { ok: true };
+  }
+  // M11 — RFI (collaboration terrain), non financier : rejouable tel quel.
+  if (m.entity === 'rfis' && m.op === 'create') {
+    const p = m.payload as unknown as RfiCreatePayload;
+    await api.rfis.add(p.operationId, {
+      number: p.number, subject: p.subject, question: p.question, raisedBy: p.raisedBy,
+      priority: p.priority, dueDate: p.dueDate ?? null, documentRef: p.documentRef ?? null,
+    });
+    return { ok: true };
+  }
+  // M19 — réserve de réception, non financière : rejouable tel quel.
+  if (m.entity === 'reserves' && m.op === 'create') {
+    const p = m.payload as unknown as ReserveCreatePayload;
+    await api.reception.addReserve(p.operationId, {
+      label: p.label, location: p.location, severity: p.severity, raisedAt: p.raisedAt,
     });
     return { ok: true };
   }
