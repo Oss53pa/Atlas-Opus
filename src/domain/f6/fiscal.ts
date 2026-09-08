@@ -3,7 +3,7 @@
  * TVA, retenues (source + garantie), net à payer et révision de prix. TOUT
  * calcul via Money.ts — jamais de flottant, jamais un LLM (invariant §5).
  */
-import { Money } from '../money/Money';
+import { Money, sumMoney, type Currency } from '../money/Money';
 import { getCountry, type WhtNature } from '../country';
 import type { FiscalContext, PaymentBreakdown, PaymentInput, RevisionTerm } from './types';
 
@@ -59,6 +59,23 @@ export function computePayment(input: PaymentInput): PaymentBreakdown {
     .subtract(penalites);
 
   return { baseHT, tva, retenueSource: rSource, retenueGarantie: rGarantie, avanceRemboursee, penalites, netAPayer };
+}
+
+/**
+ * Poste « travaux » du bilan (M4) : somme des nets à payer F6 des décomptes.
+ * Chaque décompte porte son propre taux de retenue de garantie ; TVA et retenue
+ * à la source viennent du contexte pays (nature « travaux »). Money.ts exact.
+ */
+export function travauxNet(
+  items: { brut: Money; retentionRate: number }[],
+  vatRate: number,
+  whtRate: number,
+  currency: Currency,
+): Money {
+  return sumMoney(
+    items.map((it) => computePayment({ brut: it.brut, vatRate, whtRate, retentionRate: it.retentionRate }).netAPayer),
+    currency,
+  );
 }
 
 // ── Révision de prix (marchés, v4.1) ─────────────────────────────────────────

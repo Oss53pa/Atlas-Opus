@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Money } from '../money/Money';
-import { vat, retenueSource, retenueGarantie, fiscalContext, computePayment, revisionCoefficient, reviseAmount } from './fiscal';
+import { vat, retenueSource, retenueGarantie, fiscalContext, computePayment, travauxNet, revisionCoefficient, reviseAmount } from './fiscal';
 
 const XOF = 'XOF';
 const m = (major: number) => Money.of(major, XOF);
@@ -50,6 +50,20 @@ describe('F6 — net à payer (§7)', () => {
     // 50 + 9 − 2.5 − 2.5 = 54 M
     expect(b.netAPayer.toMajorNumber()).toBe(54_000_000);
     expect(computePayment({ brut: m(50_000_000), vatRate: 0.18, whtRate: 0.05, retentionRate: 0.05 })).toEqual(b);
+  });
+});
+
+describe('F6 — poste travaux du bilan (net des décomptes)', () => {
+  it('somme les nets à payer F6 (TVA 18 %, WHT 5 %, garantie 5 %)', () => {
+    // 2 décomptes 50M et 100M → nets 54M et 108M → 162M.
+    const total = travauxNet(
+      [{ brut: m(50_000_000), retentionRate: 0.05 }, { brut: m(100_000_000), retentionRate: 0.05 }],
+      0.18, 0.05, XOF,
+    );
+    expect(total.toMajorNumber()).toBe(162_000_000);
+  });
+  it('liste vide → zéro', () => {
+    expect(travauxNet([], 0.18, 0.05, XOF).toMajorNumber()).toBe(0);
   });
 });
 

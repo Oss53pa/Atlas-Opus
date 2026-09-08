@@ -70,6 +70,7 @@ import { nextLibraryStatus } from '../domain/m22/library';
 import { Money } from '../domain/money/Money';
 import { type BilanLine } from '../domain/finance/bilan';
 import { recomputeBilan, type BilanRecomputeInput } from '../domain/finance/recompute';
+import { fiscalContext, travauxNet } from '../domain/f6';
 import type { Telemetry } from '../lib/telemetry';
 import type {
   BilanLineInput,
@@ -782,7 +783,7 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
   const today = () => (deps.now?.() ?? new Date().toISOString()).slice(0, 10);
   // Postes dérivés (source de vérité hors bilan) : honoraires (M7) et
   // frais_financiers (M5). Ils supersèdent toute ligne saisie manuellement.
-  const DERIVED_POSTES = ['honoraires', 'frais_financiers'];
+  const DERIVED_POSTES = ['honoraires', 'frais_financiers', 'travaux'];
   const honoraires = (opId: string, currency: string) =>
     honorairesFromStakeholders(
       db.stakeholders.filter((s) => s.operationId === opId && s.tenantId === session.tenantId),
@@ -796,10 +797,20 @@ export function createBilanRepo(db: MockDb, session: Session, deps: Deps): Bilan
       .map((d) => ({ amount: d.amount, rate: rateById.get(d.financingId) ?? 0, date: d.date, status: d.status }));
     return fraisFinanciersFromDrawdowns(items, today(), currency);
   };
+  // RG-F6 — poste travaux dérivé du net à payer des décomptes (M15/F6).
+  const travaux = (opId: string, currency: string) => {
+    const op = db.operations.find((o) => o.id === opId && o.tenantId === session.tenantId);
+    const ctx = fiscalContext(op?.countryCode ?? '', 'travaux', 0);
+    const items = db.decomptes
+      .filter((d) => d.operationId === opId && d.tenantId === session.tenantId)
+      .map((d) => ({ brut: Money.of(d.amountGross, currency), retentionRate: d.retentionRate }));
+    return travauxNet(items, ctx.vatRate, ctx.whtRate, currency);
+  };
   const derivedCostLines = (opId: string, currency: string): { poste: string; amount: Money }[] =>
     [
       { poste: 'honoraires', amount: honoraires(opId, currency) },
       { poste: 'frais_financiers', amount: fraisFinanciers(opId, currency) },
+      { poste: 'travaux', amount: travaux(opId, currency) },
     ].filter((l) => !l.amount.isZero());
   const nonDerivedSeeds = (opId: string) =>
     seeds(opId).filter((b) => !(b.kind === 'cost' && DERIVED_POSTES.includes(b.poste)));
