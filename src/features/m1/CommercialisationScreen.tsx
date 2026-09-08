@@ -257,10 +257,13 @@ function SaleCard({
 }: {
   sale: Sale; currency: string; canEdit: boolean; onRemove: () => void; onSettledChange: (total: number) => void;
 }) {
-  const { commercialisation } = useData();
-  const { data: loaded, loading } = useReceipts(sale.id);
+  const { commercialisation, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
+  const toast = useToast();
+  const { data: loaded, loading, refetch } = useReceipts(sale.id);
   const [rows, setRows] = useState<Receipt[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const settled = recettesEncaissees(rows, currency);
   useEffect(() => { onSettledChange(settled.toMajorNumber()); }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -269,8 +272,24 @@ function SaleCard({
   const [draft, setDraft] = useState<{ amountText: string; method: ReceiptMethod }>({ amountText: '', method: 'virement' });
 
   async function addReceipt() {
+    const amountMajor = Number(draft.amountText.replace(/[^\d]/g, '')) || 0;
+    // Offline-first (F3) : encaissement (M6) capturé « pending » — money-in
+    // provisoire ; l'imputation « settled » (recette réalisée) reste en ligne (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'receipts', op: 'create', entityId: null,
+        payload: { saleId: sale.id, amountMajor, currency, method: draft.method, reference: null },
+        baseVersion: null, createdAt: new Date().toISOString(), financial: true,
+      });
+      const optimistic: Receipt = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, saleId: sale.id, amount: Money.of(amountMajor, currency), method: draft.method, status: 'pending', reference: null };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ amountText: '', method: 'virement' });
+      setAdding(false);
+      toast.push(t('com.receipts.added.offline'), 'info');
+      return;
+    }
     const rec = await commercialisation.addReceipt(sale.id, {
-      amount: Money.of(Number(draft.amountText.replace(/[^\d]/g, '')) || 0, currency),
+      amount: Money.of(amountMajor, currency),
       method: draft.method,
     });
     setRows((r) => [...r, rec]);
@@ -278,6 +297,11 @@ function SaleCard({
     setAdding(false);
   }
   async function settle(rid: string) {
+    // §4 — imputer un encaissement (recette réalisée) est une écriture financière : en ligne uniquement.
+    if (!online) {
+      toast.push(t('com.receipts.offlineBlocked'), 'danger');
+      return;
+    }
     const rec = await commercialisation.setReceiptStatus(rid, 'settled');
     setRows((r) => r.map((x) => (x.id === rid ? rec : x)));
   }
