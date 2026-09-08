@@ -9,7 +9,7 @@
 import type { OfflineTransport, PendingMutation, SettleResult } from '../domain/f3';
 import type { DataApi } from './providers';
 
-type TransportDeps = Pick<DataApi, 'siteReports'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -20,11 +20,29 @@ interface SiteReportCreatePayload {
   blockers: number;
 }
 
+interface DecompteCreatePayload {
+  operationId: string;
+  contractId: string;
+  number: number;
+  amountGross: number;
+  retentionRate?: number;
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
     await api.siteReports.add(p.operationId, {
       date: p.date, author: p.author, progress: p.progress, summary: p.summary, blockers: p.blockers,
+    });
+    return { ok: true };
+  }
+  // M15 — un décompte capturé hors-ligne est nécessairement un brouillon (§4) ;
+  // sa création (statut draft par construction) est rejouable. Les transitions
+  // sensibles (validation/mandatement) restent en ligne (Edge Functions gardées).
+  if (m.entity === 'decomptes' && m.op === 'create') {
+    const p = m.payload as unknown as DecompteCreatePayload;
+    await api.payments.addDecompte(p.operationId, {
+      contractId: p.contractId, number: p.number, amountGross: p.amountGross, retentionRate: p.retentionRate,
     });
     return { ok: true };
   }
