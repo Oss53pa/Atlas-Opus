@@ -1233,6 +1233,7 @@ export const fr = {
   'stakeholders.total': 'Total honoraires',
   'stakeholders.empty': 'Aucun intervenant. Ajoutez la maîtrise d’œuvre, les entreprises…',
   'stakeholders.added': 'Intervenant ajouté.',
+  'stakeholders.added.offline': 'Intervenant saisi hors-ligne — en attente de synchronisation.',
   'stakeholders.removed': 'Intervenant supprimé.',
   'stakeholders.field.type': 'Type',
   'stakeholders.field.name': 'Nom',

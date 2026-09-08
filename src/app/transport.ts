@@ -13,10 +13,11 @@ import type { ReserveSeverity } from '../domain/m19/types';
 import type { DocDiscipline } from '../domain/ged/types';
 import type { SaleKind, ScheduleStage } from '../domain/m6/types';
 import type { TenureType } from '../domain/m2/foncier';
+import type { StakeholderType } from '../domain/m2/types';
 import type { RevisionTerm } from '../domain/f6/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -103,6 +104,18 @@ interface PriceRevisionCreatePayload {
   terms: RevisionTerm[];
   coefficient: number;
   revisedAmount: number;
+}
+
+// M7 — intervenant : ses honoraires (feeAmount, number) alimentent le poste
+// honoraires vérifié du bilan. JSON-safe (pas de Money).
+interface StakeholderCreatePayload {
+  operationId: string;
+  type: StakeholderType;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  mission?: string | null;
+  feeAmount?: number;
 }
 
 // M2 — la parcelle porte un prix `number` (déjà JSON-safe, pas de Money).
@@ -200,6 +213,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     await api.revisions.add(p.operationId, {
       contractId: p.contractId, baseAmount: p.baseAmount, a0: p.a0, terms: p.terms,
       coefficient: p.coefficient, revisedAmount: p.revisedAmount,
+    });
+    return { ok: true };
+  }
+  // M7 — intervenant (alimente le poste honoraires du bilan).
+  if (m.entity === 'stakeholders' && m.op === 'create') {
+    const p = m.payload as unknown as StakeholderCreatePayload;
+    await api.stakeholders.add(p.operationId, {
+      type: p.type, name: p.name, email: p.email ?? null, phone: p.phone ?? null,
+      mission: p.mission ?? null, feeAmount: p.feeAmount ?? 0,
     });
     return { ok: true };
   }

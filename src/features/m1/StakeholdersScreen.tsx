@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, Mail, Phone, AlertTriangle, Lock } from 'luc
 import { Badge, Banner, Button, Card, EmptyState, Field, Money as MoneyView, Select, Skeleton, StatCard, useToast } from '../../ui';
 import { stakeholderTypeLabel, raciLabel, RACI_TONE, decisionKindLabel } from './labels';
 import { useData, useOperation, useStakeholders, useRaci, useDecisions } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatDate } from '../../lib/format';
@@ -27,16 +28,18 @@ const emptyDraft: StakeholderInput = { type: 'moe', name: '', email: '', phone: 
 
 export function StakeholdersScreen({ id }: { id: string }) {
   const { stakeholders, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useStakeholders(id);
+  const { data: loaded, loading, refetch } = useStakeholders(id);
 
   const [rows, setRows] = useState<Stakeholder[]>([]);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<StakeholderInput>(emptyDraft);
   const [feeText, setFeeText] = useState('');
 
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
   useEffect(() => {
     if (loaded) setRows(loaded);
   }, [loaded]);
@@ -50,7 +53,28 @@ export function StakeholdersScreen({ id }: { id: string }) {
 
   async function submit() {
     if (!draft.name.trim()) return;
-    const rec = await stakeholders.add(id, { ...draft, name: draft.name.trim(), feeAmount: Number(feeText.replace(/[^\d]/g, '')) || 0 });
+    const input = { ...draft, name: draft.name.trim(), feeAmount: Number(feeText.replace(/[^\d]/g, '')) || 0 };
+    // Offline-first (F3) : intervenant (M7) — alimente le poste honoraires du bilan.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'stakeholders', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const nowIso = new Date().toISOString();
+      const optimistic: Stakeholder = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id,
+        type: input.type, name: input.name, email: input.email ?? null, phone: input.phone ?? null,
+        mission: input.mission ?? null, feeAmount: input.feeAmount, createdAt: nowIso, updatedAt: nowIso,
+      };
+      setRows((rs) => [...rs, optimistic]);
+      setDraft(emptyDraft);
+      setFeeText('');
+      setAdding(false);
+      toast.push(t('stakeholders.added.offline'), 'info');
+      return;
+    }
+    const rec = await stakeholders.add(id, input);
     setRows((rs) => [...rs, rec]);
     setDraft(emptyDraft);
     setFeeText('');
