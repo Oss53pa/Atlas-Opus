@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { docDisciplineLabel, docStatusLabel, DOC_STATUS_TONE } from './labels';
 import { useData, useOperation, useDocuments } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t } from '../../i18n';
 import { approvedCount, pendingVisaCount, canVisa, DOC_DISCIPLINES, type Document, type DocDiscipline, type DocStatus } from '../../domain/ged';
@@ -11,13 +12,16 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function ConceptionScreen({ id }: { id: string }) {
   const { documents, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useDocuments(id);
+  const { data: loaded, loading, refetch } = useDocuments(id);
 
   const [rows, setRows] = useState<Document[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
   const canEdit = can(session.role, 'op.update') && !readOnly;
@@ -29,6 +33,24 @@ export function ConceptionScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.reference.trim() || !draft.title.trim()) return;
+    // Offline-first (F3) : document GED non financier → capture admise (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'documents', op: 'create', entityId: null,
+        payload: { operationId: id, ...draft }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Document = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id,
+        reference: draft.reference.trim(), title: draft.title.trim(), discipline: draft.discipline,
+        indice: draft.indice.trim() || 'A', status: 'en_cours',
+      };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ reference: '', title: '', discipline: 'architecture', indice: 'A' });
+      setAdding(false);
+      toast.push(t('doc.added.offline'), 'info');
+      return;
+    }
     const rec = await documents.add(id, draft);
     setRows((r) => [...r, rec]);
     setDraft({ reference: '', title: '', discipline: 'architecture', indice: 'A' });
