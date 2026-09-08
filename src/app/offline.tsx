@@ -22,6 +22,9 @@ interface OfflineApi {
   online: boolean;
   queue: PendingMutation[];
   pendingCount: number;
+  /** Mutations dont la synchro a échoué de façon terminale (à trancher). */
+  conflictCount: number;
+  rejectedCount: number;
   /** true si un transport de synchro est branché (bouton « Synchroniser »). */
   canSync: boolean;
   /**
@@ -34,6 +37,8 @@ interface OfflineApi {
   capture(input: CaptureInput): { admitted: boolean; reason?: string };
   /** Vide la file via le transport (no-op si aucun transport ou hors-ligne). */
   flush(): Promise<void>;
+  /** Retire les mutations terminales en échec (conflit/rejet), une fois tranchées. */
+  discardResolved(): void;
   admits(input: Pick<PendingMutation, 'financial' | 'payload' | 'op'>): boolean;
 }
 
@@ -84,6 +89,10 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
     };
   }, []);
 
+  const discardResolved = useCallback(() => {
+    setQueue((q) => q.filter((m) => m.status !== 'conflict' && m.status !== 'rejected'));
+  }, []);
+
   const capture = useCallback((input: CaptureInput) => {
     const verdict = admitOffline(input);
     setQueue((q) => enqueueMutation(q, input).queue);
@@ -114,17 +123,22 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
 
   const value = useMemo<OfflineApi>(() => {
     const pendingCount = queue.filter((m) => m.status === 'queued').length;
+    const conflictCount = queue.filter((m) => m.status === 'conflict').length;
+    const rejectedCount = queue.filter((m) => m.status === 'rejected').length;
     return {
       online,
       queue,
       pendingCount,
+      conflictCount,
+      rejectedCount,
       canSync: Boolean(transport),
       syncedAt,
       capture,
       flush,
+      discardResolved,
       admits: (input) => admitOffline(input).ok,
     };
-  }, [online, queue, transport, syncedAt, capture, flush]);
+  }, [online, queue, transport, syncedAt, capture, flush, discardResolved]);
 
   return <OfflineCtx.Provider value={value}>{children}</OfflineCtx.Provider>;
 }
