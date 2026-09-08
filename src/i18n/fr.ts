@@ -1533,6 +1533,7 @@ export const fr = {
   'draw.title': 'Tranches de déblocage',
   'draw.add': 'Ajouter une tranche',
   'draw.blocked.progress': 'Avancement validé insuffisant pour débloquer cette tranche (RG-M5-01).',
+  'draw.added.offline': 'Déblocage saisi hors-ligne — en attente de synchronisation.',
   'draw.field.amount': 'Montant',
   'draw.field.condition': 'Condition (% avancement)',
   'draw.action.request': 'Demander',
