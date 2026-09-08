@@ -15,9 +15,10 @@ import type { SaleKind, ScheduleStage, ReceiptMethod } from '../domain/m6/types'
 import type { TenureType } from '../domain/m2/foncier';
 import type { StakeholderType } from '../domain/m2/types';
 import type { RevisionTerm } from '../domain/f6/types';
+import type { GuaranteeType } from '../domain/m17/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -133,6 +134,17 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M17 — caution/garantie : montant `number` (JSON-safe, pas de Money) ;
+// document (non écriture), donc rejouable tel quel.
+interface GuaranteeCreatePayload {
+  operationId: string;
+  type: GuaranteeType;
+  issuer: string;
+  amount: number;
+  validFrom: string;
+  validUntil?: string | null;
 }
 
 // M2 — la parcelle porte un prix `number` (déjà JSON-safe, pas de Money).
@@ -252,6 +264,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M17 — caution/garantie (document, non écriture) : rejouable tel quel.
+  if (m.entity === 'guarantees' && m.op === 'create') {
+    const p = m.payload as unknown as GuaranteeCreatePayload;
+    await api.guarantees.add(p.operationId, {
+      type: p.type, issuer: p.issuer, amount: p.amount, validFrom: p.validFrom, validUntil: p.validUntil ?? null,
+    });
     return { ok: true };
   }
   return { ok: false, retriable: false, error: `unsupported:${m.entity}.${m.op}` };

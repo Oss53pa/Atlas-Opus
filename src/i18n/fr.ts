@@ -183,6 +183,7 @@ export const fr = {
   'guarantee.add': 'Ajouter une garantie',
   'guarantee.empty': 'Aucune garantie. Enregistrez les cautions bancaires de l’opération.',
   'guarantee.added': 'Garantie ajoutée.',
+  'guarantee.added.offline': 'Caution saisie hors-ligne — en attente de synchronisation.',
   'guarantee.removed': 'Garantie supprimée.',
   'guarantee.action.liberee': 'Libérer',
   'guarantee.action.appelee': 'Appeler',

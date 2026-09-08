@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { guaranteeTypeLabel, guaranteeStatusLabel, GUARANTEE_STATUS_TONE } from './labels';
 import { useData, useOperation, useGuarantees } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatAmount, formatDate } from '../../lib/format';
@@ -18,13 +19,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function CautionsScreen({ id }: { id: string }) {
   const { guarantees, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useGuarantees(id);
+  const { data: loaded, loading, refetch } = useGuarantees(id);
 
   const [rows, setRows] = useState<Guarantee[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -40,10 +43,25 @@ export function CautionsScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.issuer.trim()) return;
-    const rec = await guarantees.add(id, {
+    const input = {
       type: draft.type, issuer: draft.issuer, amount: Number(draft.amount.replace(/[^\d]/g, '')) || 0,
       validFrom: draft.from || now, validUntil: draft.until || null,
-    });
+    };
+    // Offline-first (F3) : caution/garantie (M17), créée active — document, non écriture.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'guarantees', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Guarantee = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'active' };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ type: 'restitution_avance', issuer: '', amount: '', from: now, until: '' });
+      setAdding(false);
+      toast.push(t('guarantee.added.offline'), 'info');
+      return;
+    }
+    const rec = await guarantees.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ type: 'restitution_avance', issuer: '', amount: '', from: now, until: '' });
     setAdding(false);
