@@ -449,10 +449,14 @@ export const fr = {
   // Situation de travaux (détail M16)
   'situation.notFound': 'Situation introuvable.',
   'situation.title': 'Situation de travaux n° {n}',
+  'situation.baseHT': 'Base HT',
+  'situation.tva': 'TVA',
+  'situation.retenueSource': 'Retenue à la source',
   'situation.retention': 'Retenue de garantie',
   'situation.retentionRate': 'Taux {pct}',
+  'situation.netAPayer': 'Net à payer',
   'situation.breakdown': 'Décomposition',
-  'situation.subtitle': 'Brut, retenue de garantie et net à payer.',
+  'situation.subtitle': 'Base HT, TVA, retenues (source + garantie) et net à payer — fiscalité F6 selon le pays de l’opération.',
   // Détail d'un poste de bilan (détail M4)
   'poste.notFound': 'Poste introuvable.',
   'poste.consumption': 'Consommation',
