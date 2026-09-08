@@ -11,7 +11,7 @@ import type { DataApi } from './providers';
 import type { RfiPriority } from '../domain/rfi/types';
 import type { ReserveSeverity } from '../domain/m19/types';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -49,6 +49,16 @@ interface ReserveCreatePayload {
   raisedAt: string;
 }
 
+interface PurchaseOrderCreatePayload {
+  operationId: string;
+  reference: string;
+  supplier: string;
+  item: string;
+  quantity: number;
+  unit: string;
+  amount: number;
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
@@ -81,6 +91,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     const p = m.payload as unknown as ReserveCreatePayload;
     await api.reception.addReserve(p.operationId, {
       label: p.label, location: p.location, severity: p.severity, raisedAt: p.raisedAt,
+    });
+    return { ok: true };
+  }
+  // M9 — bon d'achat capturé hors-ligne = brouillon (§4) ; sa création est
+  // rejouable. L'engagement (passage hors brouillon) reste en ligne.
+  if (m.entity === 'purchaseOrders' && m.op === 'create') {
+    const p = m.payload as unknown as PurchaseOrderCreatePayload;
+    await api.purchasing.add(p.operationId, {
+      reference: p.reference, supplier: p.supplier, item: p.item, quantity: p.quantity, unit: p.unit, amount: p.amount,
     });
     return { ok: true };
   }

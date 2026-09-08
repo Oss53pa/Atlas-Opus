@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Skeleton, useToast, type TableRowData } from '../../ui';
 import { purchaseStatusLabel, PURCHASE_STATUS_TONE } from './labels';
 import { useData, useOperation, usePurchaseOrders } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatAmount } from '../../lib/format';
@@ -12,13 +13,16 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function AchatsScreen({ id }: { id: string }) {
   const { purchasing, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = usePurchaseOrders(id);
+  const { data: loaded, loading, refetch } = usePurchaseOrders(id);
 
   const [rows, setRows] = useState<PurchaseOrder[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -31,11 +35,27 @@ export function AchatsScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.reference.trim() || !draft.supplier.trim()) return;
-    const rec = await purchasing.add(id, {
+    const input = {
       reference: draft.reference, supplier: draft.supplier, item: draft.item,
       quantity: Number(draft.qty.replace(/[^\d]/g, '')) || 0, unit: draft.unit || 'u',
       amount: Number(draft.amount.replace(/[^\d]/g, '')) || 0,
-    });
+    };
+    // Offline-first (F3) : un bon d'achat capturé hors-ligne reste un BROUILLON —
+    // engagement de budget = écriture financière, admise en brouillon (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'purchaseOrders', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: true,
+      });
+      const optimistic: PurchaseOrder = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'brouillon' };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ reference: '', supplier: '', item: '', qty: '', unit: 'u', amount: '' });
+      setAdding(false);
+      toast.push(t('purchase.added.offline'), 'info');
+      return;
+    }
+    const rec = await purchasing.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ reference: '', supplier: '', item: '', qty: '', unit: 'u', amount: '' });
     setAdding(false);
@@ -44,6 +64,11 @@ export function AchatsScreen({ id }: { id: string }) {
   async function advance(o: PurchaseOrder) {
     const next = nextPurchaseStatus(o.status);
     if (!next) return;
+    // §4 — engager le bon (hors brouillon) est une écriture financière : en ligne uniquement.
+    if (!online) {
+      toast.push(t('purchase.offlineBlocked'), 'danger');
+      return;
+    }
     const rec = await purchasing.setStatus(o.id, next);
     setRows((r) => r.map((x) => (x.id === o.id ? rec : x)));
   }

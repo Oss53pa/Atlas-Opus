@@ -127,6 +127,8 @@ export const fr = {
   'purchase.add': 'Nouveau bon de commande',
   'purchase.empty': 'Aucun bon de commande. Créez les approvisionnements du chantier.',
   'purchase.added': 'Bon de commande créé.',
+  'purchase.added.offline': 'Bon d’achat saisi hors-ligne (brouillon) — en attente de synchronisation.',
+  'purchase.offlineBlocked': 'Engagement indisponible hors-ligne — bon d’achat en brouillon uniquement.',
   'purchase.removed': 'Bon de commande supprimé.',
   'purchase.advance': 'Faire avancer',
   'purchase.kpi.count': 'Bons',
