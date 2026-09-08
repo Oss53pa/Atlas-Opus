@@ -60,6 +60,7 @@ import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
 import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo } from '../repo';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
+import { fiscalContext, travauxNet } from '../../domain/f6';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -407,8 +408,20 @@ function toBilanRecord(r: BilanLineRow): BilanLineRecord {
 
 /** Bilan (M4) depuis ao_bilan_lines. TRI null tant que les cash-flows ne sont pas en base. */
 export function createSupabaseBilanRepo(client: SupabaseClient, session: Session): BilanRepo {
-  const DERIVED_POSTES = ['honoraires', 'frais_financiers'];
+  const DERIVED_POSTES = ['honoraires', 'frais_financiers', 'travaux'];
   const todayIsoDate = () => new Date().toISOString().slice(0, 10);
+
+  // RG-F6 — poste travaux dérivé du net à payer des décomptes (M15/F6).
+  const travauxFor = async (opId: string, currency: string): Promise<Money> => {
+    const { data: op } = await client.from(OPS).select('country_code').eq('id', opId).maybeSingle();
+    const ctx = fiscalContext((op as { country_code?: string } | null)?.country_code ?? '', 'travaux', 0);
+    const { data: decs } = await client.from('ao_decomptes').select('amount_gross, retention_rate').eq('operation_id', opId);
+    const items = (decs ?? []).map((d: { amount_gross: number | string; retention_rate: number | string }) => ({
+      brut: Money.of(Number(d.amount_gross), currency),
+      retentionRate: Number(d.retention_rate),
+    }));
+    return travauxNet(items, ctx.vatRate, ctx.whtRate, currency);
+  };
 
   // RG-M7-09 — honoraires dérivés des intervenants (source de vérité M7).
   const honorairesFor = async (opId: string, currency: string): Promise<Money> => {
@@ -437,10 +450,11 @@ export function createSupabaseBilanRepo(client: SupabaseClient, session: Session
   };
 
   const derivedCostLines = async (opId: string, currency: string): Promise<{ poste: string; amount: Money }[]> => {
-    const [hono, ff] = await Promise.all([honorairesFor(opId, currency), fraisFinanciersFor(opId, currency)]);
+    const [hono, ff, tvx] = await Promise.all([honorairesFor(opId, currency), fraisFinanciersFor(opId, currency), travauxFor(opId, currency)]);
     return [
       { poste: 'honoraires', amount: hono },
       { poste: 'frais_financiers', amount: ff },
+      { poste: 'travaux', amount: tvx },
     ].filter((l) => !l.amount.isZero());
   };
 
