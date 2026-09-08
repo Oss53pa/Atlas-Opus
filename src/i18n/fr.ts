@@ -272,6 +272,7 @@ export const fr = {
   'site.add': 'Nouveau compte rendu',
   'site.empty': 'Aucun compte rendu. Consignez l’avancement du chantier.',
   'site.added': 'Compte rendu ajouté.',
+  'site.added.offline': 'Compte rendu saisi hors-ligne — en attente de synchronisation.',
   'site.removed': 'Compte rendu supprimé.',
   'site.kpi.count': 'Comptes rendus',
   'site.kpi.progress': 'Dernier avancement',
