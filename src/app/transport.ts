@@ -16,9 +16,10 @@ import type { TenureType } from '../domain/m2/foncier';
 import type { StakeholderType } from '../domain/m2/types';
 import type { RevisionTerm } from '../domain/f6/types';
 import type { GuaranteeType } from '../domain/m17/types';
+import type { ChangeOrigin } from '../domain/m14/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -134,6 +135,15 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M14 — demande de modification (change order) : créée « requested » (§4),
+// sans montant (l'impact est instruit en ligne). Payload JSON-safe.
+interface ChangeOrderCreatePayload {
+  operationId: string;
+  contractId: string;
+  origin: ChangeOrigin;
+  description: string;
 }
 
 // M17 — caution/garantie : montant `number` (JSON-safe, pas de Money) ;
@@ -264,6 +274,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M14 — demande de modification (créée « requested ») : rejouable tel quel.
+  // L'instruction d'impact et l'arbitrage (rôle-gardés) restent en ligne.
+  if (m.entity === 'changeOrders' && m.op === 'create') {
+    const p = m.payload as unknown as ChangeOrderCreatePayload;
+    await api.changeOrders.add(p.operationId, {
+      contractId: p.contractId, origin: p.origin, description: p.description,
+    });
     return { ok: true };
   }
   // M17 — caution/garantie (document, non écriture) : rejouable tel quel.

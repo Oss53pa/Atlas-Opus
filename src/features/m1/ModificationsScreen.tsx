@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { changeOriginLabel, changeStatusLabel, CHANGE_STATUS_TONE } from './labels';
 import { useData, useOperation, useChangeOrders, useContracts } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { Money, sumMoney } from '../../domain/money/Money';
@@ -15,14 +16,16 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function ModificationsScreen({ id }: { id: string }) {
   const { changeOrders, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
   const { data: contracts } = useContracts(id);
-  const { data: loaded, loading } = useChangeOrders(id);
+  const { data: loaded, loading, refetch } = useChangeOrders(id);
 
   const [rows, setRows] = useState<ChangeOrder[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -46,7 +49,30 @@ export function ModificationsScreen({ id }: { id: string }) {
   async function add() {
     const contractId = draft.contractId || contracts?.[0]?.id;
     if (!contractId || !draft.description.trim()) return;
-    const rec = await changeOrders.add(id, { contractId, origin: draft.origin, description: draft.description });
+    const input = { contractId, origin: draft.origin, description: draft.description };
+    // Offline-first (F3) : une demande de modification (M14) est créée « requested »
+    // (§4). L'instruction d'impact et l'arbitrage (rôle-gardés, §5) restent en ligne.
+    if (!online) {
+      const nowIso = new Date().toISOString();
+      capture({
+        id: crypto.randomUUID(), entity: 'changeOrders', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: nowIso, financial: false,
+      });
+      const optimistic: ChangeOrder = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id,
+        contractId, origin: draft.origin, description: draft.description,
+        impactCost: Money.zero(currency), impactDays: 0, impactQuality: null, impactAnalyzed: false,
+        status: 'requested', avenantRef: null, decidedBy: null, rejectionReason: null,
+        createdAt: nowIso, updatedAt: nowIso,
+      };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ contractId: '', origin: 'aleas', description: '' });
+      setAdding(false);
+      toast.push(t('change.added.offline'), 'info');
+      return;
+    }
+    const rec = await changeOrders.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ contractId: '', origin: 'aleas', description: '' });
     setAdding(false);
