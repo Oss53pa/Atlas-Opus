@@ -11,7 +11,7 @@ import type { DataApi } from './providers';
 import type { RfiPriority } from '../domain/rfi/types';
 import type { ReserveSeverity } from '../domain/m19/types';
 import type { DocDiscipline } from '../domain/ged/types';
-import type { SaleKind, ScheduleStage } from '../domain/m6/types';
+import type { SaleKind, ScheduleStage, ReceiptMethod } from '../domain/m6/types';
 import type { TenureType } from '../domain/m2/foncier';
 import type { StakeholderType } from '../domain/m2/types';
 import type { RevisionTerm } from '../domain/f6/types';
@@ -126,6 +126,15 @@ interface StakeholderCreatePayload {
   feeAmount?: number;
 }
 
+// M6 — encaissement : montant en unités majeures + devise (Money reconstruit).
+interface ReceiptCreatePayload {
+  saleId: string;
+  amountMajor: number;
+  currency: string;
+  method: ReceiptMethod;
+  reference?: string | null;
+}
+
 // M2 — la parcelle porte un prix `number` (déjà JSON-safe, pas de Money).
 interface LandParcelCreatePayload {
   operationId: string;
@@ -231,6 +240,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
       type: p.type, name: p.name, email: p.email ?? null, phone: p.phone ?? null,
       mission: p.mission ?? null, feeAmount: p.feeAmount ?? 0,
     });
+    return { ok: true };
+  }
+  // M6 — encaissement d'une vente (recette ; imputation « settled » en ligne).
+  if (m.entity === 'receipts' && m.op === 'create') {
+    const p = m.payload as unknown as ReceiptCreatePayload;
+    await api.commercialisation.addReceipt(p.saleId, { amount: Money.of(p.amountMajor, p.currency), method: p.method, reference: p.reference ?? null });
     return { ok: true };
   }
   // M5 — déblocage d'une tranche de financement (alimente les frais financiers).

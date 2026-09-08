@@ -173,6 +173,21 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.condition).toBe(0.3);
   });
 
+  it('receipts.create → reconstruit Money et appelle addReceipt', async () => {
+    const calls: { saleId: string; input: { amount: { toMajorNumber(): number }; method: string } }[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      commercialisation: { addReceipt: async (saleId: string, input: { amount: { toMajorNumber(): number }; method: string }) => { calls.push({ saleId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'receipts', op: 'create', payload: { saleId: 's1', amountMajor: 15_000_000, currency: 'XOF', method: 'virement', reference: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0].saleId).toBe('s1');
+    expect(calls[0].input.amount.toMajorNumber()).toBe(15_000_000);
+    expect(calls[0].input.method).toBe('virement');
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));

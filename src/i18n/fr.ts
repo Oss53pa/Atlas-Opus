@@ -1563,6 +1563,8 @@ export const fr = {
   'com.sales.add': 'Ajouter une vente',
   'com.sales.added': 'Vente ajoutée',
   'com.sales.added.offline': 'Vente saisie hors-ligne (brouillon) — en attente de synchronisation.',
+  'com.receipts.added.offline': 'Encaissement saisi hors-ligne — en attente de synchronisation.',
+  'com.receipts.offlineBlocked': 'Imputation indisponible hors-ligne — encaissement provisoire uniquement.',
   'com.sales.removed': 'Vente supprimée',
   'com.receipts': 'Encaissements',
   'com.receipt.add': 'Ajouter',
