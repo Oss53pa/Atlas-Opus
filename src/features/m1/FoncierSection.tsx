@@ -10,6 +10,7 @@ import {
   TITLE_STATUS_TONE,
 } from './labels';
 import { useData, useLandParcels, useTitles } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { t } from '../../i18n';
 import {
   TENURE_TYPES,
@@ -25,11 +26,14 @@ import {
 } from '../../domain/m2/foncier';
 
 export function FoncierSection({ operationId, currency, canEdit }: { operationId: string; currency: string; canEdit: boolean }) {
-  const { compliance } = useData();
+  const { compliance, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const toast = useToast();
-  const { data: loaded, loading } = useLandParcels(operationId);
+  const { data: loaded, loading, refetch } = useLandParcels(operationId);
   const [rows, setRows] = useState<LandParcel[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<{ reference: string; tenureType: TenureType; areaText: string; priceText: string; notary: string }>({
@@ -45,6 +49,24 @@ export function FoncierSection({ operationId, currency, canEdit }: { operationId
       price: Number(draft.priceText.replace(/[^\d]/g, '')) || 0,
       notary: draft.notary.trim() || null,
     };
+    // Offline-first (F3) : parcelle (montage juridique M2), créée en prospection.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'landParcels', op: 'create', entityId: null,
+        payload: { operationId, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: LandParcel = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId,
+        reference: input.reference, area: input.area, tenureType: input.tenureType, price: input.price,
+        acquisitionStatus: 'prospection', notary: input.notary ?? null, suspensiveConditions: input.suspensiveConditions ?? [],
+      };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ reference: '', tenureType: 'titre_foncier', areaText: '', priceText: '', notary: '' });
+      setAdding(false);
+      toast.push(t('foncier.added.offline'), 'info');
+      return;
+    }
     const rec = await compliance.addLandParcel(operationId, input);
     setRows((r) => [...r, rec]);
     setDraft({ reference: '', tenureType: 'titre_foncier', areaText: '', priceText: '', notary: '' });

@@ -1424,6 +1424,7 @@ export const fr = {
   'foncier.empty': 'Aucune parcelle enregistrée.',
   'foncier.add': 'Ajouter une parcelle',
   'foncier.added': 'Parcelle ajoutée',
+  'foncier.added.offline': 'Parcelle saisie hors-ligne — en attente de synchronisation.',
   'foncier.removed': 'Parcelle supprimée',
   'foncier.advance': 'Faire avancer',
   'foncier.conditions': 'Conditions suspensives',

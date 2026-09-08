@@ -12,9 +12,10 @@ import type { RfiPriority } from '../domain/rfi/types';
 import type { ReserveSeverity } from '../domain/m19/types';
 import type { DocDiscipline } from '../domain/ged/types';
 import type { SaleKind, ScheduleStage } from '../domain/m6/types';
+import type { TenureType } from '../domain/m2/foncier';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -91,6 +92,17 @@ interface SaleCreatePayload {
   schedule?: ScheduleStage[];
 }
 
+// M2 — la parcelle porte un prix `number` (déjà JSON-safe, pas de Money).
+interface LandParcelCreatePayload {
+  operationId: string;
+  reference: string;
+  area: number;
+  tenureType: TenureType;
+  price: number;
+  notary?: string | null;
+  suspensiveConditions?: string[];
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
@@ -157,6 +169,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     await api.commercialisation.addSale(p.operationId, {
       kind: p.kind, unitId: p.unitId ?? null, counterpart: p.counterpart,
       amount: Money.of(p.amountMajor, p.currency), schedule: p.schedule ?? [],
+    });
+    return { ok: true };
+  }
+  // M2 — parcelle foncière (montage juridique) créée en « prospection », rejouable.
+  if (m.entity === 'landParcels' && m.op === 'create') {
+    const p = m.payload as unknown as LandParcelCreatePayload;
+    await api.compliance.addLandParcel(p.operationId, {
+      reference: p.reference, area: p.area, tenureType: p.tenureType, price: p.price,
+      notary: p.notary ?? null, suspensiveConditions: p.suspensiveConditions ?? [],
     });
     return { ok: true };
   }
