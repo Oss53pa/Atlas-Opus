@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { rfiStatusLabel, rfiPriorityLabel, RFI_STATUS_TONE, RFI_PRIORITY_TONE } from './labels';
 import { useData, useOperation, useRfis } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatDate } from '../../lib/format';
@@ -14,6 +15,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function RfiScreen({ id }: { id: string }) {
   const { rfis, session } = useData();
+  const { online, capture } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
@@ -33,10 +35,25 @@ export function RfiScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.number.trim() || !draft.subject.trim()) return;
-    const rec = await rfis.add(id, {
+    const input = {
       number: draft.number, subject: draft.subject, question: draft.question, raisedBy: draft.raisedBy,
       priority: draft.priority, dueDate: draft.due || null, documentRef: draft.document || null,
-    });
+    };
+    // Offline-first (F3) : RFI non financière → capture admise hors-ligne (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'rfis', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Rfi = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'ouverte', answer: null };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ number: '', subject: '', question: '', raisedBy: '', priority: 'normale', due: '', document: '' });
+      setAdding(false);
+      toast.push(t('rfi.added.offline'), 'info');
+      return;
+    }
+    const rec = await rfis.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ number: '', subject: '', question: '', raisedBy: '', priority: 'normale', due: '', document: '' });
     setAdding(false);

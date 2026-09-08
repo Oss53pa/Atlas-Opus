@@ -40,6 +40,32 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { contractId: 'c1', number: 3, amountGross: 1_000_000, retentionRate: 0.05 } });
   });
 
+  it('rfis.create → appelle rfis.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      rfis: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'rfis', op: 'create', payload: { operationId: 'op-1', number: 'RFI-01', subject: 'S', question: 'Q', raisedBy: 'BET', priority: 'urgente', dueDate: null, documentRef: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { number: 'RFI-01', priority: 'urgente' } });
+  });
+
+  it('reserves.create → appelle reception.addReserve et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      reception: { addReserve: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'reserves', op: 'create', payload: { operationId: 'op-1', label: 'Fissure', location: 'R+2', severity: 'majeure', raisedAt: '2026-09-04' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'Fissure', severity: 'majeure' } });
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
