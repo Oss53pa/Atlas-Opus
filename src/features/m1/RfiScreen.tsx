@@ -15,14 +15,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function RfiScreen({ id }: { id: string }) {
   const { rfis, session } = useData();
-  const { online, capture } = useOffline();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useRfis(id);
+  const { data: loaded, loading, refetch } = useRfis(id);
 
   const [rows, setRows] = useState<Rfi[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
   const canEdit = can(session.role, 'op.update') && !readOnly;

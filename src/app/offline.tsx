@@ -24,6 +24,12 @@ interface OfflineApi {
   pendingCount: number;
   /** true si un transport de synchro est branché (bouton « Synchroniser »). */
   canSync: boolean;
+  /**
+   * Horodatage (ms) du dernier drainage ayant synchronisé ≥ 1 mutation. Signal
+   * de réconciliation : les écrans le surveillent pour se rafraîchir et
+   * remplacer leurs lignes optimistes « local-… » par les entités serveur.
+   */
+  syncedAt: number;
   /** Capture une mutation hors-ligne. Renvoie le verdict de recevabilité (§4). */
   capture(input: CaptureInput): { admitted: boolean; reason?: string };
   /** Vide la file via le transport (no-op si aucun transport ou hors-ligne). */
@@ -54,6 +60,7 @@ function loadQueue(): PendingMutation[] {
 export function OfflineProvider({ transport, children }: { transport?: OfflineTransport; children: ReactNode }) {
   const [online, setOnline] = useState<boolean>(readOnline);
   const [queue, setQueue] = useState<PendingMutation[]>(loadQueue);
+  const [syncedAt, setSyncedAt] = useState(0);
   const flushing = useRef(false);
 
   // Persistance : toute évolution de la file est sauvegardée localement.
@@ -91,6 +98,9 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
       const res = await drainQueue(current, transport);
       // Ne conserve que ce qui reste à faire (queued/conflict/rejected).
       setQueue(res.queue.filter((m) => m.status !== 'synced'));
+      // Réconciliation : signale aux écrans de se rafraîchir (lignes optimistes
+      // remplacées par les entités serveur) uniquement si quelque chose a été livré.
+      if (res.synced > 0) setSyncedAt(Date.now());
     } finally {
       flushing.current = false;
     }
@@ -109,11 +119,12 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
       queue,
       pendingCount,
       canSync: Boolean(transport),
+      syncedAt,
       capture,
       flush,
       admits: (input) => admitOffline(input).ok,
     };
-  }, [online, queue, transport, capture, flush]);
+  }, [online, queue, transport, syncedAt, capture, flush]);
 
   return <OfflineCtx.Provider value={value}>{children}</OfflineCtx.Provider>;
 }
