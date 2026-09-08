@@ -1271,6 +1271,8 @@ export const fr = {
   'payments.contract.added': 'Marché ajouté.',
   'payments.contract.removed': 'Marché supprimé.',
   'payments.decompte.added': 'Décompte créé.',
+  'payments.decompte.added.offline': 'Décompte saisi hors-ligne (brouillon) — en attente de synchronisation.',
+  'payments.decompte.offlineBlocked': 'Validation/mandatement indisponibles hors-ligne — écriture financière en brouillon uniquement.',
   'payments.decompte.advanced': 'Décompte : {status}.',
   'payments.readonly': 'Lecture seule.',
   'decompte.status.draft': 'Brouillon',

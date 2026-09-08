@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, ArrowRight, FileText } from 'lucide-react';
 import { Badge, Banner, Button, Card, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Skeleton, useToast } from '../../ui';
 import { decompteStatusLabel, DECOMPTE_TONE } from './labels';
 import { useContracts, useData, useDecomptes, useOperation } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatAmount, formatPercent } from '../../lib/format';
@@ -14,6 +15,7 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function PaymentsScreen({ id }: { id: string }) {
   const { payments, session } = useData();
+  const { online, capture } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
@@ -61,6 +63,27 @@ export function PaymentsScreen({ id }: { id: string }) {
     const gross = Number(dDraft.gross.replace(/[^\d]/g, '')) || 0;
     const rate = (Number(dDraft.retentionPct.replace(/[^\d.,]/g, '').replace(',', '.')) || 0) / 100;
     const number = Math.max(0, ...decomptes.filter((d) => d.contractId === contractId).map((d) => d.number)) + 1;
+    // Offline-first (F3) : un décompte capturé hors-ligne reste un BROUILLON —
+    // écriture financière admise en brouillon uniquement (invariant §4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'decomptes', op: 'create', entityId: null,
+        payload: { operationId: id, contractId, number, amountGross: gross, retentionRate: rate },
+        baseVersion: null, createdAt: new Date().toISOString(), financial: true,
+      });
+      const currency = op?.currency ?? 'XOF';
+      const net = decompteNet(Money.of(gross, currency), rate).net.toMajorNumber();
+      const now = new Date().toISOString();
+      const optimistic: Decompte = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, contractId, number,
+        amountGross: gross, retentionRate: rate, amountNet: net, status: 'draft', createdAt: now, updatedAt: now,
+      };
+      setDecomptes((ds) => [...ds, optimistic]);
+      setDecFor(null);
+      setDDraft({ gross: '', retentionPct: '5' });
+      toast.push(t('payments.decompte.added.offline'), 'info');
+      return;
+    }
     const d = await payments.addDecompte(id, { contractId, number, amountGross: gross, retentionRate: rate });
     setDecomptes((ds) => [...ds, d]);
     setDecFor(null);
@@ -70,6 +93,12 @@ export function PaymentsScreen({ id }: { id: string }) {
   async function advance(d: Decompte) {
     const next = nextDecompteStatus(d.status);
     if (!next) return;
+    // §4 — validation/mandatement/paiement sont des écritures sensibles (Edge
+    // Functions gardées) : indisponibles hors-ligne.
+    if (!online) {
+      toast.push(t('payments.decompte.offlineBlocked'), 'danger');
+      return;
+    }
     const updated = await payments.setDecompteStatus(d.id, next);
     setDecomptes((ds) => ds.map((x) => (x.id === d.id ? updated : x)));
     toast.push(t('payments.decompte.advanced', { status: decompteStatusLabel(next) }), 'success');

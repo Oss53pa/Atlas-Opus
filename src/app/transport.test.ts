@@ -27,7 +27,20 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { author: 'Koffi', progress: 0.62, blockers: 0 } });
   });
 
-  it('entité/op non gérée → échec définitif (rejected)', async () => {
+  it('decomptes.create → appelle addDecompte (brouillon) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      payments: { addDecompte: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'decomptes', op: 'create', payload: { operationId: 'op-1', contractId: 'c1', number: 3, amountGross: 1_000_000, retentionRate: 0.05 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { contractId: 'c1', number: 3, amountGross: 1_000_000, retentionRate: 0.05 } });
+  });
+
+  it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
     expect(res).toEqual({ ok: false, retriable: false, error: 'unsupported:decomptes.setStatus' });
