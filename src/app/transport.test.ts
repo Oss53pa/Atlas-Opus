@@ -1,0 +1,41 @@
+import { describe, it, expect } from 'vitest';
+import { createRepoTransport } from './transport';
+import type { PendingMutation } from '../domain/f3';
+import type { SiteReport, SiteReportInput } from '../domain/m13/types';
+
+const mutation = (over: Partial<PendingMutation> = {}): PendingMutation => ({
+  id: 'm1', entity: 'siteReports', op: 'create', entityId: null,
+  payload: { operationId: 'op-1', date: '2026-09-04', author: 'Koffi', progress: 0.62, summary: 'RAS', blockers: 0 },
+  baseVersion: null, createdAt: '2026-09-04T10:00:00.000Z', financial: false, status: 'queued', attempts: 0, lastError: null,
+  ...over,
+});
+
+describe('createRepoTransport — rejeu concret', () => {
+  it('siteReports.create → appelle add avec le payload et renvoie ok', async () => {
+    const calls: { opId: string; input: SiteReportInput }[] = [];
+    const api = {
+      siteReports: {
+        add: async (opId: string, input: SiteReportInput): Promise<SiteReport> => {
+          calls.push({ opId, input });
+          return { id: 's1', tenantId: 't', operationId: opId, number: 1, ...input };
+        },
+      },
+    };
+    const res = await createRepoTransport(api)(mutation());
+    expect(res).toEqual({ ok: true });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { author: 'Koffi', progress: 0.62, blockers: 0 } });
+  });
+
+  it('entité/op non gérée → échec définitif (rejected)', async () => {
+    const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
+    const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
+    expect(res).toEqual({ ok: false, retriable: false, error: 'unsupported:decomptes.setStatus' });
+  });
+
+  it('erreur d’exécution → retriable', async () => {
+    const api = { siteReports: { add: async () => { throw new Error('network down'); } } };
+    const res = await createRepoTransport(api)(mutation());
+    expect(res).toEqual({ ok: false, retriable: true, error: 'network down' });
+  });
+});
