@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('guarantees.create → appelle guarantees.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      guarantees: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'guarantees', op: 'create', payload: { operationId: 'op-1', type: 'restitution_avance', issuer: 'Ecobank', amount: 25_000_000, validFrom: '2026-09-04', validUntil: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { type: 'restitution_avance', issuer: 'Ecobank', amount: 25_000_000, validUntil: null } });
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
