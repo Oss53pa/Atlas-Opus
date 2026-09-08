@@ -10,6 +10,8 @@ import {
   admitOffline, deserializeQueue, drainQueue, enqueue as enqueueMutation, serializeQueue,
   type OfflineTransport, type PendingMutation,
 } from '../domain/f3';
+import { useData } from './providers';
+import { createRepoTransport } from './transport';
 
 const STORAGE_KEY = 'ao.offline.queue';
 
@@ -114,4 +116,15 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
   }, [online, queue, transport, capture, flush]);
 
   return <OfflineCtx.Provider value={value}>{children}</OfflineCtx.Provider>;
+}
+
+/**
+ * Branche le transport concret (repos courants, mock ou Supabase) sur le
+ * provider. À placer sous DataProvider — ferme la boucle offline : les mutations
+ * capturées sont rejouées via les repos au retour du réseau.
+ */
+export function OfflineBridge({ children }: { children: ReactNode }) {
+  const api = useData();
+  const transport = useMemo(() => createRepoTransport(api), [api]);
+  return <OfflineProvider transport={transport}>{children}</OfflineProvider>;
 }
