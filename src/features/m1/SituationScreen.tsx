@@ -7,6 +7,7 @@ import { t, locale } from '../../i18n';
 import { formatPercent } from '../../lib/format';
 import { Money } from '../../domain/money/Money';
 import { nextDecompteStatus } from '../../domain/payments/decompte';
+import { computePayment, fiscalContext } from '../../domain/f6';
 import { can } from '../../domain/m1/permissions';
 import { isReadOnlyForRole } from '../../domain/m1/rules';
 
@@ -25,8 +26,12 @@ export function SituationScreen({ id, did }: { id: string; did: string }) {
   if (!d) return <Banner tone="danger" icon={<AlertTriangle size={16} />} action={<Button size="sm" variant="glass" onClick={() => navigate({ name: 'payments', id })}>{t('common.back')}</Button>}>{t('situation.notFound')}</Banner>;
 
   const contract = contracts?.find((c) => c.id === d.contractId);
-  const retention = d.amountGross - d.amountNet;
   const next = nextDecompteStatus(d.status);
+
+  // Fiscalité F6 : TVA + retenues (source + garantie) selon le pays de l'opération.
+  // La retenue à la source suit la nature « travaux » d'une situation de travaux.
+  const ctx = fiscalContext(op?.countryCode ?? '', 'travaux', d.retentionRate);
+  const pay = computePayment({ brut: Money.of(d.amountGross, currency), vatRate: ctx.vatRate, whtRate: ctx.whtRate, retentionRate: d.retentionRate });
 
   async function advance() {
     if (!d || !next) return;
@@ -35,9 +40,11 @@ export function SituationScreen({ id, did }: { id: string; did: string }) {
   }
 
   const facts: Fact[] = [
-    { label: t('payments.field.gross'), value: <MoneyView amount={d.amountGross} currency={currency} /> },
-    { label: t('situation.retention'), value: <span className="mono">− {Money.of(retention, currency).format(locale)}</span>, sub: t('situation.retentionRate', { pct: formatPercent(d.retentionRate, locale, 0) }) },
-    { label: t('payments.col.net'), value: <MoneyView amount={d.amountNet} currency={currency} />, severity: 'accent' },
+    { label: t('situation.baseHT'), value: <MoneyView amount={pay.baseHT.toMajorNumber()} currency={currency} /> },
+    { label: t('situation.tva'), value: <span className="mono">+ {pay.tva.format(locale)}</span>, sub: t('situation.retentionRate', { pct: formatPercent(ctx.vatRate, locale, 2) }) },
+    { label: t('situation.retenueSource'), value: <span className="mono">− {pay.retenueSource.format(locale)}</span>, sub: t('situation.retentionRate', { pct: formatPercent(ctx.whtRate, locale, 2) }) },
+    { label: t('situation.retention'), value: <span className="mono">− {pay.retenueGarantie.format(locale)}</span>, sub: t('situation.retentionRate', { pct: formatPercent(d.retentionRate, locale, 0) }) },
+    { label: t('situation.netAPayer'), value: <MoneyView amount={pay.netAPayer.toMajorNumber()} currency={currency} />, severity: 'accent' },
   ];
 
   return (
@@ -55,9 +62,9 @@ export function SituationScreen({ id, did }: { id: string; did: string }) {
 
       <KpiRow
         items={[
-          { label: t('payments.field.gross'), value: <MoneyView amount={d.amountGross} currency={currency} /> },
-          { label: t('situation.retention'), value: Money.of(retention, currency).format(locale), accent: retention > 0 },
-          { label: t('payments.col.net'), value: <MoneyView amount={d.amountNet} currency={currency} /> },
+          { label: t('situation.baseHT'), value: <MoneyView amount={pay.baseHT.toMajorNumber()} currency={currency} /> },
+          { label: t('situation.tva'), value: pay.tva.format(locale) },
+          { label: t('situation.netAPayer'), value: <MoneyView amount={pay.netAPayer.toMajorNumber()} currency={currency} />, accent: true },
         ]}
       />
 
