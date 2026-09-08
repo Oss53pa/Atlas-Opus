@@ -10,8 +10,9 @@ import type { OfflineTransport, PendingMutation, SettleResult } from '../domain/
 import type { DataApi } from './providers';
 import type { RfiPriority } from '../domain/rfi/types';
 import type { ReserveSeverity } from '../domain/m19/types';
+import type { DocDiscipline } from '../domain/ged/types';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -59,6 +60,14 @@ interface PurchaseOrderCreatePayload {
   amount: number;
 }
 
+interface DocumentCreatePayload {
+  operationId: string;
+  reference: string;
+  title: string;
+  discipline: DocDiscipline;
+  indice: string;
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
@@ -100,6 +109,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     const p = m.payload as unknown as PurchaseOrderCreatePayload;
     await api.purchasing.add(p.operationId, {
       reference: p.reference, supplier: p.supplier, item: p.item, quantity: p.quantity, unit: p.unit, amount: p.amount,
+    });
+    return { ok: true };
+  }
+  // M10 — document GED (non financier) : rejouable tel quel.
+  if (m.entity === 'documents' && m.op === 'create') {
+    const p = m.payload as unknown as DocumentCreatePayload;
+    await api.documents.add(p.operationId, {
+      reference: p.reference, title: p.title, discipline: p.discipline, indice: p.indice,
     });
     return { ok: true };
   }

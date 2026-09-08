@@ -338,6 +338,7 @@ export const fr = {
   'doc.add': 'Ajouter un document',
   'doc.empty': 'Aucun document. Diffusez les plans pour visa.',
   'doc.added': 'Document ajouté.',
+  'doc.added.offline': 'Document saisi hors-ligne — en attente de synchronisation.',
   'doc.removed': 'Document supprimé.',
   'doc.action.diffuse': 'Diffuser',
   'doc.action.vise_a': 'Viser A',
