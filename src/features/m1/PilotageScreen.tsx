@@ -14,14 +14,16 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function PilotageScreen({ id }: { id: string }) {
   const { siteReports, session } = useData();
-  const { online, capture } = useOffline();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useSiteReports(id);
+  const { data: loaded, loading, refetch } = useSiteReports(id);
 
   const [rows, setRows] = useState<SiteReport[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
   const canEdit = can(session.role, 'planning.edit') && !readOnly;

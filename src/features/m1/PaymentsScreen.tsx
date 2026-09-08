@@ -15,12 +15,12 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function PaymentsScreen({ id }: { id: string }) {
   const { payments, session } = useData();
-  const { online, capture } = useOffline();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
   const { data: loadedContracts, loading: lc } = useContracts(id);
-  const { data: loadedDecomptes, loading: ld } = useDecomptes(id);
+  const { data: loadedDecomptes, loading: ld, refetch: refetchDecomptes } = useDecomptes(id);
 
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [decomptes, setDecomptes] = useState<Decompte[]>([]);
@@ -31,6 +31,8 @@ export function PaymentsScreen({ id }: { id: string }) {
 
   useEffect(() => { if (loadedContracts) setContracts(loadedContracts); }, [loadedContracts]);
   useEffect(() => { if (loadedDecomptes) setDecomptes(loadedDecomptes); }, [loadedDecomptes]);
+  // Réconciliation post-synchro : recharge les décomptes serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) refetchDecomptes(); }, [syncedAt, refetchDecomptes]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
