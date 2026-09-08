@@ -11,8 +11,10 @@ import type { DataApi } from './providers';
 import type { RfiPriority } from '../domain/rfi/types';
 import type { ReserveSeverity } from '../domain/m19/types';
 import type { DocDiscipline } from '../domain/ged/types';
+import type { SaleKind, ScheduleStage } from '../domain/m6/types';
+import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -68,6 +70,27 @@ interface DocumentCreatePayload {
   indice: string;
 }
 
+// M6 — les montants transitent en unités majeures + devise (JSON-safe : Money
+// utilise des centimes bigint, non sérialisables) ; le transport reconstruit Money.
+interface UnitCreatePayload {
+  operationId: string;
+  lotId?: string | null;
+  typology: string;
+  area: number;
+  priceMajor: number;
+  currency: string;
+}
+
+interface SaleCreatePayload {
+  operationId: string;
+  kind: SaleKind;
+  unitId?: string | null;
+  counterpart: string;
+  amountMajor: number;
+  currency: string;
+  schedule?: ScheduleStage[];
+}
+
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
@@ -117,6 +140,23 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     const p = m.payload as unknown as DocumentCreatePayload;
     await api.documents.add(p.operationId, {
       reference: p.reference, title: p.title, discipline: p.discipline, indice: p.indice,
+    });
+    return { ok: true };
+  }
+  // M6 — unité (inventaire physique, non financier).
+  if (m.entity === 'units' && m.op === 'create') {
+    const p = m.payload as unknown as UnitCreatePayload;
+    await api.commercialisation.addUnit(p.operationId, {
+      lotId: p.lotId ?? null, typology: p.typology, area: p.area, price: Money.of(p.priceMajor, p.currency),
+    });
+    return { ok: true };
+  }
+  // M6 — vente/bail capturée hors-ligne = brouillon (§4) ; création rejouable.
+  if (m.entity === 'sales' && m.op === 'create') {
+    const p = m.payload as unknown as SaleCreatePayload;
+    await api.commercialisation.addSale(p.operationId, {
+      kind: p.kind, unitId: p.unitId ?? null, counterpart: p.counterpart,
+      amount: Money.of(p.amountMajor, p.currency), schedule: p.schedule ?? [],
     });
     return { ok: true };
   }

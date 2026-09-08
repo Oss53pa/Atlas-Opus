@@ -11,6 +11,7 @@ import {
   RECEIPT_STATUS_TONE,
 } from './labels';
 import { useData, useOperation, useUnits, useSales, useReceipts } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t } from '../../i18n';
 import { Money } from '../../domain/money/Money';
@@ -33,6 +34,7 @@ import {
 
 export function CommercialisationScreen({ id }: { id: string }) {
   const { commercialisation, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
@@ -43,6 +45,8 @@ export function CommercialisationScreen({ id }: { id: string }) {
   const [sales, setSales] = useState<Sale[]>([]);
   useEffect(() => { if (unitsQ.data) setUnits(unitsQ.data); }, [unitsQ.data]);
   useEffect(() => { if (salesQ.data) setSales(salesQ.data); }, [salesQ.data]);
+  // Réconciliation post-synchro : recharge les entités serveur (remplace l'optimiste).
+  useEffect(() => { if (syncedAt) { unitsQ.refetch(); salesQ.refetch(); } }, [syncedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -57,11 +61,24 @@ export function CommercialisationScreen({ id }: { id: string }) {
   const [unitDraft, setUnitDraft] = useState({ typology: '', areaText: '', priceText: '' });
   async function addUnit() {
     if (!unitDraft.typology.trim()) return;
-    const rec = await commercialisation.addUnit(id, {
-      typology: unitDraft.typology.trim(),
-      area: Number(unitDraft.areaText.replace(/[^\d]/g, '')) || 0,
-      price: Money.of(Number(unitDraft.priceText.replace(/[^\d]/g, '')) || 0, currency),
-    });
+    const typology = unitDraft.typology.trim();
+    const area = Number(unitDraft.areaText.replace(/[^\d]/g, '')) || 0;
+    const priceMajor = Number(unitDraft.priceText.replace(/[^\d]/g, '')) || 0;
+    // Offline-first (F3) : unité (inventaire physique), non financière.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'units', op: 'create', entityId: null,
+        payload: { operationId: id, typology, area, priceMajor, currency }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Unit = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, lotId: null, typology, area, price: Money.of(priceMajor, currency), status: 'disponible' };
+      setUnits((u) => [...u, optimistic]);
+      setUnitDraft({ typology: '', areaText: '', priceText: '' });
+      setAddingUnit(false);
+      toast.push(t('com.units.added.offline'), 'info');
+      return;
+    }
+    const rec = await commercialisation.addUnit(id, { typology, area, price: Money.of(priceMajor, currency) });
     setUnits((u) => [...u, rec]);
     setUnitDraft({ typology: '', areaText: '', priceText: '' });
     setAddingUnit(false);
@@ -90,11 +107,29 @@ export function CommercialisationScreen({ id }: { id: string }) {
   });
   async function addSale() {
     if (!saleDraft.counterpart.trim()) return;
+    const counterpart = saleDraft.counterpart.trim();
+    const unitId = saleDraft.unitId || null;
+    const amountMajor = Number(saleDraft.amountText.replace(/[^\d]/g, '')) || 0;
+    // Offline-first (F3) : une vente/bail capturée hors-ligne reste un BROUILLON —
+    // engagement de recette = écriture financière, admise en brouillon (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'sales', op: 'create', entityId: null,
+        payload: { operationId: id, kind: saleDraft.kind, unitId, counterpart, amountMajor, currency, schedule: [] },
+        baseVersion: null, createdAt: new Date().toISOString(), financial: true,
+      });
+      const optimistic: Sale = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, kind: saleDraft.kind, unitId, counterpart, amount: Money.of(amountMajor, currency), schedule: [], status: 'draft' };
+      setSales((s) => [...s, optimistic]);
+      setSaleDraft({ kind: 'reservation', unitId: '', counterpart: '', amountText: '' });
+      setAddingSale(false);
+      toast.push(t('com.sales.added.offline'), 'info');
+      return;
+    }
     const rec = await commercialisation.addSale(id, {
       kind: saleDraft.kind,
-      unitId: saleDraft.unitId || null,
-      counterpart: saleDraft.counterpart.trim(),
-      amount: Money.of(Number(saleDraft.amountText.replace(/[^\d]/g, '')) || 0, currency),
+      unitId,
+      counterpart,
+      amount: Money.of(amountMajor, currency),
     });
     setSales((s) => [...s, rec]);
     setSaleDraft({ kind: 'reservation', unitId: '', counterpart: '', amountText: '' });

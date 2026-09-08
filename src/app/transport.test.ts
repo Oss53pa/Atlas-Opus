@@ -92,6 +92,33 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { reference: 'ARC-101', indice: 'B' } });
   });
 
+  it('units.create → reconstruit Money et appelle addUnit', async () => {
+    const calls: { opId: string; input: { price: { toMajorNumber(): number } } }[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      commercialisation: { addUnit: async (opId: string, input: { price: { toMajorNumber(): number } }) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'units', op: 'create', payload: { operationId: 'op-1', typology: 'T3', area: 78, priceMajor: 45_000_000, currency: 'XOF' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0].input.price.toMajorNumber()).toBe(45_000_000); // Money reconstruit
+  });
+
+  it('sales.create → reconstruit Money (brouillon) et appelle addSale', async () => {
+    const calls: { input: { amount: { toMajorNumber(): number }; counterpart: string } }[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      commercialisation: { addSale: async (_opId: string, input: { amount: { toMajorNumber(): number }; counterpart: string }) => { calls.push({ input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'sales', op: 'create', payload: { operationId: 'op-1', kind: 'reservation', unitId: null, counterpart: 'M. Koné', amountMajor: 30_000_000, currency: 'XOF', schedule: [] } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0].input.amount.toMajorNumber()).toBe(30_000_000);
+    expect(calls[0].input.counterpart).toBe('M. Koné');
+  });
+
   it('entité/op non gérée (transition sensible) → échec définitif (rejected)', async () => {
     const api = { siteReports: { add: async () => { throw new Error('should not be called'); } } };
     const res = await createRepoTransport(api as never)(mutation({ entity: 'decomptes', op: 'setStatus' }));
