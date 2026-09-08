@@ -77,6 +77,7 @@ import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/t
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
+import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
 export interface Session {
   userId: string;
@@ -315,6 +316,12 @@ export interface AuditRepo {
 }
 
 /** Cautions & garanties (M17) : garanties bancaires. */
+/** Révisions de prix des marchés (M8, v4.1). */
+export interface RevisionsRepo {
+  list(operationId: string): Promise<PriceRevision[]>;
+  add(operationId: string, input: PriceRevisionInput): Promise<PriceRevision>;
+}
+
 export interface GuaranteesRepo {
   list(operationId: string): Promise<Guarantee[]>;
   add(operationId: string, input: GuaranteeInput): Promise<Guarantee>;

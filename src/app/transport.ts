@@ -13,9 +13,10 @@ import type { ReserveSeverity } from '../domain/m19/types';
 import type { DocDiscipline } from '../domain/ged/types';
 import type { SaleKind, ScheduleStage } from '../domain/m6/types';
 import type { TenureType } from '../domain/m2/foncier';
+import type { RevisionTerm } from '../domain/f6/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -90,6 +91,18 @@ interface SaleCreatePayload {
   amountMajor: number;
   currency: string;
   schedule?: ScheduleStage[];
+}
+
+// M8 — révision de prix : montants en unités majeures (JSON-safe), coefficient
+// et montant révisé déjà calculés côté TS (F6 / Money.ts).
+interface PriceRevisionCreatePayload {
+  operationId: string;
+  contractId: string;
+  baseAmount: number;
+  a0: number;
+  terms: RevisionTerm[];
+  coefficient: number;
+  revisedAmount: number;
 }
 
 // M2 — la parcelle porte un prix `number` (déjà JSON-safe, pas de Money).
@@ -178,6 +191,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     await api.compliance.addLandParcel(p.operationId, {
       reference: p.reference, area: p.area, tenureType: p.tenureType, price: p.price,
       notary: p.notary ?? null, suspensiveConditions: p.suspensiveConditions ?? [],
+    });
+    return { ok: true };
+  }
+  // M8 — révision de prix (v4.1). Coefficient/montant révisé calculés en TS (F6).
+  if (m.entity === 'priceRevisions' && m.op === 'create') {
+    const p = m.payload as unknown as PriceRevisionCreatePayload;
+    await api.revisions.add(p.operationId, {
+      contractId: p.contractId, baseAmount: p.baseAmount, a0: p.a0, terms: p.terms,
+      coefficient: p.coefficient, revisedAmount: p.revisedAmount,
     });
     return { ok: true };
   }
