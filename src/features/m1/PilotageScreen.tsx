@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Panel, Progress, Skeleton, useToast, type TableRowData } from '../../ui';
 import { useData, useOperation, useSiteReports } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
@@ -13,6 +14,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function PilotageScreen({ id }: { id: string }) {
   const { siteReports, session } = useData();
+  const { online, capture } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
@@ -29,11 +31,28 @@ export function PilotageScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.author.trim()) return;
-    const rec = await siteReports.add(id, {
+    const input = {
       date: draft.date || today(), author: draft.author,
       progress: Math.min(100, Number(draft.progress.replace(/[^\d]/g, '')) || 0) / 100,
       summary: draft.summary, blockers: Number(draft.blockers.replace(/[^\d]/g, '')) || 0,
-    });
+    };
+    // Offline-first (F3) : saisie terrain hors-ligne journalisée puis rejouée.
+    // Un compte rendu n'est pas une écriture financière → capture admise (§4).
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'siteReports', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const nextNumber = rows.reduce((m, r) => Math.max(m, r.number), 0) + 1;
+      const optimistic: SiteReport = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, number: nextNumber, ...input };
+      setRows((r) => [optimistic, ...r]);
+      setDraft({ date: today(), author: '', progress: '', summary: '', blockers: '0' });
+      setAdding(false);
+      toast.push(t('site.added.offline'), 'info');
+      return;
+    }
+    const rec = await siteReports.add(id, input);
     setRows((r) => [rec, ...r]);
     setDraft({ date: today(), author: '', progress: '', summary: '', blockers: '0' });
     setAdding(false);
