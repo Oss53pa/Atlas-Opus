@@ -57,7 +57,9 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo } from '../repo';
+import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
+import type { RevisionTerm } from '../../domain/f6/types';
 import type { Study, StudyInput, StudyStatus, StudyKind } from '../../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../../domain/m10/types';
@@ -1813,6 +1815,39 @@ export function createSupabaseGovernanceRepo(client: SupabaseClient, session: Se
         }).select('*').single(),
       ) as DecisionRow;
       return toDecision(row);
+    },
+  };
+}
+
+// ── Révisions de prix (M8, v4.1) ─────────────────────────────────────────────
+interface PriceRevisionRow {
+  id: string; tenant_id: string; operation_id: string; contract_id: string;
+  base_amount: number | string; a0: number | string; terms: RevisionTerm[] | null;
+  coefficient: number | string; revised_amount: number | string; created_at: string;
+}
+function toRevision(r: PriceRevisionRow): PriceRevision {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, contractId: r.contract_id,
+    baseAmount: Number(r.base_amount), a0: Number(r.a0), terms: r.terms ?? [],
+    coefficient: Number(r.coefficient), revisedAmount: Number(r.revised_amount), at: r.created_at,
+  };
+}
+export function createSupabaseRevisionsRepo(client: SupabaseClient, session: Session): RevisionsRepo {
+  const T = 'ao_price_revisions';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(T).select('*').eq('operation_id', opId).order('created_at', { ascending: false })) as PriceRevisionRow[];
+      return rows.map(toRevision);
+    },
+    async add(opId, input: PriceRevisionInput) {
+      const row = unwrap(
+        await client.from(T).insert({
+          tenant_id: session.tenantId, operation_id: opId, contract_id: input.contractId,
+          base_amount: input.baseAmount, a0: input.a0, terms: input.terms,
+          coefficient: input.coefficient, revised_amount: input.revisedAmount,
+        }).select('*').single(),
+      ) as PriceRevisionRow;
+      return toRevision(row);
     },
   };
 }

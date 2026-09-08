@@ -42,6 +42,7 @@ import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
 import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
+import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
 import type { AuditEntry, AuditInput } from '../domain/m23/types';
@@ -94,6 +95,7 @@ import type {
   OffersRepo,
   PurchasingRepo,
   ReceptionRepo,
+  RevisionsRepo,
   GuaranteesRepo,
   RisksRepo,
   AuditRepo,
@@ -159,6 +161,7 @@ export interface MockDb {
   members: Member[];
   notifications: NotificationItem[];
   approvals: ApprovalTask[];
+  priceRevisions: PriceRevision[];
 }
 
 interface Deps {
@@ -572,7 +575,9 @@ export function createMockDb(): MockDb {
     { id: 'ap-6', tenantId: T, module: 'M13', object: 'Situation — VRD lot 05', detail: 'en attente de visa MOE', amount: 61_500_000, status: 'visa_moe', requiredRole: 'amo', forMe: false, createdAt: '2026-09-03T09:00:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals };
+  const priceRevisions: PriceRevision[] = [];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1641,6 +1646,27 @@ export function createReceptionRepo(db: MockDb, session: Session, deps: Deps): R
     async removeReserve(rid) {
       const i = db.reserves.findIndex((x) => x.id === rid && x.tenantId === session.tenantId);
       if (i >= 0) db.reserves.splice(i, 1);
+    },
+  };
+}
+
+export function createRevisionsRepo(db: MockDb, session: Session, deps: Deps): RevisionsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const now = deps.now ?? (() => new Date().toISOString());
+  return {
+    async list(opId) {
+      return db.priceRevisions
+        .filter((r) => r.operationId === opId && r.tenantId === session.tenantId)
+        .map((r) => ({ ...r }));
+    },
+    async add(opId, input: PriceRevisionInput) {
+      const r: PriceRevision = {
+        id: id(), tenantId: session.tenantId, operationId: opId, contractId: input.contractId,
+        baseAmount: input.baseAmount, a0: input.a0, terms: input.terms,
+        coefficient: input.coefficient, revisedAmount: input.revisedAmount, at: now(),
+      };
+      db.priceRevisions.push(r);
+      return { ...r };
     },
   };
 }
