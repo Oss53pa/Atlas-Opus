@@ -21,7 +21,7 @@ import type { RiskCategory } from '../domain/m20/types';
 import type { UtilityType } from '../domain/m18/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -137,6 +137,18 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M12 — tâche de planning (jalon/ligne de temps, non écriture) : payload
+// JSON-safe (dates ISO, progression 0..1, drapeaux booléens).
+interface TaskCreatePayload {
+  operationId: string;
+  name: string;
+  startDate?: string | null;
+  endDate?: string | null;
+  isMilestone?: boolean;
+  isCritical?: boolean;
+  progress?: number;
 }
 
 // M18 — demande de raccordement concessionnaire : créée « demande », suivi
@@ -299,6 +311,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M12 — tâche de planning (jalon/ligne de temps, non écriture) : rejouable.
+  if (m.entity === 'tasks' && m.op === 'create') {
+    const p = m.payload as unknown as TaskCreatePayload;
+    await api.planning.add(p.operationId, {
+      name: p.name, startDate: p.startDate ?? null, endDate: p.endDate ?? null,
+      isMilestone: p.isMilestone ?? false, isCritical: p.isCritical ?? false, progress: p.progress ?? 0,
+    });
     return { ok: true };
   }
   // M18 — demande de raccordement (créée « demande ») : rejouable tel quel.

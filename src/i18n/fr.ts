@@ -1357,6 +1357,7 @@ export const fr = {
   'planning.badge.milestone': 'Jalon',
   'planning.badge.critical': 'Critique',
   'planning.added': 'Tâche ajoutée.',
+  'planning.added.offline': 'Tâche saisie hors-ligne — en attente de synchronisation.',
   'planning.removed': 'Tâche supprimée.',
   'planning.readonly': 'Lecture seule.',
   'planning.noDates': 'Renseignez des dates pour afficher la frise.',
