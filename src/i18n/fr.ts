@@ -215,6 +215,7 @@ export const fr = {
   'risk.add': 'Ajouter un risque',
   'risk.empty': 'Aucun risque. Identifiez les risques techniques, financiers, juridiques, délais…',
   'risk.added': 'Risque ajouté.',
+  'risk.added.offline': 'Risque saisi hors-ligne — en attente de synchronisation.',
   'risk.removed': 'Risque supprimé.',
   'risk.action.maitrise': 'Marquer maîtrisé',
   'risk.action.clos': 'Clore',

@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { riskCategoryLabel, riskStatusLabel, riskLevelLabel, RISK_STATUS_TONE, RISK_LEVEL_TONE } from './labels';
 import { useData, useOperation, useRisks } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t } from '../../i18n';
 import {
@@ -14,13 +15,15 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function RisquesScreen({ id }: { id: string }) {
   const { risks, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useRisks(id);
+  const { data: loaded, loading, refetch } = useRisks(id);
 
   const [rows, setRows] = useState<Risk[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
   const canEdit = can(session.role, 'op.update') && !readOnly;
@@ -33,10 +36,26 @@ export function RisquesScreen({ id }: { id: string }) {
   async function add() {
     if (!draft.code.trim() || !draft.label.trim()) return;
     const clamp = (v: string) => Math.min(5, Math.max(1, Number(v.replace(/[^\d]/g, '')) || 1));
-    const rec = await risks.add(id, {
+    const input = {
       code: draft.code, label: draft.label, category: draft.category,
       probability: clamp(draft.p), impact: clamp(draft.i), mitigation: draft.mitigation || null,
-    });
+    };
+    // Offline-first (F3) : un risque terrain (M20, dont HSSE) est un enregistrement
+    // de registre (non écriture) — capture admise hors-ligne, créé « ouvert ».
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'risks', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Risk = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'ouvert' };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ code: '', label: '', category: 'technique', p: '3', i: '3', mitigation: '' });
+      setAdding(false);
+      toast.push(t('risk.added.offline'), 'info');
+      return;
+    }
+    const rec = await risks.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ code: '', label: '', category: 'technique', p: '3', i: '3', mitigation: '' });
     setAdding(false);
