@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, Plus, Trash2, Diamond, Flag } from 'lucide-react';
 import { Badge, Banner, Button, Card, EmptyState, Field, Skeleton, StatCard, useToast } from '../../ui';
 import { useData, useOperation, useTasks } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
@@ -14,10 +15,11 @@ const emptyDraft: TaskInput = { name: '', startDate: '', endDate: '', isMileston
 
 export function PlanningScreen({ id }: { id: string }) {
   const { planning, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useTasks(id);
+  const { data: loaded, loading, refetch } = useTasks(id);
 
   const [rows, setRows] = useState<Task[]>([]);
   const [adding, setAdding] = useState(false);
@@ -25,6 +27,7 @@ export function PlanningScreen({ id }: { id: string }) {
   const [progressText, setProgressText] = useState('0');
 
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
   const canEdit = can(session.role, 'planning.edit') && !readOnly;
@@ -37,13 +40,36 @@ export function PlanningScreen({ id }: { id: string }) {
 
   async function submit() {
     if (!draft.name.trim()) return;
-    const tk = await planning.add(id, {
+    const input: TaskInput = {
       ...draft,
       name: draft.name.trim(),
       startDate: draft.startDate || null,
       endDate: draft.endDate || null,
       progress: (Number(progressText.replace(/[^\d]/g, '')) || 0) / 100,
-    });
+    };
+    // Offline-first (F3) : une tâche de planning (M12) est un jalon/ligne de
+    // temps (non écriture) — capture admise hors-ligne, rejouée telle quelle.
+    if (!online) {
+      const nowIso = new Date().toISOString();
+      capture({
+        id: crypto.randomUUID(), entity: 'tasks', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: nowIso, financial: false,
+      });
+      const optimistic: Task = {
+        id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id,
+        name: input.name, startDate: input.startDate ?? null, endDate: input.endDate ?? null,
+        isMilestone: input.isMilestone ?? false, isCritical: input.isCritical ?? false,
+        progress: input.progress ?? 0, createdAt: nowIso, updatedAt: nowIso,
+      };
+      setRows((rs) => [...rs, optimistic]);
+      setDraft(emptyDraft);
+      setProgressText('0');
+      setAdding(false);
+      toast.push(t('planning.added.offline'), 'info');
+      return;
+    }
+    const tk = await planning.add(id, input);
     setRows((rs) => [...rs, tk]);
     setDraft(emptyDraft);
     setProgressText('0');

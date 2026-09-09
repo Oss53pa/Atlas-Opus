@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('tasks.create → appelle planning.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      planning: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'tasks', op: 'create', payload: { operationId: 'op-1', name: 'Gros œuvre R+2', startDate: '2026-09-10', endDate: '2026-11-30', isMilestone: false, isCritical: true, progress: 0.1 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { name: 'Gros œuvre R+2', isCritical: true, progress: 0.1 } });
+  });
+
   it('connections.create → appelle connections.add (demande) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {
