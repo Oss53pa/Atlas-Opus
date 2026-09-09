@@ -909,6 +909,7 @@ export const fr = {
   'cx.add': 'Nouveau raccordement',
   'cx.empty': 'Aucun raccordement. Enregistrez les demandes auprès des concessionnaires.',
   'cx.added': 'Raccordement ajouté.',
+  'cx.added.offline': 'Raccordement saisi hors-ligne — en attente de synchronisation.',
   'cx.removed': 'Raccordement supprimé.',
   'cx.advance': 'Faire avancer',
   'cx.kpi.count': 'Raccordements',

@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { utilityLabel, connectionStatusLabel, CONNECTION_STATUS_TONE } from './labels';
 import { useData, useOperation, useConnections } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatAmount } from '../../lib/format';
@@ -14,13 +15,15 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export function RaccordementsScreen({ id }: { id: string }) {
   const { connections, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useConnections(id);
+  const { data: loaded, loading, refetch } = useConnections(id);
 
   const [rows, setRows] = useState<Connection[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -35,10 +38,26 @@ export function RaccordementsScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.concessionaire.trim()) return;
-    const rec = await connections.add(id, {
+    const input = {
       utility: draft.utility, concessionaire: draft.concessionaire, reference: draft.reference,
       cost: Number(draft.cost.replace(/[^\d]/g, '')) || 0, requestedAt: draft.requested || today(),
-    });
+    };
+    // Offline-first (F3) : une demande de raccordement (M18) est un suivi
+    // (non écriture), créée « demande ». Le paiement (« payé ») reste en ligne.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'connections', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Connection = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'demande' };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ utility: 'electricite', concessionaire: '', reference: '', cost: '', requested: today() });
+      setAdding(false);
+      toast.push(t('cx.added.offline'), 'info');
+      return;
+    }
+    const rec = await connections.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ utility: 'electricite', concessionaire: '', reference: '', cost: '', requested: today() });
     setAdding(false);

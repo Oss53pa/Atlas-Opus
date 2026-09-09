@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('connections.create → appelle connections.add (demande) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      connections: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'connections', op: 'create', payload: { operationId: 'op-1', utility: 'electricite', concessionaire: 'CIE', reference: 'RAC-01', cost: 8_500_000, requestedAt: '2026-09-09' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { utility: 'electricite', concessionaire: 'CIE', reference: 'RAC-01', cost: 8_500_000 } });
+  });
+
   it('risks.create → appelle risks.add (ouvert) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

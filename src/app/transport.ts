@@ -18,9 +18,10 @@ import type { RevisionTerm } from '../domain/f6/types';
 import type { GuaranteeType } from '../domain/m17/types';
 import type { ChangeOrigin } from '../domain/m14/types';
 import type { RiskCategory } from '../domain/m20/types';
+import type { UtilityType } from '../domain/m18/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -136,6 +137,17 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M18 — demande de raccordement concessionnaire : créée « demande », suivi
+// (non écriture) ; coût `number` (unités majeures, JSON-safe, pas de Money).
+interface ConnectionCreatePayload {
+  operationId: string;
+  utility: UtilityType;
+  concessionaire: string;
+  reference: string;
+  cost: number;
+  requestedAt: string;
 }
 
 // M20 — risque (registre, dont HSSE) : créé « ouvert », non financier.
@@ -287,6 +299,16 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M18 — demande de raccordement (créée « demande ») : rejouable tel quel.
+  // Le paiement du devis (« payé ») reste une transition en ligne.
+  if (m.entity === 'connections' && m.op === 'create') {
+    const p = m.payload as unknown as ConnectionCreatePayload;
+    await api.connections.add(p.operationId, {
+      utility: p.utility, concessionaire: p.concessionaire, reference: p.reference,
+      cost: p.cost, requestedAt: p.requestedAt,
+    });
     return { ok: true };
   }
   // M20 — risque (registre, dont HSSE) créé « ouvert » : rejouable tel quel.
