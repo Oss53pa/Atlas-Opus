@@ -68,6 +68,7 @@ export const fr = {
   'study.add': 'Ajouter une étude',
   'study.empty': 'Aucune étude. Planifiez les diagnostics préalables à la conception.',
   'study.added': 'Étude ajoutée.',
+  'study.added.offline': 'Étude saisie hors-ligne — en attente de synchronisation.',
   'study.removed': 'Étude supprimée.',
   'study.advance': 'Faire avancer',
   'study.kpi.total': 'Études',

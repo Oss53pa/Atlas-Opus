@@ -19,9 +19,10 @@ import type { GuaranteeType } from '../domain/m17/types';
 import type { ChangeOrigin } from '../domain/m14/types';
 import type { RiskCategory } from '../domain/m20/types';
 import type { UtilityType } from '../domain/m18/types';
+import type { StudyKind } from '../domain/m3/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -137,6 +138,17 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M3 — étude amont (diagnostic, non écriture) : créée « planifiée » ;
+// coût `number` (unités majeures, JSON-safe, pas de Money).
+interface StudyCreatePayload {
+  operationId: string;
+  kind: StudyKind;
+  provider: string;
+  cost: number;
+  dueDate?: string | null;
+  summary?: string | null;
 }
 
 // M12 — tâche de planning (jalon/ligne de temps, non écriture) : payload
@@ -311,6 +323,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M3 — étude amont (diagnostic, non écriture) créée « planifiée » : rejouable.
+  if (m.entity === 'studies' && m.op === 'create') {
+    const p = m.payload as unknown as StudyCreatePayload;
+    await api.studies.add(p.operationId, {
+      kind: p.kind, provider: p.provider, cost: p.cost,
+      dueDate: p.dueDate ?? null, summary: p.summary ?? null,
+    });
     return { ok: true };
   }
   // M12 — tâche de planning (jalon/ligne de temps, non écriture) : rejouable.
