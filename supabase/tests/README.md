@@ -30,6 +30,14 @@ refusant de tourner en `root`, le script se ré-exécute sous l'utilisateur
 | T4 | Rôle (UPDATE) | un rôle `site` **ne peut pas** modifier `budget_lines` |
 | T5 | Rôle (UPDATE) | un rôle `finance` **peut** modifier `budget_lines` (pas de sur-restriction) |
 | T6 | Rôle (INSERT) | un rôle `site` **ne peut pas** créer d'opération |
+| T7 | Méta (tenant) | **toute** table portant `tenant_id` a la RLS active **et** au moins une politique (gate « RLS sur 100 % des tables », §3) |
+| T8 | Méta (`operation_scope`) | **toute** table portant `operation_id` filtre par `user_operations()` en lecture (`USING`) — garantit le correctif v4.1 sur toutes les tables, présentes et futures |
+
+Les méta-tests T7/T8 scrutent le catalogue (`pg_class`, `pg_policies`) : une table
+ajoutée qui oublierait la RLS ou le filtre `operation_scope` fait échouer le gate
+sans qu'il faille l'énumérer à la main. C'est ainsi qu'ont été détectées, dans
+`schema.sql`, deux fuites hors-périmètre corrigées depuis : `notifications` (F4)
+et `rag_chunks` (contexte RAG M22), qui n'isolaient qu'au tenant.
 
 ## Fichiers
 
