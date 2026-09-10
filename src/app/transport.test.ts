@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('studies.create → appelle studies.add (planifiée) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      studies: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'studies', op: 'create', payload: { operationId: 'op-1', kind: 'geotechnique', provider: 'Geolab', cost: 6_000_000, dueDate: '2026-10-01', summary: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { kind: 'geotechnique', provider: 'Geolab', cost: 6_000_000 } });
+  });
+
   it('tasks.create → appelle planning.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

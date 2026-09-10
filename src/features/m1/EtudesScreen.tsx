@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Field, KpiRow, Money as MoneyView, Panel, Select, Skeleton, useToast, type TableRowData } from '../../ui';
 import { studyKindLabel, studyStatusLabel, STUDY_STATUS_TONE } from './labels';
 import { useData, useOperation, useStudies } from '../../app/providers';
+import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale } from '../../i18n';
 import { formatAmount, formatDate } from '../../lib/format';
@@ -14,13 +15,15 @@ import { isReadOnlyForRole } from '../../domain/m1/rules';
 
 export function EtudesScreen({ id }: { id: string }) {
   const { studies, session } = useData();
+  const { online, capture, syncedAt } = useOffline();
   const { navigate } = useNav();
   const toast = useToast();
   const { data: op } = useOperation(id);
-  const { data: loaded, loading } = useStudies(id);
+  const { data: loaded, loading, refetch } = useStudies(id);
 
   const [rows, setRows] = useState<Study[]>([]);
   useEffect(() => { if (loaded) setRows(loaded); }, [loaded]);
+  useEffect(() => { if (syncedAt) refetch(); }, [syncedAt, refetch]);
 
   const currency = op?.currency ?? 'XOF';
   const readOnly = op ? isReadOnlyForRole(op, session.role) : false;
@@ -36,11 +39,27 @@ export function EtudesScreen({ id }: { id: string }) {
 
   async function add() {
     if (!draft.provider.trim()) return;
-    const rec = await studies.add(id, {
+    const input = {
       kind: draft.kind, provider: draft.provider,
       cost: Number(draft.cost.replace(/[^\d]/g, '')) || 0,
       dueDate: draft.due || null, summary: draft.summary || null,
-    });
+    };
+    // Offline-first (F3) : une étude amont (M3) est un enregistrement de
+    // diagnostic (non écriture), créée « planifiée ». Rejouée telle quelle.
+    if (!online) {
+      capture({
+        id: crypto.randomUUID(), entity: 'studies', op: 'create', entityId: null,
+        payload: { operationId: id, ...input }, baseVersion: null,
+        createdAt: new Date().toISOString(), financial: false,
+      });
+      const optimistic: Study = { id: `local-${crypto.randomUUID()}`, tenantId: session.tenantId, operationId: id, ...input, status: 'planifiee' };
+      setRows((r) => [...r, optimistic]);
+      setDraft({ kind: 'geotechnique', provider: '', cost: '', due: '', summary: '' });
+      setAdding(false);
+      toast.push(t('study.added.offline'), 'info');
+      return;
+    }
+    const rec = await studies.add(id, input);
     setRows((r) => [...r, rec]);
     setDraft({ kind: 'geotechnique', provider: '', cost: '', due: '', summary: '' });
     setAdding(false);
