@@ -98,4 +98,37 @@ begin;
   end $$;
 commit;
 
+-- TEST 7 — Méta : toute table métier (colonne tenant_id) a la RLS ACTIVE et au
+-- moins une politique. Garde le gate « RLS sur 100 % des tables » (CDC §3) :
+-- une table ajoutée (ex. cibles du transport offline) qui oublie la RLS échoue ici.
+do $$ declare bad text; begin
+  select string_agg(c.relname, ', ' order by c.relname) into bad
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  where c.relkind = 'r'
+    and exists (select 1 from pg_attribute a
+                where a.attrelid = c.oid and a.attname = 'tenant_id' and not a.attisdropped)
+    and (c.relrowsecurity = false
+         or not exists (select 1 from pg_policy p where p.polrelid = c.oid));
+  assert bad is null, format('T7 méta-RLS : tables tenant_id sans RLS active ou sans politique : %s', bad);
+  raise notice 'PASS T7 — méta : toutes les tables tenant_id ont la RLS active + une politique';
+end $$;
+
+-- TEST 8 — Méta : toute table portant operation_id filtre bien par
+-- user_operations() dans son USING (correctif v4.1 : périmètre opération lu, pas
+-- seulement écrit). Une table operation_id qui n'isolerait qu'au tenant échoue ici.
+do $$ declare bad text; begin
+  select string_agg(c.relname, ', ' order by c.relname) into bad
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
+  where c.relkind = 'r'
+    and exists (select 1 from pg_attribute a
+                where a.attrelid = c.oid and a.attname = 'operation_id' and not a.attisdropped)
+    and not exists (select 1 from pg_policies p
+                    where p.schemaname = 'public' and p.tablename = c.relname
+                      and p.qual like '%user_operations%');
+  assert bad is null, format('T8 méta-scope : tables operation_id sans filtre user_operations() en lecture : %s', bad);
+  raise notice 'PASS T8 — méta : toutes les tables operation_id filtrent par operation_scope';
+end $$;
+
 \echo '>>> TOUS LES TESTS RLS SONT VERTS <<<'

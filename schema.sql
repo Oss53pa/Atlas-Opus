@@ -834,7 +834,13 @@ create table public.notifications (   -- F4
   created_at timestamptz not null default now());
 create index on public.notifications(user_id);
 alter table public.notifications enable row level security;
-create policy notif_read on public.notifications for select using (user_id = auth.uid() or tenant_id in (select public.user_tenants()));
+-- §5 : une notification liée à une opération n'est lisible que dans le périmètre
+-- (operation_scope) ; les notifications propres (user_id) et de niveau tenant
+-- (operation_id null) restent visibles. Corrige une fuite hors-périmètre.
+create policy notif_read on public.notifications for select using (
+  user_id = auth.uid()
+  or (tenant_id in (select public.user_tenants())
+      and (operation_id is null or operation_id in (select public.user_operations()))));
 
 create table public.integration_endpoints (  -- F5 contrats d'intégration
   id uuid primary key default gen_random_uuid(),
@@ -860,7 +866,15 @@ create table public.rag_chunks (      -- M22
   operation_id uuid references public.operations(id) on delete cascade,
   source_module text, source_id uuid, content text, embedding vector(1024));
 alter table public.rag_chunks enable row level security;
-create policy rag_iso on public.rag_chunks using (tenant_id in (select public.user_tenants())) with check (tenant_id in (select public.user_tenants()));
+-- §5 + invariant 5 (souveraineté) : le contexte RAG (PROPH3T) rattaché à une
+-- opération ne doit être récupérable que dans le périmètre ; les chunks de
+-- niveau tenant (operation_id null) restent partagés. Corrige une fuite.
+create policy rag_iso on public.rag_chunks using (
+  tenant_id in (select public.user_tenants())
+  and (operation_id is null or operation_id in (select public.user_operations())))
+with check (
+  tenant_id in (select public.user_tenants())
+  and (operation_id is null or operation_id in (select public.user_operations())));
 
 create table public.ai_runs (
   id uuid primary key default gen_random_uuid(),
