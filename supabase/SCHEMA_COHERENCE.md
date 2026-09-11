@@ -11,14 +11,23 @@
 | Niveau §5 | `schema.sql` (vérité CDC) | Déployé (migrations `ao_`) | Écart |
 |-----------|---------------------------|-----------------------------|-------|
 | 1 — Tenant | `tenant_id in (select public.user_tenants())` | `tenant_id in (select ut.tenant_id from public.user_tenants ut where ut.user_id = auth.uid())` | ✅ présent des deux côtés (formes différentes) |
-| 2 — Périmètre opération (`operation_scope`) | `operation_id in (select public.user_operations())` sur toutes les tables à `operation_id` | **absent** — 29 tables `ao_*` portent `operation_id`, **aucune** ne filtre par périmètre | 🔴 **la « faille à corriger » de la v4.1 n'est pas déployée** |
-| 3 — Rôle → action (écritures sensibles) | politiques `as restrictive` + `public.has_role(...)` (`operations_write`, `budget_lines_write`, `decomptes_write`, …) | **absent** — 46 politiques, toutes `_iso` permissives tenant-only ; aucun `has_role`, aucun `as restrictive` | 🔴 la matrice rôle × action n'est pas appliquée en base |
+| 2 — Périmètre opération (`operation_scope`) | `operation_id in (select public.user_operations())` sur toutes les tables à `operation_id` | ✅ **corrigé (migration `0034`)** — `ao_operation_members` + `ao_user_operations()`, clause de périmètre sur `ao_operations` (par `id`) et sur toutes les tables `ao_` à `operation_id` | ✅ aligné |
+| 3 — Rôle → action (écritures sensibles) | politiques `as restrictive` + `public.has_role(...)` (`operations_write`, `budget_lines_write`, `decomptes_write`, …) | ✅ **corrigé (migration `0034`)** — `ao_tenant_roles` + `ao_has_role()`, gardes `as restrictive` sur `ao_operations` (insert), `ao_bilan_lines`/`ao_decomptes` (update) | ✅ aligné (miroir de `schema.sql`) |
 
-Conséquence concrète : dans la base déployée, **un utilisateur restreint à une
-opération voit toutes les opérations de son tenant**, et **tout membre du tenant
-peut exécuter les écritures sensibles** (la RLS ne les distingue pas par rôle).
-C'est exactement la faille que le CDC §5 dit avoir corrigée — elle vit dans
-`schema.sql` et le mock, pas dans le déployé.
+> **Mise à jour (migration `0034`)** : les niveaux 2 et 3 sont désormais
+> **appliqués au déployé** de façon rétrocompatible (aucune ligne
+> `ao_operation_members` ⇒ toutes les opérations du tenant ; aucun rôle
+> `ao_tenant_roles` ⇒ écriture autorisée). Les gardes s'activent par
+> utilisateur au fur et à mesure des attributions. La suite
+> `run_migrations.sh` (MT1–MT8) valide ces garanties contre la pile `ao_`.
+> Le paragraphe ci-dessous décrit l'état **antérieur** au correctif.
+
+Conséquence concrète (état antérieur à `0034`) : dans la base déployée, **un
+utilisateur restreint à une opération voyait toutes les opérations de son
+tenant**, et **tout membre du tenant pouvait exécuter les écritures sensibles**
+(la RLS ne les distinguait pas par rôle). C'est exactement la faille que le CDC
+§5 dit avoir corrigée — elle vivait dans `schema.sql` et le mock, pas dans le
+déployé.
 
 ## Divergences détaillées
 
@@ -51,9 +60,24 @@ C'est exactement la faille que le CDC §5 dit avoir corrigée — elle vit dans
   l'isolation tenant + `operation_scope` + rôle **contre `schema.sql`** (source de
   vérité). Ils sont verts — mais valident la vérité CDC, **pas** le déployé.
 
-## Remédiation recommandée (déployé)
+## Remédiation — état
 
-Pour aligner le déployé sur §5, il faut, dans le monde `ao_` :
+- [x] **Périmètre opération** — `ao_operation_members` + `ao_user_operations()`,
+      périmètre appliqué à `ao_operations` et aux tables `ao_` à `operation_id`
+      (migration `0034`).
+- [x] **Rôle → action** — `ao_tenant_roles` + `ao_has_role()`, gardes
+      `as restrictive` sur les tables sensibles (migration `0034`).
+- [x] **Tests** — harnais étendu à la pile de migrations (`run_migrations.sh`,
+      MT1–MT8).
+- [ ] **Application** — peupler et consommer le périmètre/rôle réels
+      (`ao_operation_members` / `ao_tenant_roles`) au lieu du `operationScope:
+      null` codé en dur dans `src/app/providers.tsx`. Reste à faire côté F1
+      (auth/onboarding) : tant que ces tables ne sont pas peuplées, les gardes
+      restent en fail-open (comportement inchangé).
+
+## Détail de la remédiation (référence)
+
+Pour aligner le déployé sur §5, il fallait, dans le monde `ao_` :
 
 1. **Périmètre opération** — introduire une représentation du périmètre par
    utilisateur (p. ex. `ao_operation_members(tenant_id, user_id, operation_id)`
