@@ -69,11 +69,20 @@ déployé.
       `as restrictive` sur les tables sensibles (migration `0034`).
 - [x] **Tests** — harnais étendu à la pile de migrations (`run_migrations.sh`,
       MT1–MT8).
-- [ ] **Application** — peupler et consommer le périmètre/rôle réels
-      (`ao_operation_members` / `ao_tenant_roles`) au lieu du `operationScope:
-      null` codé en dur dans `src/app/providers.tsx`. Reste à faire côté F1
-      (auth/onboarding) : tant que ces tables ne sont pas peuplées, les gardes
-      restent en fail-open (comportement inchangé).
+- [~] **Application** — périmètre : `src/app/providers.tsx` lit désormais
+      `ao_operation_members` et alimente `session.operationScope` via
+      `src/app/scope.ts` (`resolveOperationScope`, testé), miroir de
+      `ao_user_operations()` (aucune ligne ⇒ null = toutes les opérations).
+      Restent côté F1 (auth/onboarding) :
+      - peupler `ao_operation_members` / `ao_tenant_roles` (écrans d'invitation) ;
+      - sourcer le rôle client depuis `ao_tenant_roles` (aujourd'hui lu de
+        `user_tenants.role`) pour s'aligner sur `ao_has_role` ;
+      - **réconcilier le vocabulaire de rôle** : le CHECK de `ao_tenant_roles`
+        (`owner, moa_director, finance, moe, amo, site, viewer`) diffère du type
+        applicatif `Role` (`…, procurement, commercial, stakeholder, …`) — à
+        aligner par une migration de suivi avant tout écran d'attribution.
+      Tant que ces tables ne sont pas peuplées, les gardes restent en fail-open
+      (comportement inchangé).
 
 ## Détail de la remédiation (référence)
 
