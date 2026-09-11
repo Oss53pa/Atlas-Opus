@@ -129,6 +129,7 @@ import {
   createSupabaseAdminRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
+import { resolveOperationScope } from './scope';
 import { EmptyState } from '../ui';
 import { t } from '../i18n';
 
@@ -236,11 +237,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (alive) setNoTenant(true);
         return;
       }
+      const tenantId = (ut as { tenant_id: string }).tenant_id;
+      // Périmètre opération (§5 niveau 2) : lu depuis ao_operation_members (déployé,
+      // migration 0034). Aucune ligne ⇒ null = toutes les opérations du tenant,
+      // cohérent avec la RLS (public.ao_user_operations). RLS-safe : ao_operation_members
+      // est isolée par tenant, donc cette requête ne renvoie que les lignes de l'utilisateur.
+      const { data: memberRows } = await supabase
+        .from('ao_operation_members')
+        .select('operation_id')
+        .eq('user_id', user.id)
+        .eq('tenant_id', tenantId);
       const session: Session = {
         userId: user.id,
-        tenantId: (ut as { tenant_id: string }).tenant_id,
+        tenantId,
         role: ((ut as { role: string | null }).role as Role) ?? 'viewer',
-        operationScope: null,
+        operationScope: resolveOperationScope(memberRows as { operation_id: string }[] | null),
       };
       const telemetry = createTelemetry((e) => console.debug('[telemetry]', e));
       if (alive)
