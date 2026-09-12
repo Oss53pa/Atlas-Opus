@@ -139,4 +139,24 @@ do $$ declare c int; begin
   raise notice 'PASS MT9 — audit immuable (aucune politique update/delete après 0034)';
 end $$;
 
+-- TEST 10 — Vocabulaire de rôle aligné (0035) : 'procurement' (type app Role)
+-- accepté, 'moe' (ancien vocabulaire 0034) rejeté par le CHECK.
+begin;
+  do $$ declare ok boolean := true; blocked boolean := false; begin
+    begin
+      insert into ao_tenant_roles(tenant_id,user_id,role)
+        values ('00000000-0000-0000-0000-0000000000aa','00000000-0000-0000-0000-0000000a0001','procurement');
+    exception when others then ok := false;
+    end;
+    assert ok, 'MT10 vocab rôle : procurement devrait être accepté';
+    begin
+      insert into ao_tenant_roles(tenant_id,user_id,role)
+        values ('00000000-0000-0000-0000-0000000000aa','00000000-0000-0000-0000-0000000a0001','moe');
+    exception when check_violation then blocked := true;
+    end;
+    assert blocked, 'MT10 vocab rôle : moe devrait être rejeté (hors vocabulaire app)';
+    raise notice 'PASS MT10 — vocabulaire de rôle aligné (procurement ok, moe rejeté)';
+  end $$;
+rollback;
+
 \echo '>>> TESTS RLS MIGRATIONS (déployé ao_) VERTS <<<'

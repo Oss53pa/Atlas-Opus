@@ -129,7 +129,7 @@ import {
   createSupabaseAdminRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
-import { resolveOperationScope } from './scope';
+import { resolveOperationScope, resolveRole } from './scope';
 import { EmptyState } from '../ui';
 import { t } from '../i18n';
 
@@ -247,10 +247,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .select('operation_id')
         .eq('user_id', user.id)
         .eq('tenant_id', tenantId);
+      // Rôle (§5 niveau 3) : source d'autorité = ao_tenant_roles (celle de ao_has_role).
+      // On garde user_tenants.role en repli tant que ao_tenant_roles est vide.
+      const { data: roleRows } = await supabase
+        .from('ao_tenant_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('tenant_id', tenantId);
+      const fallbackRole = ((ut as { role: string | null }).role as Role) ?? 'viewer';
       const session: Session = {
         userId: user.id,
         tenantId,
-        role: ((ut as { role: string | null }).role as Role) ?? 'viewer',
+        role: resolveRole(roleRows as { role: string }[] | null, fallbackRole),
         operationScope: resolveOperationScope(memberRows as { operation_id: string }[] | null),
       };
       const telemetry = createTelemetry((e) => console.debug('[telemetry]', e));
