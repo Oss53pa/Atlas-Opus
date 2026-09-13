@@ -232,12 +232,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       // Backend Supabase : l'AuthGate garantit un utilisateur ici.
       if (!supabase || !user) return;
-      const { data: ut } = await supabase
-        .from('user_tenants')
-        .select('tenant_id, role')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+      const loadTenant = async () =>
+        supabase!
+          .from('user_tenants')
+          .select('tenant_id, role')
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+      let { data: ut } = await loadTenant();
+      if (!ut) {
+        // F1 : un membre fraîchement inscrit n'a pas encore d'appartenance —
+        // on tente de lier ses invitations en attente (par email) puis on relit.
+        try {
+          const { data: res } = await supabase.functions.invoke('ao-accept-invitation');
+          if ((res as { linked?: number } | null)?.linked) ({ data: ut } = await loadTenant());
+        } catch { /* pas d'invitation liable : on retombe sur l'écran « no tenant » */ }
+      }
       if (!ut) {
         if (alive) setNoTenant(true);
         return;

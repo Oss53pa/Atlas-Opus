@@ -8,13 +8,14 @@ import { callerClient } from './supabase.ts';
 
 export interface Caller {
   userId: string;
+  email: string | null;
 }
 
 /** Valide le JWT du porteur et renvoie son identité. 401 si absent/invalide. */
 export async function requireCaller(req: Request): Promise<Caller> {
   const { data, error } = await callerClient(req).auth.getUser();
   if (error || !data.user) throw new HttpError(401, 'unauthenticated');
-  return { userId: data.user.id };
+  return { userId: data.user.id, email: data.user.email ?? null };
 }
 
 /**
