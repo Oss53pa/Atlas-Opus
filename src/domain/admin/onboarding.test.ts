@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeScope, effectiveRole, areRolesKnown, validateGrantInput, isValidEmail, scopeSummary, linkableMembers,
+  normalizeScope, effectiveRole, areRolesKnown, validateGrantInput, isValidEmail, scopeSummary, linkableMembers, validateInvite,
 } from './onboarding';
 
 describe('F1 onboarding — normalizeScope', () => {
@@ -51,6 +51,15 @@ describe('F1 onboarding — linkableMembers', () => {
       { userId: 'u3', name: 'C' },
     ];
     expect(linkableMembers(members).map((m) => m.name)).toEqual(['A', 'C']);
+  });
+});
+
+describe('F1 onboarding — validateInvite', () => {
+  it('exige nom, email valide et rôle connu', () => {
+    expect(validateInvite({ name: 'Awa', email: 'a@b.co', role: 'finance' }).ok).toBe(true);
+    expect(validateInvite({ name: '', email: 'a@b.co', role: 'finance' }).ok).toBe(false);
+    expect(validateInvite({ name: 'Awa', email: 'nope', role: 'finance' }).errors).toContain('email invalide');
+    expect(validateInvite({ name: 'Awa', email: 'a@b.co', role: 'moe' as never }).errors).toContain('rôle inconnu (hors vocabulaire)');
   });
 });
 

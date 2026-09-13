@@ -783,6 +783,16 @@ export const fr = {
   'membres.accessLog': 'Journal des accès',
   'membres.invite': 'Inviter un membre',
   'membres.invite.soon': 'Invitation de membre bientôt disponible.',
+  // F1 — invitation de membre
+  'invite.title': 'Inviter un membre',
+  'invite.meta': 'Créé « en attente » — droits attribués après liaison du compte',
+  'invite.name': 'Nom',
+  'invite.email': 'Email',
+  'invite.role': 'Rôle (indicatif)',
+  'invite.hint': 'Le membre reçoit l’invitation ; ses droits sont attribués une fois son compte lié.',
+  'invite.send': 'Envoyer l’invitation',
+  'invite.sent': 'Invitation créée.',
+  'invite.error': 'Échec de l’invitation.',
   // F1 — attribution des droits (rôles + périmètre)
   'grant.title': 'Attribution des droits',
   'grant.meta': 'Rôles & périmètre (RLS §5)',

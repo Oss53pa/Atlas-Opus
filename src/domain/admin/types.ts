@@ -56,6 +56,13 @@ export interface GrantValidation {
   errors: string[];
 }
 
+/** Saisie d'invitation d'un membre (par email ; créé « en_attente », user_id null). */
+export interface MemberInviteInput {
+  name: string;
+  email: string;
+  role: Role;
+}
+
 // ── Notifications (F4) ───────────────────────────────────────────────────────
 export const NOTIF_SEVERITIES = ['danger', 'echeance', 'info'] as const;
 export type NotifSeverity = (typeof NOTIF_SEVERITIES)[number];

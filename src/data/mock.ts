@@ -1405,6 +1405,15 @@ export function createAdminRepo(db: MockDb, session: Session): AdminRepo {
     async members() {
       return mine(db.members).map((m) => ({ ...m }));
     },
+    async invite(input) {
+      const m: Member = {
+        id: crypto.randomUUID(), tenantId: session.tenantId, userId: null,
+        name: input.name.trim(), email: input.email.trim(), role: input.role,
+        scope: 'toutes opérations', status: 'en_attente', lastActivity: null,
+      };
+      db.members.push(m);
+      return { ...m };
+    },
     async notifications() {
       return mine(db.notifications).map((n) => ({ ...n }));
     },
