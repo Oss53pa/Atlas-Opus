@@ -75,7 +75,7 @@ import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
-import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
+import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput } from '../domain/admin/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -263,6 +263,20 @@ export interface AdminRepo {
    * dupliquer. Renvoie `created:false` si la relance existait déjà.
    */
   upsertNotification(input: NotificationUpsert): Promise<{ created: boolean }>;
+}
+
+/**
+ * F1 — Attribution des droits (rôles + périmètre) du tenant courant. Écrit les
+ * tables d'enforcement du déployé (ao_tenant_roles, ao_operation_members) qui
+ * alimentent la RLS §5. Écritures SENSIBLES en ligne uniquement (jamais F3).
+ */
+export interface MembershipRepo {
+  /** Attributions effectives des membres du tenant, agrégées par utilisateur. */
+  listGrants(): Promise<MemberGrant[]>;
+  /** Remplace rôles + périmètre d'un utilisateur (upsert atomique). */
+  setGrant(input: MemberGrantInput): Promise<MemberGrant>;
+  /** Retire tous les rôles et le périmètre d'un utilisateur. */
+  revoke(userId: string): Promise<void>;
 }
 
 /** Conception & GED (M11) : documents & visas. */
