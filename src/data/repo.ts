@@ -81,6 +81,7 @@ import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse
 import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
+import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -331,6 +332,13 @@ export interface DoeRepo {
   list(operationId: string): Promise<DoeDocument[]>;
   add(operationId: string, input: DoeDocumentInput): Promise<DoeDocument>;
   setValidated(id: string, validated: boolean): Promise<DoeDocument>;
+  remove(id: string): Promise<void>;
+}
+
+/** M20 (actifs) — inventaire des ouvrages à transférer à l'exploitant. */
+export interface HandoverAssetsRepo {
+  list(operationId: string): Promise<HandoverAsset[]>;
+  add(operationId: string, input: HandoverAssetInput): Promise<HandoverAsset>;
   remove(id: string): Promise<void>;
 }
 

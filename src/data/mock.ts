@@ -63,6 +63,7 @@ import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput } from '../domain/litige/types';
 import type { Claim, ClaimInput } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
+import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -122,6 +123,7 @@ import type {
   DisputesRepo,
   ClaimsRepo,
   DoeRepo,
+  HandoverAssetsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -183,6 +185,7 @@ export interface MockDb {
   disputes: Dispute[];
   claims: Claim[];
   doeDocuments: DoeDocument[];
+  handoverAssets: HandoverAsset[];
 }
 
 interface Deps {
@@ -625,8 +628,12 @@ export function createMockDb(): MockDb {
     { id: 'doe-1', tenantId: T, operationId: 'op-palmiers', category: 'plans_recolement', fileRef: 'DOE/plans-recol.pdf', validated: true },
     { id: 'doe-2', tenantId: T, operationId: 'op-palmiers', category: 'garanties', fileRef: 'DOE/garanties.zip', validated: false },
   ];
+  const handoverAssets: HandoverAsset[] = [
+    { id: 'ha-1', tenantId: T, operationId: 'op-palmiers', label: 'Ascenseur bloc A', assetType: 'equipement', location: 'Hall A', warrantyEnd: '2027-06-30', targetSystem: 'GMAO Keystone' },
+    { id: 'ha-2', tenantId: T, operationId: 'op-palmiers', label: 'Poste de refoulement', assetType: 'reseau', location: 'Sous-sol', warrantyEnd: null, targetSystem: null },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1534,6 +1541,28 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
     },
     async remove(iid) {
       db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
+    },
+  };
+}
+
+export function createHandoverAssetsRepo(db: MockDb, session: Session, deps: Deps): HandoverAssetsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.handoverAssets).filter((a) => a.operationId === opId).map((a) => ({ ...a }));
+    },
+    async add(opId, input: HandoverAssetInput) {
+      const a: HandoverAsset = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        label: input.label.trim(), assetType: input.assetType, location: input.location ?? null,
+        warrantyEnd: input.warrantyEnd ?? null, targetSystem: input.targetSystem ?? null,
+      };
+      db.handoverAssets.push(a);
+      return { ...a };
+    },
+    async remove(aid) {
+      db.handoverAssets = db.handoverAssets.filter((x) => x.id !== aid);
     },
   };
 }

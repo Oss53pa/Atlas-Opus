@@ -57,12 +57,13 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
+import type { HandoverAsset, HandoverAssetInput, AssetType } from '../../domain/handoverAssets/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1603,6 +1604,35 @@ export function createSupabaseDoeRepo(client: SupabaseClient, session: Session):
     async setValidated(id, validated) {
       const row = unwrap(await client.from(TB).update({ validated }).eq('id', id).select('*').single()) as DoeRow;
       return toDoe(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M20 (actifs) — inventaire des ouvrages à transférer ──────────────────────
+interface AssetRow { id: string; tenant_id: string; operation_id: string; label: string; asset_type: string; location: string | null; warranty_end: string | null; target_system: string | null }
+function toAsset(r: AssetRow): HandoverAsset {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, label: r.label, assetType: r.asset_type as AssetType,
+    location: r.location, warrantyEnd: r.warranty_end, targetSystem: r.target_system,
+  };
+}
+export function createSupabaseHandoverAssetsRepo(client: SupabaseClient, session: Session): HandoverAssetsRepo {
+  const TB = 'ao_handover_assets';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('label')) as AssetRow[];
+      return rows.map(toAsset);
+    },
+    async add(opId, input: HandoverAssetInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, label: input.label.trim(), asset_type: input.assetType,
+        location: input.location ?? null, warranty_end: input.warrantyEnd ?? null, target_system: input.targetSystem ?? null,
+      }).select('*').single()) as AssetRow;
+      return toAsset(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

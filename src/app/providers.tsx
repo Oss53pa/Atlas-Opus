@@ -35,6 +35,7 @@ import {
   createDisputesRepo,
   createClaimsRepo,
   createDoeRepo,
+  createHandoverAssetsRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -75,6 +76,7 @@ import type {
   DisputesRepo,
   ClaimsRepo,
   DoeRepo,
+  HandoverAssetsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -108,6 +110,7 @@ import type { HsseIncident } from '../domain/hsse/types';
 import type { Dispute } from '../domain/litige/types';
 import type { Claim } from '../domain/claim/types';
 import type { DoeDocument } from '../domain/doe/types';
+import type { HandoverAsset } from '../domain/handoverAssets/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -150,6 +153,7 @@ import {
   createSupabaseDisputesRepo,
   createSupabaseClaimsRepo,
   createSupabaseDoeRepo,
+  createSupabaseHandoverAssetsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -191,6 +195,7 @@ interface DataApi {
   disputes: DisputesRepo;
   claims: ClaimsRepo;
   doe: DoeRepo;
+  handoverAssets: HandoverAssetsRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -243,6 +248,7 @@ function buildMockApi(): DataApi {
     disputes: createDisputesRepo(db, session, { telemetry }),
     claims: createClaimsRepo(db, session, { telemetry }),
     doe: createDoeRepo(db, session, { telemetry }),
+    handoverAssets: createHandoverAssetsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -343,6 +349,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           disputes: createSupabaseDisputesRepo(supabase, session),
           claims: createSupabaseClaimsRepo(supabase, session),
           doe: createSupabaseDoeRepo(supabase, session),
+          handoverAssets: createSupabaseHandoverAssetsRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -610,6 +617,11 @@ export function useClaims(operationId: string): AsyncState<Claim[]> {
 export function useDoe(operationId: string): AsyncState<DoeDocument[]> {
   const { doe } = useData();
   return useAsync(() => doe.list(operationId), [doe, operationId]);
+}
+
+export function useHandoverAssets(operationId: string): AsyncState<HandoverAsset[]> {
+  const { handoverAssets } = useData();
+  return useAsync(() => handoverAssets.list(operationId), [handoverAssets, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

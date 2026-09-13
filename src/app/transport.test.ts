@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('handoverAssets.create → appelle handoverAssets.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      handoverAssets: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'handoverAssets', op: 'create', payload: { operationId: 'op-1', label: 'Ascenseur A', assetType: 'equipement', location: 'Hall', warrantyEnd: '2027-06-30', targetSystem: 'GMAO' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'Ascenseur A', assetType: 'equipement', targetSystem: 'GMAO' } });
+  });
+
   it('doeDocuments.create → appelle doe.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

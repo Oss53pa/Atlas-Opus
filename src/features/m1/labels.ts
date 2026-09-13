@@ -21,6 +21,7 @@ import type { HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types
 import type { DisputeStatus } from '../../domain/litige/types';
 import type { ClaimStatus } from '../../domain/claim/types';
 import type { DoeCategory } from '../../domain/doe/types';
+import type { AssetType } from '../../domain/handoverAssets/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -522,6 +523,13 @@ const DOE_CATEGORY_KEY: Record<DoeCategory, MessageKey> = {
   dossier_maintenance: 'doe.cat.dossier_maintenance', autre: 'doe.cat.autre',
 };
 export const doeCategoryLabel = (c: DoeCategory) => t(DOE_CATEGORY_KEY[c]);
+
+// ── Actifs de transfert (M20) ────────────────────────────────────────────────
+const ASSET_TYPE_KEY: Record<AssetType, MessageKey> = {
+  equipement: 'asset.type.equipement', reseau: 'asset.type.reseau', batiment: 'asset.type.batiment',
+  espace_vert: 'asset.type.espace_vert', autre: 'asset.type.autre',
+};
+export const assetTypeLabel = (a: AssetType) => t(ASSET_TYPE_KEY[a]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

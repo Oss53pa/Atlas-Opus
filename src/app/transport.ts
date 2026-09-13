@@ -22,9 +22,10 @@ import type { UtilityType } from '../domain/m18/types';
 import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import type { DoeCategory } from '../domain/doe/types';
+import type { AssetType } from '../domain/handoverAssets/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -140,6 +141,16 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M20 (actifs) — actif d'inventaire de transfert (non écriture).
+interface HandoverAssetCreatePayload {
+  operationId: string;
+  label: string;
+  assetType: AssetType;
+  location?: string | null;
+  warrantyEnd?: string | null;
+  targetSystem?: string | null;
 }
 
 // M20 (DOE) — pièce du dossier des ouvrages exécutés (non écriture), non validée.
@@ -364,6 +375,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M20 (actifs) — inventaire relevé hors-ligne : rejouable tel quel.
+  if (m.entity === 'handoverAssets' && m.op === 'create') {
+    const p = m.payload as unknown as HandoverAssetCreatePayload;
+    await api.handoverAssets.add(p.operationId, {
+      label: p.label, assetType: p.assetType, location: p.location ?? null,
+      warrantyEnd: p.warrantyEnd ?? null, targetSystem: p.targetSystem ?? null,
+    });
     return { ok: true };
   }
   // M20 (DOE) — pièce collectée hors-ligne (non validée) : rejouable telle quelle.
