@@ -88,6 +88,7 @@ import type { ActionItem, ActionItemInput, ActionItemStatus } from '../domain/ac
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderStatus } from '../domain/serviceOrder/types';
 import type { EiesItem, EiesItemInput, EiesStatus } from '../domain/eiesItem/types';
 import type { Shipment, ShipmentInput, CustomsStatus } from '../domain/shipment/types';
+import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -394,6 +395,14 @@ export interface ShipmentsRepo {
   list(operationId: string): Promise<Shipment[]>;
   add(operationId: string, input: ShipmentInput): Promise<Shipment>;
   setStatus(id: string, status: CustomsStatus): Promise<Shipment>;
+  remove(id: string): Promise<void>;
+}
+
+/** M4/M5 — lignes budgétaires (budget autorisé de crédit par compte SYSCOHADA). */
+export interface BudgetLinesRepo {
+  list(operationId: string): Promise<BudgetLine[]>;
+  add(operationId: string, input: BudgetLineInput): Promise<BudgetLine>;
+  update(id: string, patch: Partial<Pick<BudgetLine, 'label' | 'amountBac'>>): Promise<BudgetLine>;
   remove(id: string): Promise<void>;
 }
 

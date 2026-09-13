@@ -608,6 +608,16 @@ export const CUSTOMS_STATUS_TONE: Record<CustomsStatus, BadgeTone> = {
 };
 export const customsStatusLabel = (s: CustomsStatus) => t(CUSTOMS_STATUS_KEY[s]);
 
+// ── Classes SYSCOHADA (M4 budget) ────────────────────────────────────────────
+const SYSCOHADA_CLASS_KEY: Record<string, MessageKey> = {
+  '1': 'budget.class.1', '2': 'budget.class.2', '3': 'budget.class.3', '4': 'budget.class.4',
+  '5': 'budget.class.5', '6': 'budget.class.6', '7': 'budget.class.7', '8': 'budget.class.8',
+};
+export const syscohadaClassLabel = (c: string) => {
+  const key = SYSCOHADA_CLASS_KEY[c];
+  return key ? t(key) : t('budget.class.other');
+};
+
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {
   create: 'audit.action.create',

@@ -30,7 +30,7 @@ import type { Milieu, Severity } from '../domain/eiesItem/types';
 import type { Incoterm } from '../domain/shipment/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -171,6 +171,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M4/M5 — ligne budgétaire (écriture financière) saisie en brouillon hors-ligne ;
+// montant `number` (unités majeures, JSON-safe).
+interface BudgetLineCreatePayload {
+  operationId: string;
+  syscohadaAccount: string;
+  label: string;
+  amountBac: number;
 }
 
 // M9 (logistique) — expédition enregistrée hors-ligne (non écriture) : « en_attente ».
@@ -455,6 +464,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M4/M5 — ligne budgétaire (brouillon financier hors-ligne) : rejouable telle quelle.
+  if (m.entity === 'budgetLines' && m.op === 'create') {
+    const p = m.payload as unknown as BudgetLineCreatePayload;
+    await api.budgetLines.add(p.operationId, {
+      syscohadaAccount: p.syscohadaAccount, label: p.label, amountBac: p.amountBac,
+    });
     return { ok: true };
   }
   // M9 (logistique) — expédition créée « en_attente » : rejouable telle quelle.

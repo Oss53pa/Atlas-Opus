@@ -75,6 +75,7 @@ import type { EiesItem, EiesItemInput } from '../domain/eiesItem/types';
 import { canTransitionEies } from '../domain/eiesItem';
 import type { Shipment, ShipmentInput } from '../domain/shipment/types';
 import { canTransitionShipment } from '../domain/shipment';
+import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -141,6 +142,7 @@ import type {
   ServiceOrdersRepo,
   EiesItemsRepo,
   ShipmentsRepo,
+  BudgetLinesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -209,6 +211,7 @@ export interface MockDb {
   serviceOrders: ServiceOrder[];
   eiesItems: EiesItem[];
   shipments: Shipment[];
+  budgetLines: BudgetLine[];
 }
 
 interface Deps {
@@ -662,6 +665,13 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const budgetLines: BudgetLine[] = [
+    { id: 'bl-p1', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2211', label: 'Terrain', amountBac: 180_000_000 },
+    { id: 'bl-p2', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2313', label: 'Bâtiments — gros œuvre', amountBac: 620_000_000 },
+    { id: 'bl-p3', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2313', label: 'Bâtiments — second œuvre', amountBac: 410_000_000 },
+    { id: 'bl-p4', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '6221', label: 'Honoraires MOE', amountBac: 95_000_000 },
+    { id: 'bl-p5', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '627', label: 'Frais financiers & assurances', amountBac: 48_000_000 },
+  ];
   const shipments: Shipment[] = [
     { id: 'sh-1', tenantId: T, operationId: 'op-palmiers', poId: 'po-p2', reference: 'EXP-AC-2026-07', incoterm: 'CIF', customsStatus: 'en_douane', eta: '2026-09-08', receivedAt: null },
     { id: 'sh-2', tenantId: T, operationId: 'op-palmiers', poId: 'po-p3', reference: 'EXP-ALU-2026-09', incoterm: 'FOB', customsStatus: 'en_transit', eta: '2026-10-05', receivedAt: null },
@@ -695,7 +705,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1660,6 +1670,34 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createBudgetLinesRepo(db: MockDb, session: Session, deps: Deps): BudgetLinesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.budgetLines).filter((b) => b.operationId === opId).map((b) => ({ ...b }));
+    },
+    async add(opId, input: BudgetLineInput) {
+      const b: BudgetLine = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        syscohadaAccount: input.syscohadaAccount.trim(), label: input.label.trim(), amountBac: input.amountBac,
+      };
+      db.budgetLines.push(b);
+      return { ...b };
+    },
+    async update(bid, patch) {
+      const b = db.budgetLines.find((x) => x.id === bid);
+      if (!b) throw new Error('budget_line_not_found');
+      if (patch.label !== undefined) b.label = patch.label.trim();
+      if (patch.amountBac !== undefined) b.amountBac = patch.amountBac;
+      return { ...b };
+    },
+    async remove(bid) {
+      db.budgetLines = db.budgetLines.filter((x) => x.id !== bid);
     },
   };
 }

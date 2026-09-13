@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -70,6 +70,7 @@ import type { ActionItem, ActionItemInput, ActionItemStatus } from '../../domain
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { EiesItem, EiesItemInput, Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { Shipment, ShipmentInput, Incoterm, CustomsStatus } from '../../domain/shipment/types';
+import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1679,6 +1680,42 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M4/M5 — lignes budgétaires ────────────────────────────────────────────────
+interface BudgetLineRow { id: string; tenant_id: string; operation_id: string; syscohada_account: string; label: string; amount_bac: number | string }
+function toBudgetLine(r: BudgetLineRow): BudgetLine {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
+    syscohadaAccount: r.syscohada_account, label: r.label, amountBac: Number(r.amount_bac),
+  };
+}
+export function createSupabaseBudgetLinesRepo(client: SupabaseClient, session: Session): BudgetLinesRepo {
+  const TB = 'ao_budget_lines';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('syscohada_account')) as BudgetLineRow[];
+      return rows.map(toBudgetLine);
+    },
+    async add(opId, input: BudgetLineInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, syscohada_account: input.syscohadaAccount.trim(),
+        label: input.label.trim(), amount_bac: input.amountBac,
+      }).select('*').single()) as BudgetLineRow;
+      return toBudgetLine(row);
+    },
+    async update(id, patch) {
+      const row = unwrap(await client.from(TB).update({
+        ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
+        ...(patch.amountBac !== undefined ? { amount_bac: patch.amountBac } : {}),
+      }).eq('id', id).select('*').single()) as BudgetLineRow;
+      return toBudgetLine(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

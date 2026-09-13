@@ -44,6 +44,7 @@ const FAMILIES: FamilyDef[] = [
     labelKey: 'nav.family.finance',
     modules: [
       { code: 'M4', labelKey: 'mod.m4', route: 'bilan' },
+      { code: 'BUD', labelKey: 'mod.budget', route: 'budget' },
       { code: 'M5', labelKey: 'mod.m5', route: 'financing' },
       { code: 'M6', labelKey: 'mod.m6', route: 'commercialisation' },
       { code: 'M16', labelKey: 'mod.m16', route: 'payments' },
