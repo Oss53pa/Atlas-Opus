@@ -75,7 +75,7 @@ import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
-import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput } from '../domain/admin/types';
+import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -255,6 +255,8 @@ export interface HandoverRepo {
 /** Administration transverse (F1/F4/F7) : membres, notifications, approbations — tenant. */
 export interface AdminRepo {
   members(): Promise<Member[]>;
+  /** Invite un membre (par email) : crée une entrée « en_attente » (user_id null). */
+  invite(input: MemberInviteInput): Promise<Member>;
   notifications(): Promise<NotificationItem[]>;
   approvals(): Promise<ApprovalTask[]>;
   /**

@@ -296,7 +296,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           connections: createSupabaseConnectionsRepo(supabase, session),
           library: createSupabaseLibraryRepo(supabase, session),
           handover: createSupabaseHandoverRepo(supabase),
-          admin: createSupabaseAdminRepo(supabase),
+          admin: createSupabaseAdminRepo(supabase, session),
           membership: createSupabaseMembershipRepo(supabase, session),
           session,
           countries: COUNTRIES,

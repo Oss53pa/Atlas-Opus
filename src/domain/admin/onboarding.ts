@@ -9,7 +9,7 @@
  * Aucune dépendance UI/IO.
  */
 import { ROLES, type Role } from '../m1/types';
-import type { GrantValidation, Member, MemberGrantInput } from './types';
+import type { GrantValidation, Member, MemberGrantInput, MemberInviteInput } from './types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -67,6 +67,19 @@ export function validateGrantInput(input: MemberGrantInput): GrantValidation {
 /** Valide un email d'invitation (forme). */
 export function isValidEmail(email: string): boolean {
   return EMAIL_RE.test(email.trim());
+}
+
+/**
+ * Valide une invitation de membre : nom, email (forme) et rôle connu. Le membre
+ * est créé « en_attente » (user_id null) ; ses droits d'enforcement sont
+ * attribués ensuite via l'éditeur d'attribution une fois le compte lié.
+ */
+export function validateInvite(input: MemberInviteInput): GrantValidation {
+  const errors: string[] = [];
+  if (!input.name || !input.name.trim()) errors.push('nom requis');
+  if (!isValidEmail(input.email)) errors.push('email invalide');
+  if (!(ROLES as readonly string[]).includes(input.role)) errors.push('rôle inconnu (hors vocabulaire)');
+  return { ok: errors.length === 0, errors };
 }
 
 /**

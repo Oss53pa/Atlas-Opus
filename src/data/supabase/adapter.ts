@@ -1342,11 +1342,19 @@ function toNotif(r: NotifRow): NotificationItem {
 function toApproval(r: ApprovalRow): ApprovalTask {
   return { id: r.id, tenantId: r.tenant_id, module: r.module, object: r.object, detail: r.detail, amount: Number(r.amount), status: r.status as ApprovalTask['status'], requiredRole: r.required_role as ApprovalTask['requiredRole'], forMe: r.for_me, createdAt: r.created_at };
 }
-export function createSupabaseAdminRepo(client: SupabaseClient): AdminRepo {
+export function createSupabaseAdminRepo(client: SupabaseClient, session: Session): AdminRepo {
   return {
     async members() {
       const rows = unwrap(await client.from('ao_members').select('*').order('name')) as MemberRow[];
       return rows.map(toMember);
+    },
+    async invite(input) {
+      const row = unwrap(await client.from('ao_members').insert({
+        tenant_id: session.tenantId,
+        name: input.name.trim(), email: input.email.trim(), role: input.role,
+        scope: 'toutes opérations', status: 'en_attente',
+      }).select('*').single()) as MemberRow;
+      return toMember(row);
     },
     async notifications() {
       const rows = unwrap(await client.from('ao_notifications').select('*').order('at', { ascending: false })) as NotifRow[];

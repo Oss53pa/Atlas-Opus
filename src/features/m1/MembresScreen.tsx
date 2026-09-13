@@ -4,7 +4,7 @@ import { Badge, Button, DataTable, Field, FactList, KpiRow, Panel, Select, Skele
 import { useData, useMembers, useMemberGrants, useOperations } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { activeMembers, distinctRoles, effectiveRole, validateGrantInput, linkableMembers, type MemberStatus } from '../../domain/admin';
+import { activeMembers, distinctRoles, effectiveRole, validateGrantInput, validateInvite, linkableMembers, type MemberStatus } from '../../domain/admin';
 import { ROLES, type Role } from '../../domain/m1/types';
 import { can } from '../../domain/m1/permissions';
 
@@ -23,8 +23,8 @@ const STATUS_TONE: Record<MemberStatus, 'success' | 'accent' | 'warning'> = {
 export function MembresScreen() {
   const { navigate } = useNav();
   const toast = useToast();
-  const { membership, session } = useData();
-  const { data: members, loading } = useMembers();
+  const { admin, membership, session } = useData();
+  const { data: members, loading, refetch: refetchMembers } = useMembers();
   const { data: grants, refetch: refetchGrants } = useMemberGrants();
   const { data: operations } = useOperations({});
   const roleLabel = (r: string) => t(`role.${r}` as MessageKey);
@@ -67,6 +67,24 @@ export function MembresScreen() {
     await membership.revoke(uid);
     toast.push(t('grant.revoked'), 'info');
     refetchGrants();
+  }
+
+  // Invitation d'un membre (crée une entrée « en_attente » ; droits attribués
+  // ensuite via l'éditeur une fois le compte lié).
+  const [inviting, setInviting] = useState(false);
+  const [invite, setInvite] = useState<{ name: string; email: string; role: Role }>({ name: '', email: '', role: 'viewer' });
+  async function sendInvite() {
+    const v = validateInvite(invite);
+    if (!v.ok) { toast.push(v.errors[0] ?? t('grant.invalid'), 'danger'); return; }
+    try {
+      await admin.invite(invite);
+      toast.push(t('invite.sent'), 'success');
+      setInvite({ name: '', email: '', role: 'viewer' });
+      setInviting(false);
+      refetchMembers();
+    } catch {
+      toast.push(t('invite.error'), 'danger');
+    }
   }
 
   if (loading) return <div className="flex flex-col gap-4"><Skeleton style={{ height: 40, width: 300 }} /><Skeleton style={{ height: 220 }} /></div>;
@@ -134,7 +152,9 @@ export function MembresScreen() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="glass" size="sm">{t('membres.accessLog')}</Button>
-          <Button variant="primary" size="sm" onClick={() => toast.push(t('membres.invite.soon'), 'info')}><UserPlus size={15} />{t('membres.invite')}</Button>
+          {canManage && (
+            <Button variant="primary" size="sm" onClick={() => setInviting((v) => !v)}><UserPlus size={15} />{t('membres.invite')}</Button>
+          )}
         </div>
       </div>
 
@@ -147,6 +167,25 @@ export function MembresScreen() {
           { label: t('membres.kpi.revocation'), value: '04.07', sub: t('membres.kpi.revocationSub') },
         ]}
       />
+
+      {canManage && inviting && (
+        <Panel title={t('invite.title')} meta={t('invite.meta')}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field id="inv-name" label={t('invite.name')} value={invite.name} onChange={(e) => setInvite((d) => ({ ...d, name: e.target.value }))} />
+            <Field id="inv-email" label={t('invite.email')} type="email" value={invite.email} onChange={(e) => setInvite((d) => ({ ...d, email: e.target.value }))} />
+            <Select id="inv-role" label={t('invite.role')} value={invite.role} onChange={(e) => setInvite((d) => ({ ...d, role: e.target.value as Role }))}>
+              {ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
+            </Select>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-[12px] text-ink-3">{t('invite.hint')}</span>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setInviting(false)}>{t('common.cancel')}</Button>
+              <Button variant="primary" size="sm" onClick={sendInvite}>{t('invite.send')}</Button>
+            </div>
+          </div>
+        </Panel>
+      )}
 
       {canManage && (
         <Panel title={t('grant.title')} meta={t('grant.meta')}>
