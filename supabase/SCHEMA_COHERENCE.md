@@ -81,9 +81,16 @@ déployé.
       `session.role` depuis `ao_tenant_roles` (source d'autorité de
       `ao_has_role`), avec repli sur `user_tenants.role`. Aucune ligne ⇒
       comportement courant préservé (fail-open).
-- [ ] **Application (onboarding F1)** — écrans d'invitation qui **peuplent**
-      `ao_operation_members` / `ao_tenant_roles`. Tant que ces tables sont
-      vides, les gardes restent en fail-open (comportement inchangé).
+- [x] **Application (onboarding F1)** — livré :
+      - invitation de membre (`ao_members` « en_attente ») via `MembresScreen` /
+        `AdminRepo.invite` (#91) ;
+      - acceptation : Edge Function `ao-accept-invitation` (service_role, ACTIVE)
+        relie `ao_members.user_id` + crée l'appartenance `user_tenants` à la
+        connexion (#92) ;
+      - attribution des droits fins (rôles + périmètre) via l'écran d'attribution
+        qui peuple `ao_tenant_roles` / `ao_operation_members` (#88, #89, #90).
+      Les gardes restent en fail-open par utilisateur tant qu'aucun droit fin ne
+      lui est attribué (comportement inchangé) — activation à l'attribution.
 
 ## Détail de la remédiation (référence)
 
