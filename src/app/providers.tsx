@@ -32,6 +32,7 @@ import {
   createMembershipRepo,
   createIntegrationsRepo,
   createHsseRepo,
+  createDisputesRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -69,6 +70,7 @@ import type {
   MembershipRepo,
   IntegrationsRepo,
   HsseRepo,
+  DisputesRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -99,6 +101,7 @@ import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { HsseIncident } from '../domain/hsse/types';
+import type { Dispute } from '../domain/litige/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -138,6 +141,7 @@ import {
   createSupabaseMembershipRepo,
   createSupabaseIntegrationsRepo,
   createSupabaseHsseRepo,
+  createSupabaseDisputesRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -176,6 +180,7 @@ interface DataApi {
   membership: MembershipRepo;
   integrations: IntegrationsRepo;
   hsse: HsseRepo;
+  disputes: DisputesRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -225,6 +230,7 @@ function buildMockApi(): DataApi {
     membership: createMembershipRepo(db, session),
     integrations: createIntegrationsRepo(db, session),
     hsse: createHsseRepo(db, session, { telemetry }),
+    disputes: createDisputesRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -322,6 +328,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           membership: createSupabaseMembershipRepo(supabase, session),
           integrations: createSupabaseIntegrationsRepo(supabase, session),
           hsse: createSupabaseHsseRepo(supabase, session),
+          disputes: createSupabaseDisputesRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -574,6 +581,11 @@ export function useOutbox(limit?: number): AsyncState<OutboxMessage[]> {
 export function useHsseIncidents(operationId: string): AsyncState<HsseIncident[]> {
   const { hsse } = useData();
   return useAsync(() => hsse.list(operationId), [hsse, operationId]);
+}
+
+export function useDisputes(operationId: string): AsyncState<Dispute[]> {
+  const { disputes } = useData();
+  return useAsync(() => disputes.list(operationId), [disputes, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {
