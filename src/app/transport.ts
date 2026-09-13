@@ -21,9 +21,10 @@ import type { RiskCategory } from '../domain/m20/types';
 import type { UtilityType } from '../domain/m18/types';
 import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
+import type { DoeCategory } from '../domain/doe/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -139,6 +140,13 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M20 (DOE) — pièce du dossier des ouvrages exécutés (non écriture), non validée.
+interface DoeCreatePayload {
+  operationId: string;
+  category: DoeCategory;
+  fileRef?: string | null;
 }
 
 // M19 (sinistres) — déclaration d'assurance (non écriture) : créée « déclaré » ;
@@ -356,6 +364,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M20 (DOE) — pièce collectée hors-ligne (non validée) : rejouable telle quelle.
+  if (m.entity === 'doeDocuments' && m.op === 'create') {
+    const p = m.payload as unknown as DoeCreatePayload;
+    await api.doe.add(p.operationId, { category: p.category, fileRef: p.fileRef ?? null });
     return { ok: true };
   }
   // M19 (sinistres) — déclaration créée « déclaré » : rejouable telle quelle.

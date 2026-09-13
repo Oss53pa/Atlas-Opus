@@ -34,6 +34,7 @@ import {
   createHsseRepo,
   createDisputesRepo,
   createClaimsRepo,
+  createDoeRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -73,6 +74,7 @@ import type {
   HsseRepo,
   DisputesRepo,
   ClaimsRepo,
+  DoeRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -105,6 +107,7 @@ import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { HsseIncident } from '../domain/hsse/types';
 import type { Dispute } from '../domain/litige/types';
 import type { Claim } from '../domain/claim/types';
+import type { DoeDocument } from '../domain/doe/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -146,6 +149,7 @@ import {
   createSupabaseHsseRepo,
   createSupabaseDisputesRepo,
   createSupabaseClaimsRepo,
+  createSupabaseDoeRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -186,6 +190,7 @@ interface DataApi {
   hsse: HsseRepo;
   disputes: DisputesRepo;
   claims: ClaimsRepo;
+  doe: DoeRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -237,6 +242,7 @@ function buildMockApi(): DataApi {
     hsse: createHsseRepo(db, session, { telemetry }),
     disputes: createDisputesRepo(db, session, { telemetry }),
     claims: createClaimsRepo(db, session, { telemetry }),
+    doe: createDoeRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -336,6 +342,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           hsse: createSupabaseHsseRepo(supabase, session),
           disputes: createSupabaseDisputesRepo(supabase, session),
           claims: createSupabaseClaimsRepo(supabase, session),
+          doe: createSupabaseDoeRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -598,6 +605,11 @@ export function useDisputes(operationId: string): AsyncState<Dispute[]> {
 export function useClaims(operationId: string): AsyncState<Claim[]> {
   const { claims } = useData();
   return useAsync(() => claims.list(operationId), [claims, operationId]);
+}
+
+export function useDoe(operationId: string): AsyncState<DoeDocument[]> {
+  const { doe } = useData();
+  return useAsync(() => doe.list(operationId), [doe, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

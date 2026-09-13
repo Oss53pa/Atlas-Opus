@@ -57,11 +57,12 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
+import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1573,6 +1574,35 @@ export function createSupabaseClaimsRepo(client: SupabaseClient, session: Sessio
     async setStatus(id, status: ClaimStatus) {
       const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as ClaimRow;
       return toClaim(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M20 (DOE) — Dossier des Ouvrages Exécutés ────────────────────────────────
+interface DoeRow { id: string; tenant_id: string; operation_id: string; category: string; file_ref: string | null; validated: boolean }
+function toDoe(r: DoeRow): DoeDocument {
+  return { id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, category: r.category as DoeCategory, fileRef: r.file_ref, validated: r.validated };
+}
+export function createSupabaseDoeRepo(client: SupabaseClient, session: Session): DoeRepo {
+  const TB = 'ao_doe_documents';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('category')) as DoeRow[];
+      return rows.map(toDoe);
+    },
+    async add(opId, input: DoeDocumentInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, category: input.category, file_ref: input.fileRef ?? null,
+      }).select('*').single()) as DoeRow;
+      return toDoe(row);
+    },
+    async setValidated(id, validated) {
+      const row = unwrap(await client.from(TB).update({ validated }).eq('id', id).select('*').single()) as DoeRow;
+      return toDoe(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

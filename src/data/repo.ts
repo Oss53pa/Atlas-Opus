@@ -80,6 +80,7 @@ import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
+import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -322,6 +323,14 @@ export interface ClaimsRepo {
   list(operationId: string): Promise<Claim[]>;
   add(operationId: string, input: ClaimInput): Promise<Claim>;
   setStatus(id: string, status: ClaimStatus): Promise<Claim>;
+  remove(id: string): Promise<void>;
+}
+
+/** M20 (DOE) — Dossier des Ouvrages Exécutés d'une opération (complétude documentaire). */
+export interface DoeRepo {
+  list(operationId: string): Promise<DoeDocument[]>;
+  add(operationId: string, input: DoeDocumentInput): Promise<DoeDocument>;
+  setValidated(id: string, validated: boolean): Promise<DoeDocument>;
   remove(id: string): Promise<void>;
 }
 

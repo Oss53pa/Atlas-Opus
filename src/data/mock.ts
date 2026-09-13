@@ -62,6 +62,7 @@ import { canManualRetry } from '../domain/f5/contract';
 import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput } from '../domain/litige/types';
 import type { Claim, ClaimInput } from '../domain/claim/types';
+import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -120,6 +121,7 @@ import type {
   HsseRepo,
   DisputesRepo,
   ClaimsRepo,
+  DoeRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -180,6 +182,7 @@ export interface MockDb {
   hsseIncidents: HsseIncident[];
   disputes: Dispute[];
   claims: Claim[];
+  doeDocuments: DoeDocument[];
 }
 
 interface Deps {
@@ -618,8 +621,12 @@ export function createMockDb(): MockDb {
   const claims: Claim[] = [
     { id: 'cl-1', tenantId: T, operationId: 'op-palmiers', insuranceId: null, event: 'Dégât des eaux niveau R+1', amount: 6_500_000, status: 'en_instruction' },
   ];
+  const doeDocuments: DoeDocument[] = [
+    { id: 'doe-1', tenantId: T, operationId: 'op-palmiers', category: 'plans_recolement', fileRef: 'DOE/plans-recol.pdf', validated: true },
+    { id: 'doe-2', tenantId: T, operationId: 'op-palmiers', category: 'garanties', fileRef: 'DOE/garanties.zip', validated: false },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1527,6 +1534,33 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
     },
     async remove(iid) {
       db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
+    },
+  };
+}
+
+export function createDoeRepo(db: MockDb, session: Session, deps: Deps): DoeRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.doeDocuments).filter((d) => d.operationId === opId).map((d) => ({ ...d }));
+    },
+    async add(opId, input: DoeDocumentInput) {
+      const d: DoeDocument = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        category: input.category, fileRef: input.fileRef ?? null, validated: false,
+      };
+      db.doeDocuments.push(d);
+      return { ...d };
+    },
+    async setValidated(did, validated) {
+      const d = db.doeDocuments.find((x) => x.id === did);
+      if (!d) throw new Error('doe_not_found');
+      d.validated = validated;
+      return { ...d };
+    },
+    async remove(did) {
+      db.doeDocuments = db.doeDocuments.filter((x) => x.id !== did);
     },
   };
 }

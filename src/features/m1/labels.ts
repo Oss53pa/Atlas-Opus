@@ -20,6 +20,7 @@ import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types
 import type { HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { DisputeStatus } from '../../domain/litige/types';
 import type { ClaimStatus } from '../../domain/claim/types';
+import type { DoeCategory } from '../../domain/doe/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -513,6 +514,14 @@ export const CLAIM_STATUS_TONE: Record<ClaimStatus, BadgeTone> = {
   declare: 'warning', en_instruction: 'info', indemnise: 'success', refuse: 'danger',
 };
 export const claimStatusLabel = (s: ClaimStatus) => t(CLAIM_STATUS_KEY[s]);
+
+// ── DOE (M20) ────────────────────────────────────────────────────────────────
+const DOE_CATEGORY_KEY: Record<DoeCategory, MessageKey> = {
+  plans_recolement: 'doe.cat.plans_recolement', notices_exploitation: 'doe.cat.notices_exploitation',
+  garanties: 'doe.cat.garanties', attestations: 'doe.cat.attestations', pv_essais: 'doe.cat.pv_essais',
+  dossier_maintenance: 'doe.cat.dossier_maintenance', autre: 'doe.cat.autre',
+};
+export const doeCategoryLabel = (c: DoeCategory) => t(DOE_CATEGORY_KEY[c]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {
