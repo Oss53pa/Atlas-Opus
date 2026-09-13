@@ -6,8 +6,8 @@
  */
 import { sha256Hex } from '../m23/sha256';
 import {
-  DEFAULT_CIRCUIT, DEFAULT_RETRY, type CallOutcome, type CircuitConfig, type CircuitState,
-  type CircuitStatus, type IntegrationSystem, type OutboxMessage, type RetryPolicy,
+  DEFAULT_CIRCUIT, DEFAULT_RETRY, DELIVERY_STATUSES, type CallOutcome, type CircuitConfig, type CircuitState,
+  type CircuitStatus, type DeliveryStatus, type IntegrationSystem, type OutboxMessage, type RetryPolicy,
 } from './types';
 
 /** Clé d'idempotence stable : deux intentions identiques la partagent. */
@@ -26,6 +26,13 @@ function stableStringify(value: unknown): string {
 /** Empreinte SHA-256 de la charge utile (rejeu au contenu divergent détectable). */
 export function payloadHash(payload: unknown): string {
   return sha256Hex(stableStringify(payload));
+}
+
+/** Comptage de l'outbox par statut (console F5) — tous les statuts présents (0 par défaut). */
+export function outboxBacklog(msgs: readonly Pick<OutboxMessage, 'status'>[]): Record<DeliveryStatus, number> {
+  const counts = Object.fromEntries(DELIVERY_STATUSES.map((s) => [s, 0])) as Record<DeliveryStatus, number>;
+  for (const m of msgs) counts[m.status] += 1;
+  return counts;
 }
 
 /** Délai avant la n-ième tentative (attempt ≥ 1) : base·factor^(n-1), plafonné. */

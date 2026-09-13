@@ -55,6 +55,7 @@ import { WorkspacesScreen } from './features/m1/WorkspacesScreen';
 import { InvitationScreen } from './features/m1/InvitationScreen';
 import { OnboardingScreen } from './features/m1/OnboardingScreen';
 import { MembresScreen } from './features/m1/MembresScreen';
+import { IntegrationsScreen } from './features/m1/IntegrationsScreen';
 import { NotificationsScreen } from './features/m1/NotificationsScreen';
 import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
@@ -161,6 +162,8 @@ function RouteView() {
       return <OnboardingScreen />;
     case 'membres':
       return <MembresScreen />;
+    case 'integrations':
+      return <IntegrationsScreen />;
     case 'notifications':
       return <NotificationsScreen />;
     case 'approbations':

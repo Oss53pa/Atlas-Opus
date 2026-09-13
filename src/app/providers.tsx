@@ -30,6 +30,7 @@ import {
   createHandoverRepo,
   createAdminRepo,
   createMembershipRepo,
+  createIntegrationsRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -65,6 +66,7 @@ import type {
   HandoverRepo,
   AdminRepo,
   MembershipRepo,
+  IntegrationsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -93,6 +95,7 @@ import type { Connection } from '../domain/m18/types';
 import type { LibraryDoc } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant } from '../domain/admin/types';
+import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -130,6 +133,7 @@ import {
   createSupabaseHandoverRepo,
   createSupabaseAdminRepo,
   createSupabaseMembershipRepo,
+  createSupabaseIntegrationsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -166,6 +170,7 @@ interface DataApi {
   handover: HandoverRepo;
   admin: AdminRepo;
   membership: MembershipRepo;
+  integrations: IntegrationsRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -213,6 +218,7 @@ function buildMockApi(): DataApi {
     handover: createHandoverRepo(db),
     admin: createAdminRepo(db, session),
     membership: createMembershipRepo(db, session),
+    integrations: createIntegrationsRepo(db, session),
     session,
     countries: COUNTRIES,
   };
@@ -308,6 +314,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           handover: createSupabaseHandoverRepo(supabase),
           admin: createSupabaseAdminRepo(supabase, session),
           membership: createSupabaseMembershipRepo(supabase, session),
+          integrations: createSupabaseIntegrationsRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -545,6 +552,16 @@ export function useMembers(): AsyncState<Member[]> {
 export function useMemberGrants(): AsyncState<MemberGrant[]> {
   const { membership } = useData();
   return useAsync(() => membership.listGrants(), [membership]);
+}
+
+export function useIntegrationEndpoints(): AsyncState<IntegrationEndpoint[]> {
+  const { integrations } = useData();
+  return useAsync(() => integrations.endpoints(), [integrations]);
+}
+
+export function useOutbox(limit?: number): AsyncState<OutboxMessage[]> {
+  const { integrations } = useData();
+  return useAsync(() => integrations.outbox(limit), [integrations, limit]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

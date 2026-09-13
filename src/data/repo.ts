@@ -76,6 +76,7 @@ import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m1
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
+import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -279,6 +280,14 @@ export interface MembershipRepo {
   setGrant(input: MemberGrantInput): Promise<MemberGrant>;
   /** Retire tous les rôles et le périmètre d'un utilisateur. */
   revoke(userId: string): Promise<void>;
+}
+
+/** F5 — console d'intégration (lecture) : santé des systèmes tiers + outbox. */
+export interface IntegrationsRepo {
+  /** Endpoints du tenant (config + disjoncteur), un par système. */
+  endpoints(): Promise<IntegrationEndpoint[]>;
+  /** Messages outbox récents du tenant (les plus récents d'abord). */
+  outbox(limit?: number): Promise<OutboxMessage[]>;
 }
 
 /** Conception & GED (M11) : documents & visas. */
