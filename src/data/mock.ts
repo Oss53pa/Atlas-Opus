@@ -58,6 +58,7 @@ import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput } from '../domain/admin/types';
 import { normalizeScope } from '../domain/admin/onboarding';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
+import { canManualRetry } from '../domain/f5/contract';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -1491,6 +1492,22 @@ export function createIntegrationsRepo(db: MockDb, session: Session): Integratio
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, limit)
         .map((m) => ({ ...m }));
+    },
+    async retry(outboxId: string) {
+      const m = db.outbox.find((x) => x.id === outboxId && x.tenantId === session.tenantId);
+      if (!m) throw new Error('outbox_not_found');
+      if (!canManualRetry(m.status)) throw new Error('not_retriable');
+      m.status = 'pending';
+      m.attempts = 0;
+      m.lastError = null;
+      m.nextAttemptAt = null;
+      return { ...m };
+    },
+    async resetCircuit(endpointId: string) {
+      const e = db.integrationEndpoints.find((x) => x.id === endpointId && x.tenantId === session.tenantId);
+      if (!e) throw new Error('endpoint_not_found');
+      e.circuit = { state: 'closed', failures: 0, openedAt: null };
+      return { ...e, circuit: { ...e.circuit } };
     },
   };
 }

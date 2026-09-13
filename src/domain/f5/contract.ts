@@ -28,6 +28,15 @@ export function payloadHash(payload: unknown): string {
   return sha256Hex(stableStringify(payload));
 }
 
+/**
+ * Un message peut-il être rejoué manuellement depuis la console ? Seuls les
+ * messages en échec (lettre morte) ou en reprise ; jamais un message livré,
+ * en attente, ou en cours (terminal/déjà pris en charge).
+ */
+export function canManualRetry(status: DeliveryStatus): boolean {
+  return status === 'dead' || status === 'retrying';
+}
+
 /** Comptage de l'outbox par statut (console F5) — tous les statuts présents (0 par défaut). */
 export function outboxBacklog(msgs: readonly Pick<OutboxMessage, 'status'>[]): Record<DeliveryStatus, number> {
   const counts = Object.fromEntries(DELIVERY_STATUSES.map((s) => [s, 0])) as Record<DeliveryStatus, number>;

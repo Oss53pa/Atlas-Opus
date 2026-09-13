@@ -26,7 +26,8 @@ export type Action =
   | 'planning.edit'
   | 'tender.read'
   | 'tender.edit'
-  | 'member.manage';
+  | 'member.manage'
+  | 'integration.manage';
 
 const ALL_READ: Role[] = [
   'owner',
@@ -63,6 +64,8 @@ const MATRIX: Record<Action, Role[]> = {
   'tender.edit': ['owner', 'moa_director', 'procurement', 'amo'],
   // F1 — attribution des droits (rôles + périmètre) : administration du tenant.
   'member.manage': ['owner', 'moa_director'],
+  // F5 — contrôle des intégrations (rejeu lettre morte, réarmement disjoncteur).
+  'integration.manage': ['owner', 'moa_director'],
 };
 
 export function can(role: Role, action: Action): boolean {
