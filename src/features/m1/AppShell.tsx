@@ -83,6 +83,7 @@ const FAMILIES: FamilyDef[] = [
     labelKey: 'nav.family.transverse',
     modules: [
       { code: 'M20', labelKey: 'mod.m20', route: 'risques' },
+      { code: 'HSSE', labelKey: 'mod.hsse', route: 'hsse' },
       { code: 'EXP', labelKey: 'mod.bascule', route: 'bascule' },
       { code: 'M21', labelKey: 'mod.m21', route: 'reporting' },
       { code: 'M22', labelKey: 'mod.m22', route: 'documents' },

@@ -59,6 +59,7 @@ import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantIn
 import { normalizeScope } from '../domain/admin/onboarding';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { canManualRetry } from '../domain/f5/contract';
+import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -114,6 +115,7 @@ import type {
   AdminRepo,
   MembershipRepo,
   IntegrationsRepo,
+  HsseRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -171,6 +173,7 @@ export interface MockDb {
   memberGrants: MemberGrant[];
   integrationEndpoints: IntegrationEndpoint[];
   outbox: OutboxMessage[];
+  hsseIncidents: HsseIncident[];
 }
 
 interface Deps {
@@ -598,7 +601,12 @@ export function createMockDb(): MockDb {
     { id: 'ob-4', tenantId: T, system: 'advist', kind: 'attestation', businessId: 'att-1', idempotencyKey: 'advist:attestation:att-1', payloadHash: 'h4', status: 'pending', attempts: 0, lastError: null, nextAttemptAt: null, createdAt: '2026-09-12T09:15:00.000Z' },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox };
+  const hsseIncidents: HsseIncident[] = [
+    { id: 'hs-1', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-003', kind: 'accident', severity: 'grave', occurredAt: '2026-08-28', location: 'R+2 aile B', description: 'Chute de plain-pied, arrêt 3 jours.', correctiveAction: 'Balisage renforcé, causerie sécurité.', status: 'en_analyse' },
+    { id: 'hs-2', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-004', kind: 'presqu_accident', severity: 'mineure', occurredAt: '2026-09-02', location: 'Zone grue', description: 'Charge balancée à proximité d’un ouvrier.', correctiveAction: null, status: 'declare' },
+  ];
+
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1476,6 +1484,36 @@ export function createMembershipRepo(db: MockDb, session: Session): MembershipRe
     },
     async revoke(userId: string) {
       db.memberGrants = db.memberGrants.filter((g) => !(g.tenantId === session.tenantId && g.userId === userId));
+    },
+  };
+}
+
+export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.hsseIncidents).filter((i) => i.operationId === opId).map((i) => ({ ...i }));
+    },
+    async add(opId, input: HsseIncidentInput) {
+      const i: HsseIncident = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        reference: input.reference.trim(), kind: input.kind, severity: input.severity,
+        occurredAt: input.occurredAt, location: input.location ?? null,
+        description: input.description.trim(), correctiveAction: input.correctiveAction ?? null,
+        status: 'declare',
+      };
+      db.hsseIncidents.push(i);
+      return { ...i };
+    },
+    async setStatus(iid, status) {
+      const i = db.hsseIncidents.find((x) => x.id === iid);
+      if (!i) throw new Error('hsse_not_found');
+      i.status = status;
+      return { ...i };
+    },
+    async remove(iid) {
+      db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
     },
   };
 }

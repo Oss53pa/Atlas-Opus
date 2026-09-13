@@ -20,9 +20,10 @@ import type { ChangeOrigin } from '../domain/m14/types';
 import type { RiskCategory } from '../domain/m20/types';
 import type { UtilityType } from '../domain/m18/types';
 import type { StudyKind } from '../domain/m3/types';
+import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -138,6 +139,19 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M19 (HSSE) — incident terrain (fait, non écriture) : créé « déclaré » ;
+// payload JSON-safe (dates ISO, énumérés).
+interface HsseCreatePayload {
+  operationId: string;
+  reference: string;
+  kind: HsseKind;
+  severity: HsseSeverity;
+  occurredAt: string;
+  location?: string | null;
+  description: string;
+  correctiveAction?: string | null;
 }
 
 // M3 — étude amont (diagnostic, non écriture) : créée « planifiée » ;
@@ -323,6 +337,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M19 (HSSE) — incident terrain créé « déclaré » : rejouable tel quel.
+  if (m.entity === 'hsseIncidents' && m.op === 'create') {
+    const p = m.payload as unknown as HsseCreatePayload;
+    await api.hsse.add(p.operationId, {
+      reference: p.reference, kind: p.kind, severity: p.severity, occurredAt: p.occurredAt,
+      location: p.location ?? null, description: p.description, correctiveAction: p.correctiveAction ?? null,
+    });
     return { ok: true };
   }
   // M3 — étude amont (diagnostic, non écriture) créée « planifiée » : rejouable.
