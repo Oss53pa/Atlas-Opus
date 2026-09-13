@@ -67,6 +67,8 @@ import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets
 import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput } from '../domain/legalEntity/types';
 import { canTransitionLegalEntity } from '../domain/legalEntity';
+import type { ActionItem, ActionItemInput } from '../domain/actionItem/types';
+import { canTransitionActionItem } from '../domain/actionItem';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -129,6 +131,7 @@ import type {
   HandoverAssetsRepo,
   BaselinesRepo,
   LegalEntitiesRepo,
+  ActionItemsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -193,6 +196,7 @@ export interface MockDb {
   handoverAssets: HandoverAsset[];
   baselines: Baseline[];
   legalEntities: LegalEntity[];
+  actionItems: ActionItem[];
 }
 
 interface Deps {
@@ -646,6 +650,11 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const actionItems: ActionItem[] = [
+    { id: 'ai-1', tenantId: T, operationId: 'op-palmiers', siteReportId: null, description: 'Reprendre l’étanchéité toiture bloc A', owner: 'Entreprise gros œuvre', dueDate: '2026-09-05', status: 'ouvert' },
+    { id: 'ai-2', tenantId: T, operationId: 'op-palmiers', siteReportId: null, description: 'Transmettre plans électricité révisés', owner: 'BET fluides', dueDate: '2026-09-30', status: 'en_cours' },
+    { id: 'ai-3', tenantId: T, operationId: 'op-palmiers', siteReportId: null, description: 'Valider échantillon carrelage', owner: 'MOA', dueDate: '2026-08-20', status: 'fait' },
+  ];
   const baselines: Baseline[] = [
     {
       id: 'bl-1', tenantId: T, operationId: 'op-palmiers', label: 'Ordre de service initial',
@@ -660,7 +669,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1625,6 +1634,35 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createActionItemsRepo(db: MockDb, session: Session, deps: Deps): ActionItemsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.actionItems).filter((i) => i.operationId === opId).map((i) => ({ ...i }));
+    },
+    async add(opId, input: ActionItemInput) {
+      const it: ActionItem = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        siteReportId: input.siteReportId ?? null, description: input.description.trim(),
+        owner: input.owner.trim(), dueDate: input.dueDate, status: 'ouvert',
+      };
+      db.actionItems.push(it);
+      return { ...it };
+    },
+    async setStatus(iid, status) {
+      const it = db.actionItems.find((x) => x.id === iid);
+      if (!it) throw new Error('action_item_not_found');
+      if (!canTransitionActionItem(it.status, status)) throw new Error('action_item_transition_invalid');
+      it.status = status;
+      return { ...it };
+    },
+    async remove(iid) {
+      db.actionItems = db.actionItems.filter((x) => x.id !== iid);
     },
   };
 }

@@ -16,6 +16,7 @@ export type Route =
   | { name: 'planning'; id: string }
   | { name: 'baselines'; id: string }
   | { name: 'montage'; id: string }
+  | { name: 'actions'; id: string }
   | { name: 'passation'; id: string }
   | { name: 'etudes'; id: string }
   | { name: 'analyse'; id: string }

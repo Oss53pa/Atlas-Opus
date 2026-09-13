@@ -21,6 +21,7 @@ import { PaymentsScreen } from './features/m1/PaymentsScreen';
 import { PlanningScreen } from './features/m1/PlanningScreen';
 import { BaselinesScreen } from './features/m1/BaselinesScreen';
 import { MontageScreen } from './features/m1/MontageScreen';
+import { ActionsScreen } from './features/m1/ActionsScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
 import { EtudesScreen } from './features/m1/EtudesScreen';
 import { AnalyseScreen } from './features/m1/AnalyseScreen';
@@ -101,6 +102,8 @@ function RouteView() {
       return <BaselinesScreen id={route.id} />;
     case 'montage':
       return <MontageScreen id={route.id} />;
+    case 'actions':
+      return <ActionsScreen id={route.id} />;
     case 'passation':
       return <PassationScreen id={route.id} />;
     case 'etudes':

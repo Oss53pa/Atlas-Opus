@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -66,6 +66,7 @@ import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/do
 import type { HandoverAsset, HandoverAssetInput, AssetType } from '../../domain/handoverAssets/types';
 import type { Baseline, BaselineInput, BaselineTask } from '../../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput, StructureType, LegalEntityStatus, Shareholder } from '../../domain/legalEntity/types';
+import type { ActionItem, ActionItemInput, ActionItemStatus } from '../../domain/actionItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1675,6 +1676,39 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M13 (pilotage) — relevé d'actions ────────────────────────────────────────
+interface ActionItemRow { id: string; tenant_id: string; operation_id: string; site_report_id: string | null; description: string; owner: string; due_date: string; status: string }
+function toActionItem(r: ActionItemRow): ActionItem {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, siteReportId: r.site_report_id,
+    description: r.description, owner: r.owner, dueDate: r.due_date, status: r.status as ActionItemStatus,
+  };
+}
+export function createSupabaseActionItemsRepo(client: SupabaseClient, session: Session): ActionItemsRepo {
+  const TB = 'ao_action_items';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('due_date')) as ActionItemRow[];
+      return rows.map(toActionItem);
+    },
+    async add(opId, input: ActionItemInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, site_report_id: input.siteReportId ?? null,
+        description: input.description.trim(), owner: input.owner.trim(), due_date: input.dueDate,
+      }).select('*').single()) as ActionItemRow;
+      return toActionItem(row);
+    },
+    async setStatus(id, status) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as ActionItemRow;
+      return toActionItem(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

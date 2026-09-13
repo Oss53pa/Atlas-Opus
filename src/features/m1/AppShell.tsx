@@ -75,6 +75,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M13', labelKey: 'mod.m13', route: 'planning' },
       { code: 'REF', labelKey: 'mod.baseline', route: 'baselines' },
       { code: 'M14', labelKey: 'mod.m14', route: 'pilotage' },
+      { code: 'ACT', labelKey: 'mod.actions', route: 'actions' },
       { code: 'M15', labelKey: 'mod.m15', route: 'modifications' },
       { code: 'M18', labelKey: 'mod.m18', route: 'raccordements' },
       { code: 'M19', labelKey: 'mod.m19', route: 'reception' },

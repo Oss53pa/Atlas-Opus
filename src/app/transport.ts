@@ -27,7 +27,7 @@ import type { BaselineTask } from '../domain/baseline/types';
 import type { StructureType, Shareholder } from '../domain/legalEntity/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -168,6 +168,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M13 (pilotage) — action relevée sur le terrain (non écriture) : créée « ouvert ».
+interface ActionItemCreatePayload {
+  operationId: string;
+  description: string;
+  owner: string;
+  dueDate: string;
+  siteReportId?: string | null;
 }
 
 // M2 (montage juridique) — structure de portage (non écriture) : créée « projet » ;
@@ -416,6 +425,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M13 (pilotage) — action créée « ouvert » : rejouable telle quelle.
+  if (m.entity === 'actionItems' && m.op === 'create') {
+    const p = m.payload as unknown as ActionItemCreatePayload;
+    await api.actionItems.add(p.operationId, {
+      description: p.description, owner: p.owner, dueDate: p.dueDate, siteReportId: p.siteReportId ?? null,
+    });
     return { ok: true };
   }
   // M2 (montage juridique) — structure créée « projet » : rejouable telle quelle.

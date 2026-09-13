@@ -84,6 +84,7 @@ import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
 import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput, LegalEntityStatus } from '../domain/legalEntity/types';
+import type { ActionItem, ActionItemInput, ActionItemStatus } from '../domain/actionItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -358,6 +359,14 @@ export interface LegalEntitiesRepo {
   list(operationId: string): Promise<LegalEntity[]>;
   add(operationId: string, input: LegalEntityInput): Promise<LegalEntity>;
   setStatus(id: string, status: LegalEntityStatus): Promise<LegalEntity>;
+  remove(id: string): Promise<void>;
+}
+
+/** M13 (pilotage) — relevé d'actions (issues du pilotage de chantier). */
+export interface ActionItemsRepo {
+  list(operationId: string): Promise<ActionItem[]>;
+  add(operationId: string, input: ActionItemInput): Promise<ActionItem>;
+  setStatus(id: string, status: ActionItemStatus): Promise<ActionItem>;
   remove(id: string): Promise<void>;
 }
 

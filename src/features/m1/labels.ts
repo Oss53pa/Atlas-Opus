@@ -23,6 +23,7 @@ import type { ClaimStatus } from '../../domain/claim/types';
 import type { DoeCategory } from '../../domain/doe/types';
 import type { AssetType } from '../../domain/handoverAssets/types';
 import type { StructureType, LegalEntityStatus } from '../../domain/legalEntity/types';
+import type { ActionItemStatus } from '../../domain/actionItem/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -546,6 +547,16 @@ export const LEGAL_STATUS_TONE: Record<LegalEntityStatus, BadgeTone> = {
   projet: 'neutral', constituee: 'info', active: 'success', dissoute: 'danger',
 };
 export const legalEntityStatusLabel = (s: LegalEntityStatus) => t(LEGAL_STATUS_KEY[s]);
+
+// ── Relevé d'actions (M13) ───────────────────────────────────────────────────
+const ACTION_STATUS_KEY: Record<ActionItemStatus, MessageKey> = {
+  ouvert: 'action.status.ouvert', en_cours: 'action.status.en_cours',
+  fait: 'action.status.fait', annule: 'action.status.annule',
+};
+export const ACTION_STATUS_TONE: Record<ActionItemStatus, BadgeTone> = {
+  ouvert: 'warning', en_cours: 'info', fait: 'success', annule: 'neutral',
+};
+export const actionItemStatusLabel = (s: ActionItemStatus) => t(ACTION_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {
