@@ -92,7 +92,7 @@ import type { Rfi } from '../domain/rfi/types';
 import type { Connection } from '../domain/m18/types';
 import type { LibraryDoc } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
-import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
+import type { Member, NotificationItem, ApprovalTask, MemberGrant } from '../domain/admin/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -530,6 +530,11 @@ export function useHandover(operationId: string): AsyncState<HandoverFile | null
 export function useMembers(): AsyncState<Member[]> {
   const { admin } = useData();
   return useAsync(() => admin.members(), [admin]);
+}
+
+export function useMemberGrants(): AsyncState<MemberGrant[]> {
+  const { membership } = useData();
+  return useAsync(() => membership.listGrants(), [membership]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {
