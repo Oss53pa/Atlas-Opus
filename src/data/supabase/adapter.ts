@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo } from '../repo';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -75,7 +75,9 @@ import type { Document, DocumentInput, DocStatus, DocDiscipline } from '../../do
 import type { Rfi, RfiInput, RfiStatus, RfiPriority } from '../../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus, UtilityType } from '../../domain/m18/types';
 import type { HandoverFile, DoeCategory, TransferEquipment } from '../../domain/handover/types';
-import type { Member, NotificationItem, ApprovalTask } from '../../domain/admin/types';
+import type { Member, NotificationItem, ApprovalTask, MemberGrantInput } from '../../domain/admin/types';
+import type { Role } from '../../domain/m1/types';
+import { normalizeScope } from '../../domain/admin/onboarding';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus, DocCategory } from '../../domain/m22/types';
 import type { BilanLineRow, ContractRow, DecompteRow, OperationRow, ProgramItemRow, StakeholderRow, TaskRow, TenderRow } from './types';
 
@@ -1365,6 +1367,54 @@ export function createSupabaseAdminRepo(client: SupabaseClient): AdminRepo {
         .select('id');
       if (error) throw new Error(error.message);
       return { created: (data ?? []).length > 0 };
+    },
+  };
+}
+
+// ── F1 — Attribution des droits (rôles + périmètre) ──────────────────────────
+interface TenantRoleRow { user_id: string; role: string }
+interface OpMemberRow { user_id: string; operation_id: string }
+
+export function createSupabaseMembershipRepo(client: SupabaseClient, session: Session): MembershipRepo {
+  const t = session.tenantId;
+  return {
+    async listGrants() {
+      const roleRows = unwrap(await client.from('ao_tenant_roles').select('user_id, role').eq('tenant_id', t)) as TenantRoleRow[];
+      const memberRows = unwrap(await client.from('ao_operation_members').select('user_id, operation_id').eq('tenant_id', t)) as OpMemberRow[];
+      const byUser = new Map<string, { roles: Role[]; scope: string[] }>();
+      const ensure = (u: string) => {
+        let g = byUser.get(u);
+        if (!g) { g = { roles: [], scope: [] }; byUser.set(u, g); }
+        return g;
+      };
+      for (const r of roleRows) ensure(r.user_id).roles.push(r.role as Role);
+      const scopedUsers = new Set<string>();
+      for (const m of memberRows) { ensure(m.user_id).scope.push(m.operation_id); scopedUsers.add(m.user_id); }
+      return [...byUser.entries()].map(([userId, g]) => ({
+        userId, tenantId: t, roles: g.roles,
+        // aucune ligne ao_operation_members ⇒ null = toutes les opérations (cohérent RLS).
+        operationScope: scopedUsers.has(userId) ? g.scope : null,
+      }));
+    },
+    async setGrant(input: MemberGrantInput) {
+      const scope = normalizeScope(input.operationScope);
+      // Remplace rôles : purge puis insère.
+      { const { error } = await client.from('ao_tenant_roles').delete().eq('tenant_id', t).eq('user_id', input.userId); if (error) throw new Error(error.message); }
+      if (input.roles.length > 0) {
+        const { error } = await client.from('ao_tenant_roles').insert(input.roles.map((role) => ({ tenant_id: t, user_id: input.userId, role })));
+        if (error) throw new Error(error.message);
+      }
+      // Remplace périmètre : purge puis insère (aucune ligne ⇒ toutes les opérations).
+      { const { error } = await client.from('ao_operation_members').delete().eq('tenant_id', t).eq('user_id', input.userId); if (error) throw new Error(error.message); }
+      if (scope) {
+        const { error } = await client.from('ao_operation_members').insert(scope.map((operation_id) => ({ tenant_id: t, user_id: input.userId, operation_id })));
+        if (error) throw new Error(error.message);
+      }
+      return { userId: input.userId, tenantId: t, roles: [...input.roles], operationScope: scope };
+    },
+    async revoke(userId: string) {
+      { const { error } = await client.from('ao_tenant_roles').delete().eq('tenant_id', t).eq('user_id', userId); if (error) throw new Error(error.message); }
+      { const { error } = await client.from('ao_operation_members').delete().eq('tenant_id', t).eq('user_id', userId); if (error) throw new Error(error.message); }
     },
   };
 }

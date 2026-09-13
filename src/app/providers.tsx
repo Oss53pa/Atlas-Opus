@@ -29,6 +29,7 @@ import {
   createLibraryRepo,
   createHandoverRepo,
   createAdminRepo,
+  createMembershipRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -63,6 +64,7 @@ import type {
   LibraryRepo,
   HandoverRepo,
   AdminRepo,
+  MembershipRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -127,6 +129,7 @@ import {
   createSupabaseLibraryRepo,
   createSupabaseHandoverRepo,
   createSupabaseAdminRepo,
+  createSupabaseMembershipRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -162,6 +165,7 @@ interface DataApi {
   library: LibraryRepo;
   handover: HandoverRepo;
   admin: AdminRepo;
+  membership: MembershipRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -208,6 +212,7 @@ function buildMockApi(): DataApi {
     library: createLibraryRepo(db, session, { telemetry }),
     handover: createHandoverRepo(db),
     admin: createAdminRepo(db, session),
+    membership: createMembershipRepo(db, session),
     session,
     countries: COUNTRIES,
   };
@@ -292,6 +297,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           library: createSupabaseLibraryRepo(supabase, session),
           handover: createSupabaseHandoverRepo(supabase),
           admin: createSupabaseAdminRepo(supabase),
+          membership: createSupabaseMembershipRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });

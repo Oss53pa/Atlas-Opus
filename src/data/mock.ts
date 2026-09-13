@@ -55,7 +55,8 @@ import type { Rfi, RfiInput, RfiStatus } from '../domain/rfi/types';
 import type { Connection, ConnectionInput, ConnectionStatus } from '../domain/m18/types';
 import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
-import type { Member, NotificationItem, ApprovalTask } from '../domain/admin/types';
+import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput } from '../domain/admin/types';
+import { normalizeScope } from '../domain/admin/onboarding';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -109,6 +110,7 @@ import type {
   LibraryRepo,
   HandoverRepo,
   AdminRepo,
+  MembershipRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -163,6 +165,7 @@ export interface MockDb {
   notifications: NotificationItem[];
   approvals: ApprovalTask[];
   priceRevisions: PriceRevision[];
+  memberGrants: MemberGrant[];
 }
 
 interface Deps {
@@ -577,8 +580,9 @@ export function createMockDb(): MockDb {
   ];
 
   const priceRevisions: PriceRevision[] = [];
+  const memberGrants: MemberGrant[] = [];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1423,6 +1427,30 @@ export function createAdminRepo(db: MockDb, session: Session): AdminRepo {
         dedupKey: input.dedupKey,
       });
       return { created: true };
+    },
+  };
+}
+
+export function createMembershipRepo(db: MockDb, session: Session): MembershipRepo {
+  const mine = () => db.memberGrants.filter((g) => g.tenantId === session.tenantId);
+  return {
+    async listGrants() {
+      return mine().map((g) => ({ ...g, roles: [...g.roles], operationScope: g.operationScope ? [...g.operationScope] : null }));
+    },
+    async setGrant(input: MemberGrantInput) {
+      const grant: MemberGrant = {
+        userId: input.userId,
+        tenantId: session.tenantId,
+        roles: [...input.roles],
+        operationScope: normalizeScope(input.operationScope),
+      };
+      const i = db.memberGrants.findIndex((g) => g.tenantId === session.tenantId && g.userId === input.userId);
+      if (i >= 0) db.memberGrants[i] = grant;
+      else db.memberGrants.push(grant);
+      return { ...grant, roles: [...grant.roles], operationScope: grant.operationScope ? [...grant.operationScope] : null };
+    },
+    async revoke(userId: string) {
+      db.memberGrants = db.memberGrants.filter((g) => !(g.tenantId === session.tenantId && g.userId === userId));
     },
   };
 }

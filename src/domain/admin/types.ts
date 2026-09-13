@@ -23,6 +23,36 @@ export interface Member {
   lastActivity: string | null;
 }
 
+// ── Attributions de droits (F1 · enforcement RLS) ────────────────────────────
+// Le déployé applique le périmètre (ao_operation_members) et le rôle
+// (ao_tenant_roles) via la RLS (migrations 0034/0035). Ces types portent
+// l'attribution effective par utilisateur — la source d'autorité de
+// ao_user_operations()/ao_has_role(). Distinct de `Member` (annuaire d'affichage).
+
+/** Attribution effective des droits d'un utilisateur dans un tenant. */
+export interface MemberGrant {
+  userId: string;
+  tenantId: string;
+  /** Rôles attribués (ao_tenant_roles) ; le rôle effectif = le plus privilégié. */
+  roles: Role[];
+  /** Périmètre opération (ao_operation_members) ; null = toutes les opérations. */
+  operationScope: string[] | null;
+}
+
+/** Saisie d'attribution (invitation / édition des droits d'un membre). */
+export interface MemberGrantInput {
+  userId: string;
+  roles: Role[];
+  /** null ou [] ⇒ toutes les opérations du tenant. */
+  operationScope: string[] | null;
+}
+
+/** Résultat de validation d'une saisie d'attribution. */
+export interface GrantValidation {
+  ok: boolean;
+  errors: string[];
+}
+
 // ── Notifications (F4) ───────────────────────────────────────────────────────
 export const NOTIF_SEVERITIES = ['danger', 'echeance', 'info'] as const;
 export type NotifSeverity = (typeof NOTIF_SEVERITIES)[number];
