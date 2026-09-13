@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('hsseIncidents.create → appelle hsse.add (déclaré) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      hsse: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'hsseIncidents', op: 'create', payload: { operationId: 'op-1', reference: 'HSSE-9', kind: 'accident', severity: 'grave', occurredAt: '2026-09-13', location: 'R+1', description: 'Chute', correctiveAction: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { reference: 'HSSE-9', kind: 'accident', severity: 'grave' } });
+  });
+
   it('studies.create → appelle studies.add (planifiée) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

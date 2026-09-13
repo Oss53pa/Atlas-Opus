@@ -57,8 +57,9 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
+import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1464,6 +1465,44 @@ export function createSupabaseIntegrationsRepo(client: SupabaseClient, session: 
       const { data, error } = await client.functions.invoke('ao-integration-control', { body: { action: 'reset_circuit', endpointId } });
       if (error) throw new Error(error.message);
       return toEndpoint((data as { endpoint: EndpointRow }).endpoint);
+    },
+  };
+}
+
+// ── M19 (HSSE) — registre des incidents ──────────────────────────────────────
+interface HsseRow {
+  id: string; tenant_id: string; operation_id: string; reference: string; kind: string; severity: string;
+  occurred_at: string; location: string | null; description: string; corrective_action: string | null; status: string;
+}
+function toHsse(r: HsseRow): HsseIncident {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference,
+    kind: r.kind as HsseKind, severity: r.severity as HsseSeverity, occurredAt: r.occurred_at,
+    location: r.location, description: r.description, correctiveAction: r.corrective_action, status: r.status as HsseStatus,
+  };
+}
+export function createSupabaseHsseRepo(client: SupabaseClient, session: Session): HsseRepo {
+  const TB = 'ao_hsse_incidents';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('occurred_at', { ascending: false })) as HsseRow[];
+      return rows.map(toHsse);
+    },
+    async add(opId, input: HsseIncidentInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, reference: input.reference.trim(), kind: input.kind,
+        severity: input.severity, occurred_at: input.occurredAt, location: input.location ?? null,
+        description: input.description.trim(), corrective_action: input.correctiveAction ?? null,
+      }).select('*').single()) as HsseRow;
+      return toHsse(row);
+    },
+    async setStatus(id, status: HsseStatus) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as HsseRow;
+      return toHsse(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
   };
 }

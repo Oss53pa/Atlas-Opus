@@ -77,6 +77,7 @@ import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/t
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
+import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -296,6 +297,14 @@ export interface IntegrationsRepo {
   retry(outboxId: string): Promise<OutboxMessage>;
   /** Réarme le disjoncteur d'un système → fermé (échecs remis à zéro). */
   resetCircuit(endpointId: string): Promise<IntegrationEndpoint>;
+}
+
+/** M19 (HSSE) — registre des incidents Santé-Sécurité-Environnement d'une opération. */
+export interface HsseRepo {
+  list(operationId: string): Promise<HsseIncident[]>;
+  add(operationId: string, input: HsseIncidentInput): Promise<HsseIncident>;
+  setStatus(id: string, status: HsseStatus): Promise<HsseIncident>;
+  remove(id: string): Promise<void>;
 }
 
 /** Conception & GED (M11) : documents & visas. */

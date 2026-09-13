@@ -17,6 +17,7 @@ import type { PurchaseStatus } from '../../domain/m10/types';
 import type { ReserveSeverity, ReserveStatus } from '../../domain/m19/types';
 import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/types';
 import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
+import type { HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -469,6 +470,27 @@ export const RISK_LEVEL_TONE: Record<RiskLevel, BadgeTone> = {
 export const riskCategoryLabel = (c: RiskCategory) => t(RISK_CATEGORY_KEY[c]);
 export const riskStatusLabel = (s: RiskStatus) => t(RISK_STATUS_KEY[s]);
 export const riskLevelLabel = (l: RiskLevel) => t(RISK_LEVEL_KEY[l]);
+
+// ── HSSE (M19) ───────────────────────────────────────────────────────────────
+const HSSE_KIND_KEY: Record<HsseKind, MessageKey> = {
+  accident: 'hsse.kind.accident', presqu_accident: 'hsse.kind.presqu_accident',
+  environnement: 'hsse.kind.environnement', maladie_pro: 'hsse.kind.maladie_pro',
+};
+const HSSE_SEVERITY_KEY: Record<HsseSeverity, MessageKey> = {
+  mineure: 'hsse.sev.mineure', grave: 'hsse.sev.grave', critique: 'hsse.sev.critique',
+};
+export const HSSE_SEVERITY_TONE: Record<HsseSeverity, BadgeTone> = {
+  mineure: 'neutral', grave: 'warning', critique: 'danger',
+};
+const HSSE_STATUS_KEY: Record<HsseStatus, MessageKey> = {
+  declare: 'hsse.status.declare', en_analyse: 'hsse.status.en_analyse', clos: 'hsse.status.clos',
+};
+export const HSSE_STATUS_TONE: Record<HsseStatus, BadgeTone> = {
+  declare: 'warning', en_analyse: 'info', clos: 'success',
+};
+export const hsseKindLabel = (k: HsseKind) => t(HSSE_KIND_KEY[k]);
+export const hsseSeverityLabel = (s: HsseSeverity) => t(HSSE_SEVERITY_KEY[s]);
+export const hsseStatusLabel = (s: HsseStatus) => t(HSSE_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {
