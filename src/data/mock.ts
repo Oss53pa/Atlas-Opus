@@ -69,6 +69,8 @@ import type { LegalEntity, LegalEntityInput } from '../domain/legalEntity/types'
 import { canTransitionLegalEntity } from '../domain/legalEntity';
 import type { ActionItem, ActionItemInput } from '../domain/actionItem/types';
 import { canTransitionActionItem } from '../domain/actionItem';
+import type { ServiceOrder, ServiceOrderInput } from '../domain/serviceOrder/types';
+import { canTransitionServiceOrder } from '../domain/serviceOrder';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -132,6 +134,7 @@ import type {
   BaselinesRepo,
   LegalEntitiesRepo,
   ActionItemsRepo,
+  ServiceOrdersRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -197,6 +200,7 @@ export interface MockDb {
   baselines: Baseline[];
   legalEntities: LegalEntity[];
   actionItems: ActionItem[];
+  serviceOrders: ServiceOrder[];
 }
 
 interface Deps {
@@ -650,6 +654,10 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const serviceOrders: ServiceOrder[] = [
+    { id: 'so-1', tenantId: T, operationId: 'op-palmiers', contractId: null, type: 'demarrage', reference: 'OS n°1 — Démarrage', content: 'Ordre de démarrage des travaux de gros œuvre.', status: 'notifie', createdAt: '2026-05-15T00:00:00.000Z' },
+    { id: 'so-2', tenantId: T, operationId: 'op-palmiers', contractId: null, type: 'notification', reference: 'OS n°2 — Cadence', content: 'Rappel de cadence sur le planning contractuel.', status: 'emis', createdAt: '2026-07-01T00:00:00.000Z' },
+  ];
   const actionItems: ActionItem[] = [
     { id: 'ai-1', tenantId: T, operationId: 'op-palmiers', siteReportId: null, description: 'Reprendre l’étanchéité toiture bloc A', owner: 'Entreprise gros œuvre', dueDate: '2026-09-05', status: 'ouvert' },
     { id: 'ai-2', tenantId: T, operationId: 'op-palmiers', siteReportId: null, description: 'Transmettre plans électricité révisés', owner: 'BET fluides', dueDate: '2026-09-30', status: 'en_cours' },
@@ -669,7 +677,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1634,6 +1642,36 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createServiceOrdersRepo(db: MockDb, session: Session, deps: Deps): ServiceOrdersRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.serviceOrders).filter((s) => s.operationId === opId).map((s) => ({ ...s }));
+    },
+    async add(opId, input: ServiceOrderInput) {
+      const so: ServiceOrder = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        contractId: input.contractId ?? null, type: input.type,
+        reference: input.reference.trim(), content: input.content.trim(),
+        status: 'projet', createdAt: new Date().toISOString(),
+      };
+      db.serviceOrders.push(so);
+      return { ...so };
+    },
+    async setStatus(sid, status) {
+      const so = db.serviceOrders.find((x) => x.id === sid);
+      if (!so) throw new Error('service_order_not_found');
+      if (!canTransitionServiceOrder(so.status, status)) throw new Error('service_order_transition_invalid');
+      so.status = status;
+      return { ...so };
+    },
+    async remove(sid) {
+      db.serviceOrders = db.serviceOrders.filter((x) => x.id !== sid);
     },
   };
 }

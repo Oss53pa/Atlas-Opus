@@ -24,6 +24,7 @@ import type { DoeCategory } from '../../domain/doe/types';
 import type { AssetType } from '../../domain/handoverAssets/types';
 import type { StructureType, LegalEntityStatus } from '../../domain/legalEntity/types';
 import type { ActionItemStatus } from '../../domain/actionItem/types';
+import type { ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -557,6 +558,20 @@ export const ACTION_STATUS_TONE: Record<ActionItemStatus, BadgeTone> = {
   ouvert: 'warning', en_cours: 'info', fait: 'success', annule: 'neutral',
 };
 export const actionItemStatusLabel = (s: ActionItemStatus) => t(ACTION_STATUS_KEY[s]);
+
+// ── Ordres de service (M13/M15) ──────────────────────────────────────────────
+const SO_TYPE_KEY: Record<ServiceOrderType, MessageKey> = {
+  demarrage: 'so.type.demarrage', arret: 'so.type.arret', reprise: 'so.type.reprise',
+  notification: 'so.type.notification', autre: 'so.type.autre',
+};
+export const serviceOrderTypeLabel = (t2: ServiceOrderType) => t(SO_TYPE_KEY[t2]);
+const SO_STATUS_KEY: Record<ServiceOrderStatus, MessageKey> = {
+  projet: 'so.status.projet', emis: 'so.status.emis', notifie: 'so.status.notifie', annule: 'so.status.annule',
+};
+export const SO_STATUS_TONE: Record<ServiceOrderStatus, BadgeTone> = {
+  projet: 'neutral', emis: 'info', notifie: 'success', annule: 'danger',
+};
+export const serviceOrderStatusLabel = (s: ServiceOrderStatus) => t(SO_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

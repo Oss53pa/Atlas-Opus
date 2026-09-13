@@ -85,6 +85,7 @@ import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets
 import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput, LegalEntityStatus } from '../domain/legalEntity/types';
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../domain/actionItem/types';
+import type { ServiceOrder, ServiceOrderInput, ServiceOrderStatus } from '../domain/serviceOrder/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -367,6 +368,14 @@ export interface ActionItemsRepo {
   list(operationId: string): Promise<ActionItem[]>;
   add(operationId: string, input: ActionItemInput): Promise<ActionItem>;
   setStatus(id: string, status: ActionItemStatus): Promise<ActionItem>;
+  remove(id: string): Promise<void>;
+}
+
+/** M13/M15 — ordres de service (OS) notifiés à l'entreprise. */
+export interface ServiceOrdersRepo {
+  list(operationId: string): Promise<ServiceOrder[]>;
+  add(operationId: string, input: ServiceOrderInput): Promise<ServiceOrder>;
+  setStatus(id: string, status: ServiceOrderStatus): Promise<ServiceOrder>;
   remove(id: string): Promise<void>;
 }
 

@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -67,6 +67,7 @@ import type { HandoverAsset, HandoverAssetInput, AssetType } from '../../domain/
 import type { Baseline, BaselineInput, BaselineTask } from '../../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput, StructureType, LegalEntityStatus, Shareholder } from '../../domain/legalEntity/types';
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../../domain/actionItem/types';
+import type { ServiceOrder, ServiceOrderInput, ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1676,6 +1677,40 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M13/M15 — ordres de service ──────────────────────────────────────────────
+interface ServiceOrderRow { id: string; tenant_id: string; operation_id: string; contract_id: string | null; type: string; reference: string; content: string; status: string; created_at: string }
+function toServiceOrder(r: ServiceOrderRow): ServiceOrder {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, contractId: r.contract_id,
+    type: r.type as ServiceOrderType, reference: r.reference, content: r.content,
+    status: r.status as ServiceOrderStatus, createdAt: r.created_at,
+  };
+}
+export function createSupabaseServiceOrdersRepo(client: SupabaseClient, session: Session): ServiceOrdersRepo {
+  const TB = 'ao_service_orders';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at')) as ServiceOrderRow[];
+      return rows.map(toServiceOrder);
+    },
+    async add(opId, input: ServiceOrderInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, contract_id: input.contractId ?? null,
+        type: input.type, reference: input.reference.trim(), content: input.content.trim(),
+      }).select('*').single()) as ServiceOrderRow;
+      return toServiceOrder(row);
+    },
+    async setStatus(id, status) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as ServiceOrderRow;
+      return toServiceOrder(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

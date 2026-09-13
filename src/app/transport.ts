@@ -25,9 +25,10 @@ import type { DoeCategory } from '../domain/doe/types';
 import type { AssetType } from '../domain/handoverAssets/types';
 import type { BaselineTask } from '../domain/baseline/types';
 import type { StructureType, Shareholder } from '../domain/legalEntity/types';
+import type { ServiceOrderType } from '../domain/serviceOrder/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -168,6 +169,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M13/M15 — ordre de service rédigé hors-ligne (non écriture) : créé « projet ».
+interface ServiceOrderCreatePayload {
+  operationId: string;
+  type: ServiceOrderType;
+  reference: string;
+  content: string;
+  contractId?: string | null;
 }
 
 // M13 (pilotage) — action relevée sur le terrain (non écriture) : créée « ouvert ».
@@ -425,6 +435,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M13/M15 — OS rédigé « projet » : rejouable tel quel (notification hors-ligne).
+  if (m.entity === 'serviceOrders' && m.op === 'create') {
+    const p = m.payload as unknown as ServiceOrderCreatePayload;
+    await api.serviceOrders.add(p.operationId, {
+      type: p.type, reference: p.reference, content: p.content, contractId: p.contractId ?? null,
+    });
     return { ok: true };
   }
   // M13 (pilotage) — action créée « ouvert » : rejouable telle quelle.

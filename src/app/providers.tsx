@@ -39,6 +39,7 @@ import {
   createBaselinesRepo,
   createLegalEntitiesRepo,
   createActionItemsRepo,
+  createServiceOrdersRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -83,6 +84,7 @@ import type {
   BaselinesRepo,
   LegalEntitiesRepo,
   ActionItemsRepo,
+  ServiceOrdersRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -120,6 +122,7 @@ import type { HandoverAsset } from '../domain/handoverAssets/types';
 import type { Baseline } from '../domain/baseline/types';
 import type { LegalEntity } from '../domain/legalEntity/types';
 import type { ActionItem } from '../domain/actionItem/types';
+import type { ServiceOrder } from '../domain/serviceOrder/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -166,6 +169,7 @@ import {
   createSupabaseBaselinesRepo,
   createSupabaseLegalEntitiesRepo,
   createSupabaseActionItemsRepo,
+  createSupabaseServiceOrdersRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -211,6 +215,7 @@ interface DataApi {
   baselines: BaselinesRepo;
   legalEntities: LegalEntitiesRepo;
   actionItems: ActionItemsRepo;
+  serviceOrders: ServiceOrdersRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -267,6 +272,7 @@ function buildMockApi(): DataApi {
     baselines: createBaselinesRepo(db, session, { telemetry }),
     legalEntities: createLegalEntitiesRepo(db, session, { telemetry }),
     actionItems: createActionItemsRepo(db, session, { telemetry }),
+    serviceOrders: createServiceOrdersRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -371,6 +377,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           baselines: createSupabaseBaselinesRepo(supabase, session),
           legalEntities: createSupabaseLegalEntitiesRepo(supabase, session),
           actionItems: createSupabaseActionItemsRepo(supabase, session),
+          serviceOrders: createSupabaseServiceOrdersRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -658,6 +665,11 @@ export function useLegalEntities(operationId: string): AsyncState<LegalEntity[]>
 export function useActionItems(operationId: string): AsyncState<ActionItem[]> {
   const { actionItems } = useData();
   return useAsync(() => actionItems.list(operationId), [actionItems, operationId]);
+}
+
+export function useServiceOrders(operationId: string): AsyncState<ServiceOrder[]> {
+  const { serviceOrders } = useData();
+  return useAsync(() => serviceOrders.list(operationId), [serviceOrders, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {
