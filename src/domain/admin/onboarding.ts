@@ -9,7 +9,7 @@
  * Aucune dépendance UI/IO.
  */
 import { ROLES, type Role } from '../m1/types';
-import type { GrantValidation, MemberGrantInput } from './types';
+import type { GrantValidation, Member, MemberGrantInput } from './types';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -67,6 +67,14 @@ export function validateGrantInput(input: MemberGrantInput): GrantValidation {
 /** Valide un email d'invitation (forme). */
 export function isValidEmail(email: string): boolean {
   return EMAIL_RE.test(email.trim());
+}
+
+/**
+ * Membres pouvant recevoir une attribution : ceux dont le compte utilisateur est
+ * lié (userId non nul). Les invitations en attente n'ont pas encore de user_id.
+ */
+export function linkableMembers<T extends Pick<Member, 'userId'>>(members: readonly T[]): T[] {
+  return members.filter((m) => !!m.userId);
 }
 
 /** Résumé lisible d'un périmètre pour l'affichage. */

@@ -786,6 +786,8 @@ export const fr = {
   // F1 — attribution des droits (rôles + périmètre)
   'grant.title': 'Attribution des droits',
   'grant.meta': 'Rôles & périmètre (RLS §5)',
+  'grant.member': 'Membre',
+  'grant.member.ph': '— choisir un membre lié —',
   'grant.user': 'Utilisateur (identifiant)',
   'grant.user.ph': 'uuid de l’utilisateur',
   'grant.roles': 'Rôles attribués',

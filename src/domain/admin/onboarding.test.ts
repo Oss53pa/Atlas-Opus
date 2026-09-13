@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeScope, effectiveRole, areRolesKnown, validateGrantInput, isValidEmail, scopeSummary,
+  normalizeScope, effectiveRole, areRolesKnown, validateGrantInput, isValidEmail, scopeSummary, linkableMembers,
 } from './onboarding';
 
 describe('F1 onboarding — normalizeScope', () => {
@@ -40,6 +40,17 @@ describe('F1 onboarding — validation', () => {
   it('isValidEmail', () => {
     expect(isValidEmail('a@b.co')).toBe(true);
     expect(isValidEmail('nope')).toBe(false);
+  });
+});
+
+describe('F1 onboarding — linkableMembers', () => {
+  it('ne garde que les membres au compte lié (userId non nul)', () => {
+    const members = [
+      { userId: 'u1', name: 'A' },
+      { userId: null, name: 'B (en attente)' },
+      { userId: 'u3', name: 'C' },
+    ];
+    expect(linkableMembers(members).map((m) => m.name)).toEqual(['A', 'C']);
   });
 });
 
