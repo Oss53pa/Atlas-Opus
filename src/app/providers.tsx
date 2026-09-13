@@ -43,6 +43,7 @@ import {
   createEiesItemsRepo,
   createShipmentsRepo,
   createBudgetLinesRepo,
+  createEvaluationCriteriaRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -91,6 +92,7 @@ import type {
   EiesItemsRepo,
   ShipmentsRepo,
   BudgetLinesRepo,
+  EvaluationCriteriaRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -132,6 +134,7 @@ import type { ServiceOrder } from '../domain/serviceOrder/types';
 import type { EiesItem } from '../domain/eiesItem/types';
 import type { Shipment } from '../domain/shipment/types';
 import type { BudgetLine } from '../domain/budgetLine/types';
+import type { EvaluationCriterion } from '../domain/evaluationCriterion/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -182,6 +185,7 @@ import {
   createSupabaseEiesItemsRepo,
   createSupabaseShipmentsRepo,
   createSupabaseBudgetLinesRepo,
+  createSupabaseEvaluationCriteriaRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -231,6 +235,7 @@ interface DataApi {
   eiesItems: EiesItemsRepo;
   shipments: ShipmentsRepo;
   budgetLines: BudgetLinesRepo;
+  evaluationCriteria: EvaluationCriteriaRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -291,6 +296,7 @@ function buildMockApi(): DataApi {
     eiesItems: createEiesItemsRepo(db, session, { telemetry }),
     shipments: createShipmentsRepo(db, session, { telemetry }),
     budgetLines: createBudgetLinesRepo(db, session, { telemetry }),
+    evaluationCriteria: createEvaluationCriteriaRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -399,6 +405,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           eiesItems: createSupabaseEiesItemsRepo(supabase, session),
           shipments: createSupabaseShipmentsRepo(supabase, session),
           budgetLines: createSupabaseBudgetLinesRepo(supabase, session),
+          evaluationCriteria: createSupabaseEvaluationCriteriaRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -706,6 +713,11 @@ export function useShipments(operationId: string): AsyncState<Shipment[]> {
 export function useBudgetLines(operationId: string): AsyncState<BudgetLine[]> {
   const { budgetLines } = useData();
   return useAsync(() => budgetLines.list(operationId), [budgetLines, operationId]);
+}
+
+export function useEvaluationCriteria(operationId: string): AsyncState<EvaluationCriterion[]> {
+  const { evaluationCriteria } = useData();
+  return useAsync(() => evaluationCriteria.list(operationId), [evaluationCriteria, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

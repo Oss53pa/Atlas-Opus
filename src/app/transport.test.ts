@@ -228,6 +228,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
   });
 
+  it('evaluationCriteria.create → appelle evaluationCriteria.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      evaluationCriteria: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'evaluationCriteria', op: 'create', payload: { operationId: 'op-1', label: 'Prix', type: 'financier', weight: 0.45 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'Prix', type: 'financier', weight: 0.45 } });
+  });
+
   it('budgetLines.create → appelle budgetLines.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

@@ -27,6 +27,7 @@ import type { ActionItemStatus } from '../../domain/actionItem/types';
 import type { ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { CustomsStatus } from '../../domain/shipment/types';
+import type { CriterionType } from '../../domain/evaluationCriterion/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -617,6 +618,16 @@ export const syscohadaClassLabel = (c: string) => {
   const key = SYSCOHADA_CLASS_KEY[c];
   return key ? t(key) : t('budget.class.other');
 };
+
+// ── Critères d'évaluation (M23) ──────────────────────────────────────────────
+const CRITERION_TYPE_KEY: Record<CriterionType, MessageKey> = {
+  technique: 'crit.type.technique', financier: 'crit.type.financier',
+  administratif: 'crit.type.administratif', delai: 'crit.type.delai',
+};
+export const CRITERION_TYPE_TONE: Record<CriterionType, BadgeTone> = {
+  technique: 'info', financier: 'accent', administratif: 'neutral', delai: 'warning',
+};
+export const criterionTypeLabel = (c: CriterionType) => t(CRITERION_TYPE_KEY[c]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

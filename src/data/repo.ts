@@ -89,6 +89,7 @@ import type { ServiceOrder, ServiceOrderInput, ServiceOrderStatus } from '../dom
 import type { EiesItem, EiesItemInput, EiesStatus } from '../domain/eiesItem/types';
 import type { Shipment, ShipmentInput, CustomsStatus } from '../domain/shipment/types';
 import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
+import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -403,6 +404,14 @@ export interface BudgetLinesRepo {
   list(operationId: string): Promise<BudgetLine[]>;
   add(operationId: string, input: BudgetLineInput): Promise<BudgetLine>;
   update(id: string, patch: Partial<Pick<BudgetLine, 'label' | 'amountBac'>>): Promise<BudgetLine>;
+  remove(id: string): Promise<void>;
+}
+
+/** M23 (dépouillement) — grille de critères d'évaluation pondérés. */
+export interface EvaluationCriteriaRepo {
+  list(operationId: string): Promise<EvaluationCriterion[]>;
+  add(operationId: string, input: EvaluationCriterionInput): Promise<EvaluationCriterion>;
+  update(id: string, patch: Partial<Pick<EvaluationCriterion, 'label' | 'weight'>>): Promise<EvaluationCriterion>;
   remove(id: string): Promise<void>;
 }
 

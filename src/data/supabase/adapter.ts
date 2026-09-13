@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -71,6 +71,7 @@ import type { ServiceOrder, ServiceOrderInput, ServiceOrderType, ServiceOrderSta
 import type { EiesItem, EiesItemInput, Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { Shipment, ShipmentInput, Incoterm, CustomsStatus } from '../../domain/shipment/types';
 import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types';
+import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1680,6 +1681,42 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M23 — grille de critères d'évaluation ────────────────────────────────────
+interface EvalCriterionRow { id: string; tenant_id: string; operation_id: string; context_id: string | null; label: string; type: string; weight: number | string }
+function toEvalCriterion(r: EvalCriterionRow): EvaluationCriterion {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, contextId: r.context_id,
+    label: r.label, type: r.type as CriterionType, weight: Number(r.weight),
+  };
+}
+export function createSupabaseEvaluationCriteriaRepo(client: SupabaseClient, session: Session): EvaluationCriteriaRepo {
+  const TB = 'ao_evaluation_criteria';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at')) as EvalCriterionRow[];
+      return rows.map(toEvalCriterion);
+    },
+    async add(opId, input: EvaluationCriterionInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, context_id: input.contextId ?? null,
+        label: input.label.trim(), type: input.type, weight: input.weight,
+      }).select('*').single()) as EvalCriterionRow;
+      return toEvalCriterion(row);
+    },
+    async update(id, patch) {
+      const row = unwrap(await client.from(TB).update({
+        ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
+        ...(patch.weight !== undefined ? { weight: patch.weight } : {}),
+      }).eq('id', id).select('*').single()) as EvalCriterionRow;
+      return toEvalCriterion(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

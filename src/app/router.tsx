@@ -21,6 +21,7 @@ export type Route =
   | { name: 'eies'; id: string }
   | { name: 'shipments'; id: string }
   | { name: 'budget'; id: string }
+  | { name: 'criteres'; id: string }
   | { name: 'passation'; id: string }
   | { name: 'etudes'; id: string }
   | { name: 'analyse'; id: string }

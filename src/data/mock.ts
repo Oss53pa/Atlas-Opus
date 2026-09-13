@@ -76,6 +76,7 @@ import { canTransitionEies } from '../domain/eiesItem';
 import type { Shipment, ShipmentInput } from '../domain/shipment/types';
 import { canTransitionShipment } from '../domain/shipment';
 import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
+import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -143,6 +144,7 @@ import type {
   EiesItemsRepo,
   ShipmentsRepo,
   BudgetLinesRepo,
+  EvaluationCriteriaRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -212,6 +214,7 @@ export interface MockDb {
   eiesItems: EiesItem[];
   shipments: Shipment[];
   budgetLines: BudgetLine[];
+  evaluationCriteria: EvaluationCriterion[];
 }
 
 interface Deps {
@@ -665,6 +668,11 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const evaluationCriteria: EvaluationCriterion[] = [
+    { id: 'ec-1', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Valeur technique', type: 'technique', weight: 0.4 },
+    { id: 'ec-2', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Prix des prestations', type: 'financier', weight: 0.45 },
+    { id: 'ec-3', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Délai d’exécution', type: 'delai', weight: 0.15 },
+  ];
   const budgetLines: BudgetLine[] = [
     { id: 'bl-p1', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2211', label: 'Terrain', amountBac: 180_000_000 },
     { id: 'bl-p2', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2313', label: 'Bâtiments — gros œuvre', amountBac: 620_000_000 },
@@ -705,7 +713,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1670,6 +1678,34 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createEvaluationCriteriaRepo(db: MockDb, session: Session, deps: Deps): EvaluationCriteriaRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.evaluationCriteria).filter((c) => c.operationId === opId).map((c) => ({ ...c }));
+    },
+    async add(opId, input: EvaluationCriterionInput) {
+      const c: EvaluationCriterion = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        contextId: input.contextId ?? null, label: input.label.trim(), type: input.type, weight: input.weight,
+      };
+      db.evaluationCriteria.push(c);
+      return { ...c };
+    },
+    async update(cid, patch) {
+      const c = db.evaluationCriteria.find((x) => x.id === cid);
+      if (!c) throw new Error('evaluation_criterion_not_found');
+      if (patch.label !== undefined) c.label = patch.label.trim();
+      if (patch.weight !== undefined) c.weight = patch.weight;
+      return { ...c };
+    },
+    async remove(cid) {
+      db.evaluationCriteria = db.evaluationCriteria.filter((x) => x.id !== cid);
     },
   };
 }

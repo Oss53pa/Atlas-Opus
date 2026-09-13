@@ -28,9 +28,10 @@ import type { StructureType, Shareholder } from '../domain/legalEntity/types';
 import type { ServiceOrderType } from '../domain/serviceOrder/types';
 import type { Milieu, Severity } from '../domain/eiesItem/types';
 import type { Incoterm } from '../domain/shipment/types';
+import type { CriterionType } from '../domain/evaluationCriterion/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -171,6 +172,14 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M23 — critère d'évaluation (non écriture) : poids fraction 0..1 (JSON-safe).
+interface EvaluationCriterionCreatePayload {
+  operationId: string;
+  label: string;
+  type: CriterionType;
+  weight: number;
 }
 
 // M4/M5 — ligne budgétaire (écriture financière) saisie en brouillon hors-ligne ;
@@ -464,6 +473,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M23 — critère d'évaluation créé hors-ligne : rejouable tel quel.
+  if (m.entity === 'evaluationCriteria' && m.op === 'create') {
+    const p = m.payload as unknown as EvaluationCriterionCreatePayload;
+    await api.evaluationCriteria.add(p.operationId, { label: p.label, type: p.type, weight: p.weight });
     return { ok: true };
   }
   // M4/M5 — ligne budgétaire (brouillon financier hors-ligne) : rejouable telle quelle.

@@ -58,6 +58,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M7', labelKey: 'mod.m7', route: 'stakeholders' },
       { code: 'M8', labelKey: 'mod.m8', route: 'passation' },
       { code: 'M9', labelKey: 'mod.m9', route: 'analyse' },
+      { code: 'CRIT', labelKey: 'mod.criteres', route: 'criteres' },
       { code: 'M10', labelKey: 'mod.m10', route: 'achats' },
       { code: 'LOG', labelKey: 'mod.shipments', route: 'shipments' },
     ],
