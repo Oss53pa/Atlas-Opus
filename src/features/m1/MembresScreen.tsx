@@ -1,9 +1,12 @@
-import { ChevronLeft, UserPlus } from 'lucide-react';
-import { Badge, Button, DataTable, FactList, KpiRow, Panel, Skeleton, EmptyState, useToast, type Fact, type TableRowData } from '../../ui';
-import { useMembers } from '../../app/providers';
+import { useState } from 'react';
+import { ChevronLeft, UserPlus, Trash2, Shield } from 'lucide-react';
+import { Badge, Button, DataTable, Field, FactList, KpiRow, Panel, Skeleton, EmptyState, useToast, type Fact, type TableRowData } from '../../ui';
+import { useData, useMembers, useMemberGrants, useOperations } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { activeMembers, distinctRoles, type MemberStatus } from '../../domain/admin';
+import { activeMembers, distinctRoles, effectiveRole, validateGrantInput, type MemberStatus } from '../../domain/admin';
+import { ROLES, type Role } from '../../domain/m1/types';
+import { can } from '../../domain/m1/permissions';
 
 const STATUS_KEY: Record<MemberStatus, MessageKey> = {
   actif: 'membres.status.actif', en_attente: 'membres.status.en_attente', suspendu: 'membres.status.suspendu',
@@ -20,15 +23,58 @@ const STATUS_TONE: Record<MemberStatus, 'success' | 'accent' | 'warning'> = {
 export function MembresScreen() {
   const { navigate } = useNav();
   const toast = useToast();
+  const { membership, session } = useData();
   const { data: members, loading } = useMembers();
+  const { data: grants, refetch: refetchGrants } = useMemberGrants();
+  const { data: operations } = useOperations({});
   const roleLabel = (r: string) => t(`role.${r}` as MessageKey);
+  const canManage = can(session.role, 'member.manage');
+
+  // Éditeur d'attribution des droits (F1 · rôles + périmètre → ao_tenant_roles/
+  // ao_operation_members). Écriture sensible en ligne (jamais offline).
+  const [userId, setUserId] = useState('');
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [scopeAll, setScopeAll] = useState(true);
+  const [scope, setScope] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  function resetForm() {
+    setUserId(''); setRoles([]); setScopeAll(true); setScope([]);
+  }
+  function toggleRole(r: Role) {
+    setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
+  }
+  function toggleOp(id: string) {
+    setScope((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+  async function saveGrant() {
+    const input = { userId: userId.trim(), roles, operationScope: scopeAll ? null : scope };
+    const v = validateGrantInput(input);
+    if (!v.ok) { toast.push(v.errors[0] ?? t('grant.invalid'), 'danger'); return; }
+    setSaving(true);
+    try {
+      await membership.setGrant(input);
+      toast.push(t('grant.saved'), 'success');
+      resetForm();
+      refetchGrants();
+    } catch {
+      toast.push(t('grant.error'), 'danger');
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function revokeGrant(uid: string) {
+    await membership.revoke(uid);
+    toast.push(t('grant.revoked'), 'info');
+    refetchGrants();
+  }
 
   if (loading) return <div className="flex flex-col gap-4"><Skeleton style={{ height: 40, width: 300 }} /><Skeleton style={{ height: 220 }} /></div>;
 
   const list = members ?? [];
   const active = activeMembers(list);
   const pending = list.filter((m) => m.status === 'en_attente').length;
-  const roles = distinctRoles(list);
+  const roleCount = distinctRoles(list);
   const restricted = list.filter((m) => m.scope !== 'toutes opérations').length;
 
   const rows: TableRowData[] = list.map((m) => ({
@@ -60,6 +106,18 @@ export function MembresScreen() {
     { label: t('membres.deleg.none'), sub: t('membres.deleg.noneSub'), severity: 'neutral' },
   ];
 
+  const opName = (id: string) => (operations ?? []).find((o) => o.id === id)?.name ?? id;
+  const grantRows: TableRowData[] = (grants ?? []).map((g) => ({
+    cells: [
+      <span className="mono text-[13px]">{g.userId}</span>,
+      <Badge tone="accent">{roleLabel(effectiveRole(g.roles) ?? 'viewer')}</Badge>,
+      <span className="text-[13px]">{g.operationScope === null ? t('grant.scope.all') : g.operationScope.map(opName).join(', ')}</span>,
+      canManage ? (
+        <Button variant="ghost" size="sm" icon aria-label={t('grant.revoke')} onClick={() => revokeGrant(g.userId)}><Trash2 size={15} /></Button>
+      ) : <span />,
+    ],
+  }));
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -80,11 +138,64 @@ export function MembresScreen() {
         items={[
           { label: t('membres.kpi.members'), value: active, sub: t('membres.kpi.seats', { n: 12 }) },
           { label: t('membres.kpi.invitations'), value: pending, sub: t('membres.kpi.invitationsSub') },
-          { label: t('membres.kpi.roles'), value: roles, sub: t('membres.kpi.rolesSub', { n: 9 }) },
+          { label: t('membres.kpi.roles'), value: roleCount, sub: t('membres.kpi.rolesSub', { n: 9 }) },
           { label: t('membres.kpi.restricted'), value: restricted, sub: t('membres.kpi.restrictedSub') },
           { label: t('membres.kpi.revocation'), value: '04.07', sub: t('membres.kpi.revocationSub') },
         ]}
       />
+
+      {canManage && (
+        <Panel title={t('grant.title')} meta={t('grant.meta')}>
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field id="grant-user" label={t('grant.user')} value={userId} placeholder={t('grant.user.ph')} onChange={(e) => setUserId(e.target.value)} />
+            </div>
+            <div>
+              <div className="mb-2 text-[12px] font-medium text-ink-2">{t('grant.roles')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {ROLES.map((r) => (
+                  <Button key={r} variant={roles.includes(r) ? 'primary' : 'glass'} size="sm" onClick={() => toggleRole(r)}>{roleLabel(r)}</Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 text-[12px] font-medium text-ink-2">{t('grant.scope')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                <Button variant={scopeAll ? 'primary' : 'glass'} size="sm" onClick={() => setScopeAll(true)}>{t('grant.scope.all')}</Button>
+                <Button variant={!scopeAll ? 'primary' : 'glass'} size="sm" onClick={() => setScopeAll(false)}>{t('grant.scope.restricted')}</Button>
+              </div>
+              {!scopeAll && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(operations ?? []).map((o) => (
+                    <Button key={o.id} variant={scope.includes(o.id) ? 'primary' : 'glass'} size="sm" onClick={() => toggleOp(o.id)}>{o.name}</Button>
+                  ))}
+                  {(operations ?? []).length === 0 && <span className="text-[12px] text-ink-3">{t('grant.scope.noops')}</span>}
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] text-ink-3"><Shield size={12} className="mb-0.5 inline" /> {t('grant.hint')}</span>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={resetForm}>{t('common.cancel')}</Button>
+                <Button variant="primary" size="sm" onClick={saveGrant} disabled={saving}>{t('grant.save')}</Button>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <DataTable
+              template="1.4fr 1fr 1.6fr auto"
+              columns={[
+                { label: t('grant.col.user') },
+                { label: t('grant.col.role') },
+                { label: t('grant.col.scope') },
+                { label: '' },
+              ]}
+              rows={grantRows}
+              empty={<EmptyState title={t('grant.title')} description={t('grant.empty')} />}
+            />
+          </div>
+        </Panel>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
         <div className="flex flex-col gap-4">
