@@ -78,6 +78,7 @@ import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
+import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -304,6 +305,14 @@ export interface HsseRepo {
   list(operationId: string): Promise<HsseIncident[]>;
   add(operationId: string, input: HsseIncidentInput): Promise<HsseIncident>;
   setStatus(id: string, status: HsseStatus): Promise<HsseIncident>;
+  remove(id: string): Promise<void>;
+}
+
+/** M19 (litiges) — registre des litiges & contentieux d'une opération. */
+export interface DisputesRepo {
+  list(operationId: string): Promise<Dispute[]>;
+  add(operationId: string, input: DisputeInput): Promise<Dispute>;
+  setStatus(id: string, status: DisputeStatus): Promise<Dispute>;
   remove(id: string): Promise<void>;
 }
 

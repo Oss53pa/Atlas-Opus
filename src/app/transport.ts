@@ -23,7 +23,7 @@ import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -139,6 +139,16 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M19 (litiges) — litige (suivi, non écriture) : créé « ouvert » ; montant en
+// jeu `number` (unités majeures, JSON-safe, pas de Money).
+interface DisputeCreatePayload {
+  operationId: string;
+  counterpart: string;
+  object: string;
+  amountAtStake: number;
+  fileRef?: string | null;
 }
 
 // M19 (HSSE) — incident terrain (fait, non écriture) : créé « déclaré » ;
@@ -337,6 +347,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M19 (litiges) — litige créé « ouvert » : rejouable tel quel.
+  if (m.entity === 'disputes' && m.op === 'create') {
+    const p = m.payload as unknown as DisputeCreatePayload;
+    await api.disputes.add(p.operationId, {
+      counterpart: p.counterpart, object: p.object, amountAtStake: p.amountAtStake, fileRef: p.fileRef ?? null,
+    });
     return { ok: true };
   }
   // M19 (HSSE) — incident terrain créé « déclaré » : rejouable tel quel.

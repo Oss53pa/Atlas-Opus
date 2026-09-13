@@ -18,6 +18,7 @@ import type { ReserveSeverity, ReserveStatus } from '../../domain/m19/types';
 import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/types';
 import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
 import type { HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
+import type { DisputeStatus } from '../../domain/litige/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -491,6 +492,16 @@ export const HSSE_STATUS_TONE: Record<HsseStatus, BadgeTone> = {
 export const hsseKindLabel = (k: HsseKind) => t(HSSE_KIND_KEY[k]);
 export const hsseSeverityLabel = (s: HsseSeverity) => t(HSSE_SEVERITY_KEY[s]);
 export const hsseStatusLabel = (s: HsseStatus) => t(HSSE_STATUS_KEY[s]);
+
+// ── Litiges (M19) ────────────────────────────────────────────────────────────
+const DISPUTE_STATUS_KEY: Record<DisputeStatus, MessageKey> = {
+  ouvert: 'litige.status.ouvert', en_cours: 'litige.status.en_cours',
+  transige: 'litige.status.transige', clos: 'litige.status.clos',
+};
+export const DISPUTE_STATUS_TONE: Record<DisputeStatus, BadgeTone> = {
+  ouvert: 'warning', en_cours: 'info', transige: 'accent', clos: 'success',
+};
+export const disputeStatusLabel = (s: DisputeStatus) => t(DISPUTE_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

@@ -22,6 +22,7 @@ export type Route =
   | { name: 'cautions'; id: string }
   | { name: 'risques'; id: string }
   | { name: 'hsse'; id: string }
+  | { name: 'litiges'; id: string }
   | { name: 'journal'; id: string }
   | { name: 'pilotage'; id: string }
   | { name: 'modifications'; id: string }
