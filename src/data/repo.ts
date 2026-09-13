@@ -87,6 +87,7 @@ import type { LegalEntity, LegalEntityInput, LegalEntityStatus } from '../domain
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../domain/actionItem/types';
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderStatus } from '../domain/serviceOrder/types';
 import type { EiesItem, EiesItemInput, EiesStatus } from '../domain/eiesItem/types';
+import type { Shipment, ShipmentInput, CustomsStatus } from '../domain/shipment/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -385,6 +386,14 @@ export interface EiesItemsRepo {
   list(operationId: string): Promise<EiesItem[]>;
   add(operationId: string, input: EiesItemInput): Promise<EiesItem>;
   setStatus(id: string, status: EiesStatus): Promise<EiesItem>;
+  remove(id: string): Promise<void>;
+}
+
+/** M9 (logistique) — expéditions & dédouanement des approvisionnements. */
+export interface ShipmentsRepo {
+  list(operationId: string): Promise<Shipment[]>;
+  add(operationId: string, input: ShipmentInput): Promise<Shipment>;
+  setStatus(id: string, status: CustomsStatus): Promise<Shipment>;
   remove(id: string): Promise<void>;
 }
 

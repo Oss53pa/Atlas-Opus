@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -69,6 +69,7 @@ import type { LegalEntity, LegalEntityInput, StructureType, LegalEntityStatus, S
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../../domain/actionItem/types';
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { EiesItem, EiesItemInput, Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
+import type { Shipment, ShipmentInput, Incoterm, CustomsStatus } from '../../domain/shipment/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1678,6 +1679,43 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M9 (logistique) — expéditions & dédouanement ─────────────────────────────
+interface ShipmentRow { id: string; tenant_id: string; operation_id: string; po_id: string | null; reference: string; incoterm: string | null; customs_status: string; eta: string | null; received_at: string | null }
+function toShipment(r: ShipmentRow): Shipment {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, poId: r.po_id, reference: r.reference,
+    incoterm: (r.incoterm as Incoterm | null), customsStatus: r.customs_status as CustomsStatus,
+    eta: r.eta, receivedAt: r.received_at,
+  };
+}
+export function createSupabaseShipmentsRepo(client: SupabaseClient, session: Session): ShipmentsRepo {
+  const TB = 'ao_shipments';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('eta', { nullsFirst: false })) as ShipmentRow[];
+      return rows.map(toShipment);
+    },
+    async add(opId, input: ShipmentInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, po_id: input.poId ?? null,
+        reference: input.reference.trim(), incoterm: input.incoterm ?? null, eta: input.eta ?? null,
+      }).select('*').single()) as ShipmentRow;
+      return toShipment(row);
+    },
+    async setStatus(id, status) {
+      // La livraison matérialise la réception sur site.
+      const patch: Record<string, unknown> = { customs_status: status };
+      if (status === 'livre') patch.received_at = new Date().toISOString().slice(0, 10);
+      const row = unwrap(await client.from(TB).update(patch).eq('id', id).select('*').single()) as ShipmentRow;
+      return toShipment(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

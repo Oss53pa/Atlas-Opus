@@ -24,6 +24,7 @@ import { MontageScreen } from './features/m1/MontageScreen';
 import { ActionsScreen } from './features/m1/ActionsScreen';
 import { ServiceOrdersScreen } from './features/m1/ServiceOrdersScreen';
 import { EiesScreen } from './features/m1/EiesScreen';
+import { ShipmentsScreen } from './features/m1/ShipmentsScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
 import { EtudesScreen } from './features/m1/EtudesScreen';
 import { AnalyseScreen } from './features/m1/AnalyseScreen';
@@ -110,6 +111,8 @@ function RouteView() {
       return <ServiceOrdersScreen id={route.id} />;
     case 'eies':
       return <EiesScreen id={route.id} />;
+    case 'shipments':
+      return <ShipmentsScreen id={route.id} />;
     case 'passation':
       return <PassationScreen id={route.id} />;
     case 'etudes':

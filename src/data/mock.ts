@@ -73,6 +73,8 @@ import type { ServiceOrder, ServiceOrderInput } from '../domain/serviceOrder/typ
 import { canTransitionServiceOrder } from '../domain/serviceOrder';
 import type { EiesItem, EiesItemInput } from '../domain/eiesItem/types';
 import { canTransitionEies } from '../domain/eiesItem';
+import type { Shipment, ShipmentInput } from '../domain/shipment/types';
+import { canTransitionShipment } from '../domain/shipment';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -138,6 +140,7 @@ import type {
   ActionItemsRepo,
   ServiceOrdersRepo,
   EiesItemsRepo,
+  ShipmentsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -205,6 +208,7 @@ export interface MockDb {
   actionItems: ActionItem[];
   serviceOrders: ServiceOrder[];
   eiesItems: EiesItem[];
+  shipments: Shipment[];
 }
 
 interface Deps {
@@ -658,6 +662,11 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const shipments: Shipment[] = [
+    { id: 'sh-1', tenantId: T, operationId: 'op-palmiers', poId: 'po-p2', reference: 'EXP-AC-2026-07', incoterm: 'CIF', customsStatus: 'en_douane', eta: '2026-09-08', receivedAt: null },
+    { id: 'sh-2', tenantId: T, operationId: 'op-palmiers', poId: 'po-p3', reference: 'EXP-ALU-2026-09', incoterm: 'FOB', customsStatus: 'en_transit', eta: '2026-10-05', receivedAt: null },
+    { id: 'sh-3', tenantId: T, operationId: 'op-palmiers', poId: 'po-p1', reference: 'EXP-CIM-2026-05', incoterm: 'DAP', customsStatus: 'livre', eta: '2026-06-20', receivedAt: '2026-06-22' },
+  ];
   const eiesItems: EiesItem[] = [
     { id: 'ei-1', tenantId: T, operationId: 'op-palmiers', impact: 'Émissions de poussières en phase terrassement', milieu: 'physique', severity: 'moyenne', mesureAttenuation: 'Arrosage régulier des pistes', status: 'mise_en_oeuvre' },
     { id: 'ei-2', tenantId: T, operationId: 'op-palmiers', impact: 'Nuisances sonores pour le voisinage', milieu: 'humain', severity: 'forte', mesureAttenuation: 'Limitation des horaires de chantier', status: 'en_cours' },
@@ -686,7 +695,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1651,6 +1660,38 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createShipmentsRepo(db: MockDb, session: Session, deps: Deps): ShipmentsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.shipments).filter((s) => s.operationId === opId).map((s) => ({ ...s }));
+    },
+    async add(opId, input: ShipmentInput) {
+      const sh: Shipment = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        poId: input.poId ?? null, reference: input.reference.trim(),
+        incoterm: input.incoterm ?? null, customsStatus: 'en_attente',
+        eta: input.eta ?? null, receivedAt: null,
+      };
+      db.shipments.push(sh);
+      return { ...sh };
+    },
+    async setStatus(sid, status) {
+      const sh = db.shipments.find((x) => x.id === sid);
+      if (!sh) throw new Error('shipment_not_found');
+      if (!canTransitionShipment(sh.customsStatus, status)) throw new Error('shipment_transition_invalid');
+      sh.customsStatus = status;
+      // La livraison matérialise la réception sur site.
+      if (status === 'livre' && !sh.receivedAt) sh.receivedAt = new Date().toISOString().slice(0, 10);
+      return { ...sh };
+    },
+    async remove(sid) {
+      db.shipments = db.shipments.filter((x) => x.id !== sid);
     },
   };
 }

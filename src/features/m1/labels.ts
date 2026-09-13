@@ -26,6 +26,7 @@ import type { StructureType, LegalEntityStatus } from '../../domain/legalEntity/
 import type { ActionItemStatus } from '../../domain/actionItem/types';
 import type { ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
 import type { Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
+import type { CustomsStatus } from '../../domain/shipment/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -596,6 +597,16 @@ export const EIES_STATUS_TONE: Record<EiesStatus, BadgeTone> = {
   planifiee: 'neutral', en_cours: 'info', mise_en_oeuvre: 'accent', soldee: 'success',
 };
 export const eiesStatusLabel = (s: EiesStatus) => t(EIES_STATUS_KEY[s]);
+
+// ── Expéditions (M9) ─────────────────────────────────────────────────────────
+const CUSTOMS_STATUS_KEY: Record<CustomsStatus, MessageKey> = {
+  en_attente: 'ship.status.en_attente', en_transit: 'ship.status.en_transit',
+  en_douane: 'ship.status.en_douane', dedouane: 'ship.status.dedouane', livre: 'ship.status.livre',
+};
+export const CUSTOMS_STATUS_TONE: Record<CustomsStatus, BadgeTone> = {
+  en_attente: 'neutral', en_transit: 'info', en_douane: 'warning', dedouane: 'accent', livre: 'success',
+};
+export const customsStatusLabel = (s: CustomsStatus) => t(CUSTOMS_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

@@ -41,6 +41,7 @@ import {
   createActionItemsRepo,
   createServiceOrdersRepo,
   createEiesItemsRepo,
+  createShipmentsRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -87,6 +88,7 @@ import type {
   ActionItemsRepo,
   ServiceOrdersRepo,
   EiesItemsRepo,
+  ShipmentsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -126,6 +128,7 @@ import type { LegalEntity } from '../domain/legalEntity/types';
 import type { ActionItem } from '../domain/actionItem/types';
 import type { ServiceOrder } from '../domain/serviceOrder/types';
 import type { EiesItem } from '../domain/eiesItem/types';
+import type { Shipment } from '../domain/shipment/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -174,6 +177,7 @@ import {
   createSupabaseActionItemsRepo,
   createSupabaseServiceOrdersRepo,
   createSupabaseEiesItemsRepo,
+  createSupabaseShipmentsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -221,6 +225,7 @@ interface DataApi {
   actionItems: ActionItemsRepo;
   serviceOrders: ServiceOrdersRepo;
   eiesItems: EiesItemsRepo;
+  shipments: ShipmentsRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -279,6 +284,7 @@ function buildMockApi(): DataApi {
     actionItems: createActionItemsRepo(db, session, { telemetry }),
     serviceOrders: createServiceOrdersRepo(db, session, { telemetry }),
     eiesItems: createEiesItemsRepo(db, session, { telemetry }),
+    shipments: createShipmentsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -385,6 +391,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           actionItems: createSupabaseActionItemsRepo(supabase, session),
           serviceOrders: createSupabaseServiceOrdersRepo(supabase, session),
           eiesItems: createSupabaseEiesItemsRepo(supabase, session),
+          shipments: createSupabaseShipmentsRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -682,6 +689,11 @@ export function useServiceOrders(operationId: string): AsyncState<ServiceOrder[]
 export function useEiesItems(operationId: string): AsyncState<EiesItem[]> {
   const { eiesItems } = useData();
   return useAsync(() => eiesItems.list(operationId), [eiesItems, operationId]);
+}
+
+export function useShipments(operationId: string): AsyncState<Shipment[]> {
+  const { shipments } = useData();
+  return useAsync(() => shipments.list(operationId), [shipments, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

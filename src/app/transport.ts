@@ -27,9 +27,10 @@ import type { BaselineTask } from '../domain/baseline/types';
 import type { StructureType, Shareholder } from '../domain/legalEntity/types';
 import type { ServiceOrderType } from '../domain/serviceOrder/types';
 import type { Milieu, Severity } from '../domain/eiesItem/types';
+import type { Incoterm } from '../domain/shipment/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -170,6 +171,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M9 (logistique) — expédition enregistrée hors-ligne (non écriture) : « en_attente ».
+interface ShipmentCreatePayload {
+  operationId: string;
+  reference: string;
+  poId?: string | null;
+  incoterm?: Incoterm | null;
+  eta?: string | null;
 }
 
 // M19 (E&S) — impact EIES relevé hors-ligne (non écriture) : créé « planifiee ».
@@ -445,6 +455,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M9 (logistique) — expédition créée « en_attente » : rejouable telle quelle.
+  if (m.entity === 'shipments' && m.op === 'create') {
+    const p = m.payload as unknown as ShipmentCreatePayload;
+    await api.shipments.add(p.operationId, {
+      reference: p.reference, poId: p.poId ?? null, incoterm: p.incoterm ?? null, eta: p.eta ?? null,
+    });
     return { ok: true };
   }
   // M19 (E&S) — impact EIES créé « planifiee » : rejouable tel quel.
