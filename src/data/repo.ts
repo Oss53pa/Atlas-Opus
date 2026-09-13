@@ -83,6 +83,7 @@ import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
 import type { Baseline, BaselineInput } from '../domain/baseline/types';
+import type { LegalEntity, LegalEntityInput, LegalEntityStatus } from '../domain/legalEntity/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -349,6 +350,14 @@ export interface BaselinesRepo {
   add(operationId: string, input: BaselineInput): Promise<Baseline>;
   /** Rend cette baseline active (et désactive les autres de l'opération). */
   setActive(id: string): Promise<Baseline>;
+  remove(id: string): Promise<void>;
+}
+
+/** M2 (montage juridique) — structures de portage (SPV) d'une opération. */
+export interface LegalEntitiesRepo {
+  list(operationId: string): Promise<LegalEntity[]>;
+  add(operationId: string, input: LegalEntityInput): Promise<LegalEntity>;
+  setStatus(id: string, status: LegalEntityStatus): Promise<LegalEntity>;
   remove(id: string): Promise<void>;
 }
 

@@ -24,9 +24,10 @@ import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import type { DoeCategory } from '../domain/doe/types';
 import type { AssetType } from '../domain/handoverAssets/types';
 import type { BaselineTask } from '../domain/baseline/types';
+import type { StructureType, Shareholder } from '../domain/legalEntity/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -167,6 +168,16 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M2 (montage juridique) — structure de portage (non écriture) : créée « projet » ;
+// répartition du capital JSON-safe.
+interface LegalEntityCreatePayload {
+  operationId: string;
+  structureType: StructureType;
+  name: string;
+  rccm?: string | null;
+  shareholders?: Shareholder[];
 }
 
 // M19 (sinistres) — déclaration d'assurance (non écriture) : créée « déclaré » ;
@@ -405,6 +416,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M2 (montage juridique) — structure créée « projet » : rejouable telle quelle.
+  if (m.entity === 'legalEntities' && m.op === 'create') {
+    const p = m.payload as unknown as LegalEntityCreatePayload;
+    await api.legalEntities.add(p.operationId, {
+      structureType: p.structureType, name: p.name, rccm: p.rccm ?? null, shareholders: p.shareholders ?? [],
+    });
     return { ok: true };
   }
   // M19 (sinistres) — déclaration créée « déclaré » : rejouable telle quelle.

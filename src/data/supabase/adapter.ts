@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -65,6 +65,7 @@ import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput, AssetType } from '../../domain/handoverAssets/types';
 import type { Baseline, BaselineInput, BaselineTask } from '../../domain/baseline/types';
+import type { LegalEntity, LegalEntityInput, StructureType, LegalEntityStatus, Shareholder } from '../../domain/legalEntity/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1674,6 +1675,40 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M2 (montage juridique) — structures de portage (SPV) ─────────────────────
+interface LegalEntityRow { id: string; tenant_id: string; operation_id: string; structure_type: string; name: string; rccm: string | null; shareholders: unknown; status: string }
+function toLegalEntity(r: LegalEntityRow): LegalEntity {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, structureType: r.structure_type as StructureType,
+    name: r.name, rccm: r.rccm, shareholders: Array.isArray(r.shareholders) ? (r.shareholders as Shareholder[]) : [],
+    status: r.status as LegalEntityStatus,
+  };
+}
+export function createSupabaseLegalEntitiesRepo(client: SupabaseClient, session: Session): LegalEntitiesRepo {
+  const TB = 'ao_legal_entities';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('name')) as LegalEntityRow[];
+      return rows.map(toLegalEntity);
+    },
+    async add(opId, input: LegalEntityInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, structure_type: input.structureType,
+        name: input.name.trim(), rccm: input.rccm?.trim() || null, shareholders: input.shareholders ?? [],
+      }).select('*').single()) as LegalEntityRow;
+      return toLegalEntity(row);
+    },
+    async setStatus(id, status) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as LegalEntityRow;
+      return toLegalEntity(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

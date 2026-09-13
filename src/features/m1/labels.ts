@@ -22,6 +22,7 @@ import type { DisputeStatus } from '../../domain/litige/types';
 import type { ClaimStatus } from '../../domain/claim/types';
 import type { DoeCategory } from '../../domain/doe/types';
 import type { AssetType } from '../../domain/handoverAssets/types';
+import type { StructureType, LegalEntityStatus } from '../../domain/legalEntity/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -530,6 +531,21 @@ const ASSET_TYPE_KEY: Record<AssetType, MessageKey> = {
   espace_vert: 'asset.type.espace_vert', autre: 'asset.type.autre',
 };
 export const assetTypeLabel = (a: AssetType) => t(ASSET_TYPE_KEY[a]);
+
+// ── Montage juridique (M2) ───────────────────────────────────────────────────
+const STRUCTURE_TYPE_KEY: Record<StructureType, MessageKey> = {
+  sci: 'legal.type.sci', sarl: 'legal.type.sarl', sa: 'legal.type.sa', sas: 'legal.type.sas',
+  gie: 'legal.type.gie', snc: 'legal.type.snc', autre: 'legal.type.autre',
+};
+export const structureTypeLabel = (s: StructureType) => t(STRUCTURE_TYPE_KEY[s]);
+const LEGAL_STATUS_KEY: Record<LegalEntityStatus, MessageKey> = {
+  projet: 'legal.status.projet', constituee: 'legal.status.constituee',
+  active: 'legal.status.active', dissoute: 'legal.status.dissoute',
+};
+export const LEGAL_STATUS_TONE: Record<LegalEntityStatus, BadgeTone> = {
+  projet: 'neutral', constituee: 'info', active: 'success', dissoute: 'danger',
+};
+export const legalEntityStatusLabel = (s: LegalEntityStatus) => t(LEGAL_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

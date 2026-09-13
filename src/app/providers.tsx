@@ -37,6 +37,7 @@ import {
   createDoeRepo,
   createHandoverAssetsRepo,
   createBaselinesRepo,
+  createLegalEntitiesRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -79,6 +80,7 @@ import type {
   DoeRepo,
   HandoverAssetsRepo,
   BaselinesRepo,
+  LegalEntitiesRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -114,6 +116,7 @@ import type { Claim } from '../domain/claim/types';
 import type { DoeDocument } from '../domain/doe/types';
 import type { HandoverAsset } from '../domain/handoverAssets/types';
 import type { Baseline } from '../domain/baseline/types';
+import type { LegalEntity } from '../domain/legalEntity/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -158,6 +161,7 @@ import {
   createSupabaseDoeRepo,
   createSupabaseHandoverAssetsRepo,
   createSupabaseBaselinesRepo,
+  createSupabaseLegalEntitiesRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -201,6 +205,7 @@ interface DataApi {
   doe: DoeRepo;
   handoverAssets: HandoverAssetsRepo;
   baselines: BaselinesRepo;
+  legalEntities: LegalEntitiesRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -255,6 +260,7 @@ function buildMockApi(): DataApi {
     doe: createDoeRepo(db, session, { telemetry }),
     handoverAssets: createHandoverAssetsRepo(db, session, { telemetry }),
     baselines: createBaselinesRepo(db, session, { telemetry }),
+    legalEntities: createLegalEntitiesRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -357,6 +363,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           doe: createSupabaseDoeRepo(supabase, session),
           handoverAssets: createSupabaseHandoverAssetsRepo(supabase, session),
           baselines: createSupabaseBaselinesRepo(supabase, session),
+          legalEntities: createSupabaseLegalEntitiesRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -634,6 +641,11 @@ export function useHandoverAssets(operationId: string): AsyncState<HandoverAsset
 export function useBaselines(operationId: string): AsyncState<Baseline[]> {
   const { baselines } = useData();
   return useAsync(() => baselines.list(operationId), [baselines, operationId]);
+}
+
+export function useLegalEntities(operationId: string): AsyncState<LegalEntity[]> {
+  const { legalEntities } = useData();
+  return useAsync(() => legalEntities.list(operationId), [legalEntities, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

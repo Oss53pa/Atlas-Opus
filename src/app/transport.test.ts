@@ -228,6 +228,20 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
   });
 
+  it('legalEntities.create → appelle legalEntities.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      legalEntities: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const shareholders = [{ name: 'A', sharePct: 60 }, { name: 'B', sharePct: 40 }];
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'legalEntities', op: 'create', payload: { operationId: 'op-1', structureType: 'sci', name: 'SCI X', rccm: 'CI-ABJ-1', shareholders } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { structureType: 'sci', name: 'SCI X', rccm: 'CI-ABJ-1', shareholders } });
+  });
+
   it('claims.create → appelle claims.add (déclaré) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

@@ -65,6 +65,8 @@ import type { Claim, ClaimInput } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
 import type { Baseline, BaselineInput } from '../domain/baseline/types';
+import type { LegalEntity, LegalEntityInput } from '../domain/legalEntity/types';
+import { canTransitionLegalEntity } from '../domain/legalEntity';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -126,6 +128,7 @@ import type {
   DoeRepo,
   HandoverAssetsRepo,
   BaselinesRepo,
+  LegalEntitiesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -189,6 +192,7 @@ export interface MockDb {
   doeDocuments: DoeDocument[];
   handoverAssets: HandoverAsset[];
   baselines: Baseline[];
+  legalEntities: LegalEntity[];
 }
 
 interface Deps {
@@ -635,6 +639,13 @@ export function createMockDb(): MockDb {
     { id: 'ha-1', tenantId: T, operationId: 'op-palmiers', label: 'Ascenseur bloc A', assetType: 'equipement', location: 'Hall A', warrantyEnd: '2027-06-30', targetSystem: 'GMAO Keystone' },
     { id: 'ha-2', tenantId: T, operationId: 'op-palmiers', label: 'Poste de refoulement', assetType: 'reseau', location: 'Sous-sol', warrantyEnd: null, targetSystem: null },
   ];
+  const legalEntities: LegalEntity[] = [
+    {
+      id: 'le-1', tenantId: T, operationId: 'op-palmiers', structureType: 'sci', name: 'SCI Les Palmiers',
+      rccm: 'CI-ABJ-2026-B-04512', status: 'active',
+      shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
+    },
+  ];
   const baselines: Baseline[] = [
     {
       id: 'bl-1', tenantId: T, operationId: 'op-palmiers', label: 'Ordre de service initial',
@@ -649,7 +660,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1614,6 +1625,36 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createLegalEntitiesRepo(db: MockDb, session: Session, deps: Deps): LegalEntitiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.legalEntities).filter((e) => e.operationId === opId).map((e) => ({ ...e, shareholders: [...e.shareholders] }));
+    },
+    async add(opId, input: LegalEntityInput) {
+      const e: LegalEntity = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        structureType: input.structureType, name: input.name.trim(),
+        rccm: input.rccm?.trim() || null, shareholders: (input.shareholders ?? []).map((s) => ({ ...s })),
+        status: 'projet',
+      };
+      db.legalEntities.push(e);
+      return { ...e, shareholders: [...e.shareholders] };
+    },
+    async setStatus(eid, status) {
+      const e = db.legalEntities.find((x) => x.id === eid);
+      if (!e) throw new Error('legal_entity_not_found');
+      if (!canTransitionLegalEntity(e.status, status)) throw new Error('legal_entity_transition_invalid');
+      e.status = status;
+      return { ...e, shareholders: [...e.shareholders] };
+    },
+    async remove(eid) {
+      db.legalEntities = db.legalEntities.filter((x) => x.id !== eid);
     },
   };
 }
