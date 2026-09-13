@@ -282,12 +282,20 @@ export interface MembershipRepo {
   revoke(userId: string): Promise<void>;
 }
 
-/** F5 — console d'intégration (lecture) : santé des systèmes tiers + outbox. */
+/**
+ * F5 — console d'intégration : santé des systèmes tiers + outbox (lecture) et
+ * actions d'exploitation SENSIBLES (rejeu d'une lettre morte, réarmement d'un
+ * disjoncteur) — gardées par rôle côté Edge Function ; jamais hors-ligne.
+ */
 export interface IntegrationsRepo {
   /** Endpoints du tenant (config + disjoncteur), un par système. */
   endpoints(): Promise<IntegrationEndpoint[]>;
   /** Messages outbox récents du tenant (les plus récents d'abord). */
   outbox(limit?: number): Promise<OutboxMessage[]>;
+  /** Réenfile un message en échec (dead/retrying) → pending, budget de reprise remis à zéro. */
+  retry(outboxId: string): Promise<OutboxMessage>;
+  /** Réarme le disjoncteur d'un système → fermé (échecs remis à zéro). */
+  resetCircuit(endpointId: string): Promise<IntegrationEndpoint>;
 }
 
 /** Conception & GED (M11) : documents & visas. */

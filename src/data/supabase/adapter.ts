@@ -1454,6 +1454,17 @@ export function createSupabaseIntegrationsRepo(client: SupabaseClient, session: 
       const rows = unwrap(await client.from('ao_outbox').select('*').eq('tenant_id', session.tenantId).order('created_at', { ascending: false }).limit(limit)) as OutboxRow[];
       return rows.map(toOutbox);
     },
+    // Actions sensibles : déléguées à l'Edge Function gardée par rôle (service_role).
+    async retry(outboxId: string) {
+      const { data, error } = await client.functions.invoke('ao-integration-control', { body: { action: 'retry', outboxId } });
+      if (error) throw new Error(error.message);
+      return toOutbox((data as { outbox: OutboxRow }).outbox);
+    },
+    async resetCircuit(endpointId: string) {
+      const { data, error } = await client.functions.invoke('ao-integration-control', { body: { action: 'reset_circuit', endpointId } });
+      if (error) throw new Error(error.message);
+      return toEndpoint((data as { endpoint: EndpointRow }).endpoint);
+    },
   };
 }
 

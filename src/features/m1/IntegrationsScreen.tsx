@@ -1,10 +1,11 @@
-import { ChevronLeft, Plug } from 'lucide-react';
-import { Badge, Button, DataTable, KpiRow, Panel, Skeleton, EmptyState, type TableRowData } from '../../ui';
-import { useIntegrationEndpoints, useOutbox } from '../../app/providers';
+import { ChevronLeft, Plug, RotateCcw, Zap } from 'lucide-react';
+import { Badge, Button, DataTable, KpiRow, Panel, Skeleton, EmptyState, useToast, type TableRowData } from '../../ui';
+import { useData, useIntegrationEndpoints, useOutbox } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
 import { formatDate } from '../../lib/format';
-import { effectiveCircuitState, outboxBacklog } from '../../domain/f5/contract';
+import { effectiveCircuitState, outboxBacklog, canManualRetry } from '../../domain/f5/contract';
+import { can } from '../../domain/m1/permissions';
 import type { CircuitState, DeliveryStatus } from '../../domain/f5/types';
 
 const CIRCUIT_TONE: Record<CircuitState, 'success' | 'warning' | 'danger'> = {
@@ -22,10 +23,32 @@ const DELIVERY_TONE: Record<DeliveryStatus, 'neutral' | 'accent' | 'success' | '
  */
 export function IntegrationsScreen() {
   const { navigate } = useNav();
-  const { data: endpoints, loading: le } = useIntegrationEndpoints();
-  const { data: outbox, loading: lo } = useOutbox(50);
+  const { integrations, session } = useData();
+  const toast = useToast();
+  const { data: endpoints, loading: le, refetch: refetchEndpoints } = useIntegrationEndpoints();
+  const { data: outbox, loading: lo, refetch: refetchOutbox } = useOutbox(50);
   const now = new Date().toISOString();
   const systemLabel = (s: string) => t(`f5.system.${s}` as MessageKey);
+  const canManage = can(session.role, 'integration.manage');
+
+  async function retry(outboxId: string) {
+    try {
+      await integrations.retry(outboxId);
+      toast.push(t('f5.retry.done'), 'success');
+      refetchOutbox();
+    } catch {
+      toast.push(t('f5.action.error'), 'danger');
+    }
+  }
+  async function resetCircuit(endpointId: string) {
+    try {
+      await integrations.resetCircuit(endpointId);
+      toast.push(t('f5.reset.done'), 'success');
+      refetchEndpoints();
+    } catch {
+      toast.push(t('f5.action.error'), 'danger');
+    }
+  }
 
   if (le || lo) return <div className="flex flex-col gap-4"><Skeleton style={{ height: 40, width: 320 }} /><Skeleton style={{ height: 220 }} /></div>;
 
@@ -43,6 +66,11 @@ export function IntegrationsScreen() {
         <Badge tone={CIRCUIT_TONE[eff]}>{t(`f5.circuit.${eff}` as MessageKey)}</Badge>,
         <span className="mono text-[13px] text-ink-3">{e.circuit.failures}</span>,
         <span className="mono text-[12px] text-ink-3">{e.circuit.openedAt ? formatDate(e.circuit.openedAt, undefined) : '—'}</span>,
+        <span className="flex justify-end">
+          {canManage && eff !== 'closed' && (
+            <Button variant="glass" size="sm" onClick={() => resetCircuit(e.id)}><Zap size={14} />{t('f5.reset')}</Button>
+          )}
+        </span>,
       ],
     };
   });
@@ -55,6 +83,11 @@ export function IntegrationsScreen() {
       <Badge tone={DELIVERY_TONE[m.status]}>{t(`f5.delivery.${m.status}` as MessageKey)}</Badge>,
       <span className="mono text-[13px] text-ink-3">{m.attempts}</span>,
       <span className="text-[12px] text-danger">{m.lastError ?? ''}</span>,
+      <span className="flex justify-end">
+        {canManage && canManualRetry(m.status) && (
+          <Button variant="glass" size="sm" onClick={() => retry(m.id)}><RotateCcw size={14} />{t('f5.retry')}</Button>
+        )}
+      </span>,
     ],
   }));
 
@@ -79,13 +112,14 @@ export function IntegrationsScreen() {
 
       <Panel title={t('f5.endpoints')} meta={t('f5.endpoints.meta')} bodyPadded={false}>
         <DataTable
-          template="1.4fr 0.9fr 1fr 90px 1fr"
+          template="1.4fr 0.9fr 1fr 90px 1fr auto"
           columns={[
             { label: t('f5.col.system') },
             { label: t('f5.col.status') },
             { label: t('f5.col.circuit') },
             { label: t('f5.col.failures'), align: 'right' },
             { label: t('f5.col.openedAt') },
+            { label: '' },
           ]}
           rows={epRows}
           empty={<EmptyState title={t('f5.title')} description={t('f5.endpoints.empty')} />}
@@ -94,7 +128,7 @@ export function IntegrationsScreen() {
 
       <Panel title={t('f5.outbox')} meta={t('f5.outbox.meta')} bodyPadded={false}>
         <DataTable
-          template="1.1fr 1.1fr 1fr 1fr 70px 1.3fr"
+          template="1.1fr 1.1fr 1fr 1fr 70px 1.3fr auto"
           columns={[
             { label: t('f5.col.system') },
             { label: t('f5.col.kind') },
@@ -102,6 +136,7 @@ export function IntegrationsScreen() {
             { label: t('f5.col.delivery') },
             { label: t('f5.col.attempts'), align: 'right' },
             { label: t('f5.col.error') },
+            { label: '' },
           ]}
           rows={obRows}
           empty={<EmptyState title={t('f5.outbox')} description={t('f5.outbox.empty')} />}

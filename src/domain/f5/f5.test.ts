@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   idempotencyKey, payloadHash, backoffDelayMs, shouldRetry, applyOutcome, isDue,
-  circuitAllows, recordCircuit, effectiveCircuitState, outboxBacklog,
+  circuitAllows, recordCircuit, effectiveCircuitState, outboxBacklog, canManualRetry,
 } from './contract';
 import { createIntegrationGateway } from './gateway';
 import { CLOSED_CIRCUIT, DEFAULT_RETRY, type CallOutcome, type OutboxMessage } from './types';
@@ -180,5 +180,15 @@ describe('F5 — outboxBacklog', () => {
   });
   it('liste vide ⇒ tous à 0', () => {
     expect(outboxBacklog([])).toEqual({ pending: 0, inflight: 0, delivered: 0, retrying: 0, dead: 0 });
+  });
+});
+
+describe('F5 — canManualRetry', () => {
+  it('rejeu manuel possible depuis dead/retrying uniquement', () => {
+    expect(canManualRetry('dead')).toBe(true);
+    expect(canManualRetry('retrying')).toBe(true);
+    expect(canManualRetry('delivered')).toBe(false);
+    expect(canManualRetry('pending')).toBe(false);
+    expect(canManualRetry('inflight')).toBe(false);
   });
 });
