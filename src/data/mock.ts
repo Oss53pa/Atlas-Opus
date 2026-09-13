@@ -71,6 +71,8 @@ import type { ActionItem, ActionItemInput } from '../domain/actionItem/types';
 import { canTransitionActionItem } from '../domain/actionItem';
 import type { ServiceOrder, ServiceOrderInput } from '../domain/serviceOrder/types';
 import { canTransitionServiceOrder } from '../domain/serviceOrder';
+import type { EiesItem, EiesItemInput } from '../domain/eiesItem/types';
+import { canTransitionEies } from '../domain/eiesItem';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -135,6 +137,7 @@ import type {
   LegalEntitiesRepo,
   ActionItemsRepo,
   ServiceOrdersRepo,
+  EiesItemsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -201,6 +204,7 @@ export interface MockDb {
   legalEntities: LegalEntity[];
   actionItems: ActionItem[];
   serviceOrders: ServiceOrder[];
+  eiesItems: EiesItem[];
 }
 
 interface Deps {
@@ -654,6 +658,11 @@ export function createMockDb(): MockDb {
       shareholders: [{ name: 'Atokoun Holding', sharePct: 60 }, { name: 'Partenaire foncier', sharePct: 40 }],
     },
   ];
+  const eiesItems: EiesItem[] = [
+    { id: 'ei-1', tenantId: T, operationId: 'op-palmiers', impact: 'Émissions de poussières en phase terrassement', milieu: 'physique', severity: 'moyenne', mesureAttenuation: 'Arrosage régulier des pistes', status: 'mise_en_oeuvre' },
+    { id: 'ei-2', tenantId: T, operationId: 'op-palmiers', impact: 'Nuisances sonores pour le voisinage', milieu: 'humain', severity: 'forte', mesureAttenuation: 'Limitation des horaires de chantier', status: 'en_cours' },
+    { id: 'ei-3', tenantId: T, operationId: 'op-palmiers', impact: 'Gestion des déblais et déchets inertes', milieu: 'physique', severity: 'moyenne', mesureAttenuation: null, status: 'planifiee' },
+  ];
   const serviceOrders: ServiceOrder[] = [
     { id: 'so-1', tenantId: T, operationId: 'op-palmiers', contractId: null, type: 'demarrage', reference: 'OS n°1 — Démarrage', content: 'Ordre de démarrage des travaux de gros œuvre.', status: 'notifie', createdAt: '2026-05-15T00:00:00.000Z' },
     { id: 'so-2', tenantId: T, operationId: 'op-palmiers', contractId: null, type: 'notification', reference: 'OS n°2 — Cadence', content: 'Rappel de cadence sur le planning contractuel.', status: 'emis', createdAt: '2026-07-01T00:00:00.000Z' },
@@ -677,7 +686,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1642,6 +1651,35 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createEiesItemsRepo(db: MockDb, session: Session, deps: Deps): EiesItemsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.eiesItems).filter((i) => i.operationId === opId).map((i) => ({ ...i }));
+    },
+    async add(opId, input: EiesItemInput) {
+      const it: EiesItem = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        impact: input.impact.trim(), milieu: input.milieu, severity: input.severity,
+        mesureAttenuation: input.mesureAttenuation?.trim() || null, status: 'planifiee',
+      };
+      db.eiesItems.push(it);
+      return { ...it };
+    },
+    async setStatus(iid, status) {
+      const it = db.eiesItems.find((x) => x.id === iid);
+      if (!it) throw new Error('eies_item_not_found');
+      if (!canTransitionEies(it.status, status)) throw new Error('eies_item_transition_invalid');
+      it.status = status;
+      return { ...it };
+    },
+    async remove(iid) {
+      db.eiesItems = db.eiesItems.filter((x) => x.id !== iid);
     },
   };
 }

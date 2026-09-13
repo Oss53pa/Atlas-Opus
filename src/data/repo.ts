@@ -86,6 +86,7 @@ import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import type { LegalEntity, LegalEntityInput, LegalEntityStatus } from '../domain/legalEntity/types';
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../domain/actionItem/types';
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderStatus } from '../domain/serviceOrder/types';
+import type { EiesItem, EiesItemInput, EiesStatus } from '../domain/eiesItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -376,6 +377,14 @@ export interface ServiceOrdersRepo {
   list(operationId: string): Promise<ServiceOrder[]>;
   add(operationId: string, input: ServiceOrderInput): Promise<ServiceOrder>;
   setStatus(id: string, status: ServiceOrderStatus): Promise<ServiceOrder>;
+  remove(id: string): Promise<void>;
+}
+
+/** M19 (E&S) — registre d'impacts EIES et mesures d'atténuation. */
+export interface EiesItemsRepo {
+  list(operationId: string): Promise<EiesItem[]>;
+  add(operationId: string, input: EiesItemInput): Promise<EiesItem>;
+  setStatus(id: string, status: EiesStatus): Promise<EiesItem>;
   remove(id: string): Promise<void>;
 }
 

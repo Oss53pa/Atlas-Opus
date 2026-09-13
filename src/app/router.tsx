@@ -18,6 +18,7 @@ export type Route =
   | { name: 'montage'; id: string }
   | { name: 'actions'; id: string }
   | { name: 'os'; id: string }
+  | { name: 'eies'; id: string }
   | { name: 'passation'; id: string }
   | { name: 'etudes'; id: string }
   | { name: 'analyse'; id: string }

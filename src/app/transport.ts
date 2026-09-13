@@ -26,9 +26,10 @@ import type { AssetType } from '../domain/handoverAssets/types';
 import type { BaselineTask } from '../domain/baseline/types';
 import type { StructureType, Shareholder } from '../domain/legalEntity/types';
 import type { ServiceOrderType } from '../domain/serviceOrder/types';
+import type { Milieu, Severity } from '../domain/eiesItem/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -169,6 +170,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M19 (E&S) — impact EIES relevé hors-ligne (non écriture) : créé « planifiee ».
+interface EiesItemCreatePayload {
+  operationId: string;
+  impact: string;
+  milieu: Milieu;
+  severity: Severity;
+  mesureAttenuation?: string | null;
 }
 
 // M13/M15 — ordre de service rédigé hors-ligne (non écriture) : créé « projet ».
@@ -435,6 +445,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M19 (E&S) — impact EIES créé « planifiee » : rejouable tel quel.
+  if (m.entity === 'eiesItems' && m.op === 'create') {
+    const p = m.payload as unknown as EiesItemCreatePayload;
+    await api.eiesItems.add(p.operationId, {
+      impact: p.impact, milieu: p.milieu, severity: p.severity, mesureAttenuation: p.mesureAttenuation ?? null,
+    });
     return { ok: true };
   }
   // M13/M15 — OS rédigé « projet » : rejouable tel quel (notification hors-ligne).

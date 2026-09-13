@@ -25,6 +25,7 @@ import type { AssetType } from '../../domain/handoverAssets/types';
 import type { StructureType, LegalEntityStatus } from '../../domain/legalEntity/types';
 import type { ActionItemStatus } from '../../domain/actionItem/types';
 import type { ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
+import type { Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -572,6 +573,29 @@ export const SO_STATUS_TONE: Record<ServiceOrderStatus, BadgeTone> = {
   projet: 'neutral', emis: 'info', notifie: 'success', annule: 'danger',
 };
 export const serviceOrderStatusLabel = (s: ServiceOrderStatus) => t(SO_STATUS_KEY[s]);
+
+// ── Registre EIES (M19) ──────────────────────────────────────────────────────
+const MILIEU_KEY: Record<Milieu, MessageKey> = {
+  physique: 'eies.milieu.physique', biologique: 'eies.milieu.biologique',
+  humain: 'eies.milieu.humain', socio_economique: 'eies.milieu.socio_economique',
+};
+export const milieuLabel = (m: Milieu) => t(MILIEU_KEY[m]);
+const SEVERITY_KEY: Record<Severity, MessageKey> = {
+  faible: 'eies.severity.faible', moyenne: 'eies.severity.moyenne',
+  forte: 'eies.severity.forte', critique: 'eies.severity.critique',
+};
+export const SEVERITY_TONE: Record<Severity, BadgeTone> = {
+  faible: 'neutral', moyenne: 'info', forte: 'warning', critique: 'danger',
+};
+export const severityLabel = (s: Severity) => t(SEVERITY_KEY[s]);
+const EIES_STATUS_KEY: Record<EiesStatus, MessageKey> = {
+  planifiee: 'eies.status.planifiee', en_cours: 'eies.status.en_cours',
+  mise_en_oeuvre: 'eies.status.mise_en_oeuvre', soldee: 'eies.status.soldee',
+};
+export const EIES_STATUS_TONE: Record<EiesStatus, BadgeTone> = {
+  planifiee: 'neutral', en_cours: 'info', mise_en_oeuvre: 'accent', soldee: 'success',
+};
+export const eiesStatusLabel = (s: EiesStatus) => t(EIES_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

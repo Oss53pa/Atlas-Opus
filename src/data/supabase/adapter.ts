@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -68,6 +68,7 @@ import type { Baseline, BaselineInput, BaselineTask } from '../../domain/baselin
 import type { LegalEntity, LegalEntityInput, StructureType, LegalEntityStatus, Shareholder } from '../../domain/legalEntity/types';
 import type { ActionItem, ActionItemInput, ActionItemStatus } from '../../domain/actionItem/types';
 import type { ServiceOrder, ServiceOrderInput, ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceOrder/types';
+import type { EiesItem, EiesItemInput, Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1677,6 +1678,40 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M19 (E&S) — registre d'impacts EIES ──────────────────────────────────────
+interface EiesItemRow { id: string; tenant_id: string; operation_id: string; impact: string; milieu: string; severity: string; mesure_attenuation: string | null; status: string }
+function toEiesItem(r: EiesItemRow): EiesItem {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, impact: r.impact,
+    milieu: r.milieu as Milieu, severity: r.severity as Severity,
+    mesureAttenuation: r.mesure_attenuation, status: r.status as EiesStatus,
+  };
+}
+export function createSupabaseEiesItemsRepo(client: SupabaseClient, session: Session): EiesItemsRepo {
+  const TB = 'ao_eies_items';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at')) as EiesItemRow[];
+      return rows.map(toEiesItem);
+    },
+    async add(opId, input: EiesItemInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, impact: input.impact.trim(),
+        milieu: input.milieu, severity: input.severity, mesure_attenuation: input.mesureAttenuation?.trim() || null,
+      }).select('*').single()) as EiesItemRow;
+      return toEiesItem(row);
+    },
+    async setStatus(id, status) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as EiesItemRow;
+      return toEiesItem(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

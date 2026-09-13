@@ -228,6 +228,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
   });
 
+  it('eiesItems.create → appelle eiesItems.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      eiesItems: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'eiesItems', op: 'create', payload: { operationId: 'op-1', impact: 'Poussières', milieu: 'physique', severity: 'moyenne', mesureAttenuation: 'Arrosage' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { impact: 'Poussières', milieu: 'physique', severity: 'moyenne', mesureAttenuation: 'Arrosage' } });
+  });
+
   it('serviceOrders.create → appelle serviceOrders.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {
