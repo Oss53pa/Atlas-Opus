@@ -60,6 +60,19 @@ déployé.
   l'isolation tenant + `operation_scope` + rôle **contre `schema.sql`** (source de
   vérité). Ils sont verts — mais valident la vérité CDC, **pas** le déployé.
 
+## Audit vocabulaires CHECK (déployé) ↔ enums applicatifs
+
+Comparaison des ~60 contraintes CHECK `ao_*` (statuts/types/… en `ANY(ARRAY)`)
+aux enums du domaine (`as const` + unions inline). Résultat : concordance
+générale ; **2 divergences de vocabulaire** détectées et corrigées, toutes deux
+« déployé plus étroit que le type applicatif » :
+
+- `ao_tenant_roles.role` — migration `0035` (aligné sur `Role`).
+- `ao_contracts.status` — migration `0037` : `ContractStatus` vaut
+  `draft|active|closed` ; le CHECK n'autorisait que `active|closed`. Élargi
+  (backward-compatible). Latent seulement (aucun contrat n'est créé en `draft`
+  aujourd'hui — la création pose le défaut `active`).
+
 ## Remédiation — état
 
 - [x] **Périmètre opération** — `ao_operation_members` + `ao_user_operations()`,
