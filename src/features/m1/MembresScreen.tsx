@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ChevronLeft, UserPlus, Trash2, Shield } from 'lucide-react';
-import { Badge, Button, DataTable, Field, FactList, KpiRow, Panel, Skeleton, EmptyState, useToast, type Fact, type TableRowData } from '../../ui';
+import { Badge, Button, DataTable, Field, FactList, KpiRow, Panel, Select, Skeleton, EmptyState, useToast, type Fact, type TableRowData } from '../../ui';
 import { useData, useMembers, useMemberGrants, useOperations } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { t, type MessageKey } from '../../i18n';
-import { activeMembers, distinctRoles, effectiveRole, validateGrantInput, type MemberStatus } from '../../domain/admin';
+import { activeMembers, distinctRoles, effectiveRole, validateGrantInput, linkableMembers, type MemberStatus } from '../../domain/admin';
 import { ROLES, type Role } from '../../domain/m1/types';
 import { can } from '../../domain/m1/permissions';
 
@@ -107,9 +107,13 @@ export function MembresScreen() {
   ];
 
   const opName = (id: string) => (operations ?? []).find((o) => o.id === id)?.name ?? id;
+  const memberName = (uid: string) => list.find((m) => m.userId === uid)?.name;
   const grantRows: TableRowData[] = (grants ?? []).map((g) => ({
     cells: [
-      <span className="mono text-[13px]">{g.userId}</span>,
+      <span>
+        {memberName(g.userId) ? <span className="block font-medium">{memberName(g.userId)}</span> : null}
+        <span className="mono block text-[12px] text-ink-3">{g.userId}</span>
+      </span>,
       <Badge tone="accent">{roleLabel(effectiveRole(g.roles) ?? 'viewer')}</Badge>,
       <span className="text-[13px]">{g.operationScope === null ? t('grant.scope.all') : g.operationScope.map(opName).join(', ')}</span>,
       canManage ? (
@@ -148,6 +152,12 @@ export function MembresScreen() {
         <Panel title={t('grant.title')} meta={t('grant.meta')}>
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Select id="grant-member" label={t('grant.member')} value={userId} onChange={(e) => setUserId(e.target.value)}>
+                <option value="">{t('grant.member.ph')}</option>
+                {linkableMembers(list).map((m) => (
+                  <option key={m.id} value={m.userId as string}>{m.name} · {roleLabel(m.role)}</option>
+                ))}
+              </Select>
               <Field id="grant-user" label={t('grant.user')} value={userId} placeholder={t('grant.user.ph')} onChange={(e) => setUserId(e.target.value)} />
             </div>
             <div>

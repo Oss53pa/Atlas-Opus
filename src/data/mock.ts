@@ -554,12 +554,12 @@ export function createMockDb(): MockDb {
 
   // Administration transverse (F1/F4/F7) — tenant Atlas Immobilier CI.
   const members: Member[] = [
-    { id: 'mb-1', tenantId: T, name: 'Kouassi Traoré', email: 'k.traore@atlas-mo.ci', role: 'moa_director', scope: 'toutes opérations', status: 'actif', lastActivity: 'à l’instant' },
-    { id: 'mb-2', tenantId: T, name: 'Awa Diallo', email: 'a.diallo@atlas-mo.ci', role: 'finance', scope: 'toutes opérations', status: 'actif', lastActivity: 'hier' },
-    { id: 'mb-3', tenantId: T, name: 'Bakary Konan', email: 'b.konan@ateliernord.ci', role: 'amo', scope: 'Palmiers · Plateau', status: 'actif', lastActivity: '19.08' },
-    { id: 'mb-4', tenantId: T, name: 'Thierry Bamba', email: 't.bamba@atlas-mo.ci', role: 'site', scope: 'Palmiers', status: 'actif', lastActivity: '19.08' },
-    { id: 'mb-5', tenantId: T, name: 'Sofia Renard', email: 's.renard@atlas-mo.ci', role: 'procurement', scope: 'Plateau · Bouaké', status: 'actif', lastActivity: '18.08' },
-    { id: 'mb-6', tenantId: T, name: 'invitation@exemple.ci', email: 'invitation@exemple.ci', role: 'viewer', scope: 'Palmiers', status: 'en_attente', lastActivity: null },
+    { id: 'mb-1', tenantId: T, userId: 'usr-mb-1', name: 'Kouassi Traoré', email: 'k.traore@atlas-mo.ci', role: 'moa_director', scope: 'toutes opérations', status: 'actif', lastActivity: 'à l’instant' },
+    { id: 'mb-2', tenantId: T, userId: 'usr-mb-2', name: 'Awa Diallo', email: 'a.diallo@atlas-mo.ci', role: 'finance', scope: 'toutes opérations', status: 'actif', lastActivity: 'hier' },
+    { id: 'mb-3', tenantId: T, userId: 'usr-mb-3', name: 'Bakary Konan', email: 'b.konan@ateliernord.ci', role: 'amo', scope: 'Palmiers · Plateau', status: 'actif', lastActivity: '19.08' },
+    { id: 'mb-4', tenantId: T, userId: 'usr-mb-4', name: 'Thierry Bamba', email: 't.bamba@atlas-mo.ci', role: 'site', scope: 'Palmiers', status: 'actif', lastActivity: '19.08' },
+    { id: 'mb-5', tenantId: T, userId: 'usr-mb-5', name: 'Sofia Renard', email: 's.renard@atlas-mo.ci', role: 'procurement', scope: 'Plateau · Bouaké', status: 'actif', lastActivity: '18.08' },
+    { id: 'mb-6', tenantId: T, userId: null, name: 'invitation@exemple.ci', email: 'invitation@exemple.ci', role: 'viewer', scope: 'Palmiers', status: 'en_attente', lastActivity: null },
   ];
   const notifications: NotificationItem[] = [
     { id: 'nt-1', tenantId: T, severity: 'danger', title: 'Écart physique / financier de 6 points — lot 02', context: 'Palmiers · M13 · RG-M13-06', at: '2026-08-19T14:02:00.000Z', read: false },

@@ -13,6 +13,9 @@ export type MemberStatus = (typeof MEMBER_STATUSES)[number];
 export interface Member {
   id: string;
   tenantId: string;
+  /** Compte utilisateur lié (auth.uid) une fois l'invitation acceptée ; null tant
+   * qu'en attente. Requis pour attribuer des droits (ao_tenant_roles/scope). */
+  userId: string | null;
   name: string;
   email: string;
   role: Role;
