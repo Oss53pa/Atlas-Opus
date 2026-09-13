@@ -64,6 +64,7 @@ import type { Dispute, DisputeInput } from '../domain/litige/types';
 import type { Claim, ClaimInput } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
+import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -124,6 +125,7 @@ import type {
   ClaimsRepo,
   DoeRepo,
   HandoverAssetsRepo,
+  BaselinesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -186,6 +188,7 @@ export interface MockDb {
   claims: Claim[];
   doeDocuments: DoeDocument[];
   handoverAssets: HandoverAsset[];
+  baselines: Baseline[];
 }
 
 interface Deps {
@@ -632,8 +635,21 @@ export function createMockDb(): MockDb {
     { id: 'ha-1', tenantId: T, operationId: 'op-palmiers', label: 'Ascenseur bloc A', assetType: 'equipement', location: 'Hall A', warrantyEnd: '2027-06-30', targetSystem: 'GMAO Keystone' },
     { id: 'ha-2', tenantId: T, operationId: 'op-palmiers', label: 'Poste de refoulement', assetType: 'reseau', location: 'Sous-sol', warrantyEnd: null, targetSystem: null },
   ];
+  const baselines: Baseline[] = [
+    {
+      id: 'bl-1', tenantId: T, operationId: 'op-palmiers', label: 'Ordre de service initial',
+      isActive: true, createdAt: '2026-01-20T00:00:00.000Z',
+      snapshot: [
+        { id: 'tk-p1', name: 'Études & conception', startDate: '2026-02-01', endDate: '2026-04-30', isMilestone: false },
+        { id: 'tk-p2', name: 'Obtention permis de construire', startDate: '2026-05-01', endDate: '2026-05-01', isMilestone: true },
+        { id: 'tk-p3', name: 'Gros œuvre', startDate: '2026-05-15', endDate: '2026-10-31', isMilestone: false },
+        { id: 'tk-p4', name: 'Second œuvre', startDate: '2026-09-01', endDate: '2027-04-30', isMilestone: false },
+        { id: 'tk-p5', name: 'Livraison', startDate: '2027-08-31', endDate: '2027-08-31', isMilestone: true },
+      ],
+    },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1563,6 +1579,41 @@ export function createHandoverAssetsRepo(db: MockDb, session: Session, deps: Dep
     },
     async remove(aid) {
       db.handoverAssets = db.handoverAssets.filter((x) => x.id !== aid);
+    },
+  };
+}
+
+export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): BaselinesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.baselines).filter((b) => b.operationId === opId).map((b) => ({ ...b, snapshot: [...b.snapshot] }));
+    },
+    async add(opId, input: BaselineInput) {
+      // Nouvelle baseline active : désactive les autres de l'opération.
+      for (const other of db.baselines) {
+        if (other.tenantId === session.tenantId && other.operationId === opId) other.isActive = false;
+      }
+      const b: Baseline = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        label: input.label.trim(), snapshot: input.snapshot.map((s) => ({ ...s })),
+        isActive: true, createdAt: new Date().toISOString(),
+      };
+      db.baselines.push(b);
+      return { ...b, snapshot: [...b.snapshot] };
+    },
+    async setActive(bid) {
+      const b = db.baselines.find((x) => x.id === bid);
+      if (!b) throw new Error('baseline_not_found');
+      for (const other of db.baselines) {
+        if (other.tenantId === session.tenantId && other.operationId === b.operationId) other.isActive = false;
+      }
+      b.isActive = true;
+      return { ...b, snapshot: [...b.snapshot] };
+    },
+    async remove(bid) {
+      db.baselines = db.baselines.filter((x) => x.id !== bid);
     },
   };
 }

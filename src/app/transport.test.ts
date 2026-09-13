@@ -214,6 +214,20 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { category: 'plans_recolement', fileRef: 'DOE/x.pdf' } });
   });
 
+  it('baselines.create → appelle baselines.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      baselines: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const snapshot = [{ id: 'tk-1', name: 'Gros œuvre', startDate: '2026-01-01', endDate: '2026-03-01', isMilestone: false }];
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'baselines', op: 'create', payload: { operationId: 'op-1', label: 'OS', snapshot } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
+  });
+
   it('claims.create → appelle claims.add (déclaré) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

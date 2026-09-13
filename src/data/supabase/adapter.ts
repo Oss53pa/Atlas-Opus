@@ -57,13 +57,14 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput, AssetType } from '../../domain/handoverAssets/types';
+import type { Baseline, BaselineInput, BaselineTask } from '../../domain/baseline/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1633,6 +1634,46 @@ export function createSupabaseHandoverAssetsRepo(client: SupabaseClient, session
         location: input.location ?? null, warranty_end: input.warrantyEnd ?? null, target_system: input.targetSystem ?? null,
       }).select('*').single()) as AssetRow;
       return toAsset(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M12 (planning) — baselines de référence ──────────────────────────────────
+interface BaselineRow { id: string; tenant_id: string; operation_id: string; label: string; snapshot: unknown; is_active: boolean; created_at: string }
+function toBaseline(r: BaselineRow): Baseline {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, label: r.label,
+    snapshot: Array.isArray(r.snapshot) ? (r.snapshot as BaselineTask[]) : [],
+    isActive: r.is_active, createdAt: r.created_at,
+  };
+}
+export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Session): BaselinesRepo {
+  const TB = 'ao_baselines';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at', { ascending: false })) as BaselineRow[];
+      return rows.map(toBaseline);
+    },
+    async add(opId, input: BaselineInput) {
+      // Nouvelle baseline active : désactive d'abord les autres de l'opération.
+      const off = await client.from(TB).update({ is_active: false }).eq('operation_id', opId);
+      if (off.error) throw new Error(off.error.message);
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, label: input.label.trim(),
+        snapshot: input.snapshot, is_active: true,
+      }).select('*').single()) as BaselineRow;
+      return toBaseline(row);
+    },
+    async setActive(id) {
+      const cur = unwrap(await client.from(TB).select('operation_id').eq('id', id).single()) as { operation_id: string };
+      const off = await client.from(TB).update({ is_active: false }).eq('operation_id', cur.operation_id);
+      if (off.error) throw new Error(off.error.message);
+      const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
+      return toBaseline(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

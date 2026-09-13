@@ -82,6 +82,7 @@ import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/type
 import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
 import type { HandoverAsset, HandoverAssetInput } from '../domain/handoverAssets/types';
+import type { Baseline, BaselineInput } from '../domain/baseline/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -339,6 +340,15 @@ export interface DoeRepo {
 export interface HandoverAssetsRepo {
   list(operationId: string): Promise<HandoverAsset[]>;
   add(operationId: string, input: HandoverAssetInput): Promise<HandoverAsset>;
+  remove(id: string): Promise<void>;
+}
+
+/** M12 (planning) — baselines de référence (repères de dérapage). */
+export interface BaselinesRepo {
+  list(operationId: string): Promise<Baseline[]>;
+  add(operationId: string, input: BaselineInput): Promise<Baseline>;
+  /** Rend cette baseline active (et désactive les autres de l'opération). */
+  setActive(id: string): Promise<Baseline>;
   remove(id: string): Promise<void>;
 }
 

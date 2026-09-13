@@ -23,9 +23,10 @@ import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import type { DoeCategory } from '../domain/doe/types';
 import type { AssetType } from '../domain/handoverAssets/types';
+import type { BaselineTask } from '../domain/baseline/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -158,6 +159,14 @@ interface DoeCreatePayload {
   operationId: string;
   category: DoeCategory;
   fileRef?: string | null;
+}
+
+// M12 (planning) — capture d'une baseline (non écriture) : instantané figé des
+// tâches (JSON-safe), rejouable tel quel ; devient la baseline active.
+interface BaselineCreatePayload {
+  operationId: string;
+  label: string;
+  snapshot: BaselineTask[];
 }
 
 // M19 (sinistres) — déclaration d'assurance (non écriture) : créée « déclaré » ;
@@ -390,6 +399,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'doeDocuments' && m.op === 'create') {
     const p = m.payload as unknown as DoeCreatePayload;
     await api.doe.add(p.operationId, { category: p.category, fileRef: p.fileRef ?? null });
+    return { ok: true };
+  }
+  // M12 (planning) — capture de baseline hors-ligne : rejouable telle quelle.
+  if (m.entity === 'baselines' && m.op === 'create') {
+    const p = m.payload as unknown as BaselineCreatePayload;
+    await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
     return { ok: true };
   }
   // M19 (sinistres) — déclaration créée « déclaré » : rejouable telle quelle.
