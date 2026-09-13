@@ -23,7 +23,7 @@ import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -139,6 +139,15 @@ interface ReceiptCreatePayload {
   currency: string;
   method: ReceiptMethod;
   reference?: string | null;
+}
+
+// M19 (sinistres) — déclaration d'assurance (non écriture) : créée « déclaré » ;
+// montant `number` (unités majeures, JSON-safe).
+interface ClaimCreatePayload {
+  operationId: string;
+  event: string;
+  amount: number;
+  insuranceId?: string | null;
 }
 
 // M19 (litiges) — litige (suivi, non écriture) : créé « ouvert » ; montant en
@@ -347,6 +356,12 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
     await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true };
+  }
+  // M19 (sinistres) — déclaration créée « déclaré » : rejouable telle quelle.
+  if (m.entity === 'claims' && m.op === 'create') {
+    const p = m.payload as unknown as ClaimCreatePayload;
+    await api.claims.add(p.operationId, { event: p.event, amount: p.amount, insuranceId: p.insuranceId ?? null });
     return { ok: true };
   }
   // M19 (litiges) — litige créé « ouvert » : rejouable tel quel.

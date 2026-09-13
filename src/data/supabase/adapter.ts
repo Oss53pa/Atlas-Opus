@@ -57,10 +57,11 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
+import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1536,6 +1537,42 @@ export function createSupabaseDisputesRepo(client: SupabaseClient, session: Sess
     async setStatus(id, status: DisputeStatus) {
       const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as DisputeRow;
       return toDispute(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M19 (sinistres) — registre des sinistres ─────────────────────────────────
+interface ClaimRow {
+  id: string; tenant_id: string; operation_id: string; insurance_id: string | null;
+  event: string; amount: number | string; status: string;
+}
+function toClaim(r: ClaimRow): Claim {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, insuranceId: r.insurance_id,
+    event: r.event, amount: Number(r.amount), status: r.status as ClaimStatus,
+  };
+}
+export function createSupabaseClaimsRepo(client: SupabaseClient, session: Session): ClaimsRepo {
+  const TB = 'ao_claims';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at', { ascending: false })) as ClaimRow[];
+      return rows.map(toClaim);
+    },
+    async add(opId, input: ClaimInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, insurance_id: input.insuranceId ?? null,
+        event: input.event.trim(), amount: input.amount,
+      }).select('*').single()) as ClaimRow;
+      return toClaim(row);
+    },
+    async setStatus(id, status: ClaimStatus) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as ClaimRow;
+      return toClaim(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

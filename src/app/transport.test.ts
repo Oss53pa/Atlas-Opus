@@ -188,6 +188,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0].input.method).toBe('virement');
   });
 
+  it('claims.create → appelle claims.add (déclaré) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      claims: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'claims', op: 'create', payload: { operationId: 'op-1', event: 'Dégât des eaux', amount: 6_500_000, insuranceId: null } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { event: 'Dégât des eaux', amount: 6_500_000 } });
+  });
+
   it('disputes.create → appelle disputes.add (ouvert) et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

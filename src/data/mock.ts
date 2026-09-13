@@ -61,6 +61,7 @@ import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { canManualRetry } from '../domain/f5/contract';
 import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput } from '../domain/litige/types';
+import type { Claim, ClaimInput } from '../domain/claim/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -118,6 +119,7 @@ import type {
   IntegrationsRepo,
   HsseRepo,
   DisputesRepo,
+  ClaimsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -177,6 +179,7 @@ export interface MockDb {
   outbox: OutboxMessage[];
   hsseIncidents: HsseIncident[];
   disputes: Dispute[];
+  claims: Claim[];
 }
 
 interface Deps {
@@ -612,8 +615,11 @@ export function createMockDb(): MockDb {
   const disputes: Dispute[] = [
     { id: 'lt-1', tenantId: T, operationId: 'op-palmiers', counterpart: 'BTP Ivoire SA', object: 'Pénalités de retard contestées', amountAtStake: 42_000_000, fileRef: 'CONT-2026-01', status: 'en_cours' },
   ];
+  const claims: Claim[] = [
+    { id: 'cl-1', tenantId: T, operationId: 'op-palmiers', insuranceId: null, event: 'Dégât des eaux niveau R+1', amount: 6_500_000, status: 'en_instruction' },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1521,6 +1527,33 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
     },
     async remove(iid) {
       db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
+    },
+  };
+}
+
+export function createClaimsRepo(db: MockDb, session: Session, deps: Deps): ClaimsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.claims).filter((c) => c.operationId === opId).map((c) => ({ ...c }));
+    },
+    async add(opId, input: ClaimInput) {
+      const c: Claim = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        insuranceId: input.insuranceId ?? null, event: input.event.trim(), amount: input.amount, status: 'declare',
+      };
+      db.claims.push(c);
+      return { ...c };
+    },
+    async setStatus(cid, status) {
+      const c = db.claims.find((x) => x.id === cid);
+      if (!c) throw new Error('claim_not_found');
+      c.status = status;
+      return { ...c };
+    },
+    async remove(cid) {
+      db.claims = db.claims.filter((x) => x.id !== cid);
     },
   };
 }

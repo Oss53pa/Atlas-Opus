@@ -79,6 +79,7 @@ import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantIn
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
+import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -313,6 +314,14 @@ export interface DisputesRepo {
   list(operationId: string): Promise<Dispute[]>;
   add(operationId: string, input: DisputeInput): Promise<Dispute>;
   setStatus(id: string, status: DisputeStatus): Promise<Dispute>;
+  remove(id: string): Promise<void>;
+}
+
+/** M19 (sinistres) — registre des sinistres / déclarations d'assurance d'une opération. */
+export interface ClaimsRepo {
+  list(operationId: string): Promise<Claim[]>;
+  add(operationId: string, input: ClaimInput): Promise<Claim>;
+  setStatus(id: string, status: ClaimStatus): Promise<Claim>;
   remove(id: string): Promise<void>;
 }
 

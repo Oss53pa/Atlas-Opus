@@ -19,6 +19,7 @@ import type { GuaranteeType, GuaranteeDisplayStatus } from '../../domain/m17/typ
 import type { RiskCategory, RiskStatus, RiskLevel } from '../../domain/m20/types';
 import type { HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { DisputeStatus } from '../../domain/litige/types';
+import type { ClaimStatus } from '../../domain/claim/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -502,6 +503,16 @@ export const DISPUTE_STATUS_TONE: Record<DisputeStatus, BadgeTone> = {
   ouvert: 'warning', en_cours: 'info', transige: 'accent', clos: 'success',
 };
 export const disputeStatusLabel = (s: DisputeStatus) => t(DISPUTE_STATUS_KEY[s]);
+
+// ── Sinistres (M19) ──────────────────────────────────────────────────────────
+const CLAIM_STATUS_KEY: Record<ClaimStatus, MessageKey> = {
+  declare: 'claim.status.declare', en_instruction: 'claim.status.en_instruction',
+  indemnise: 'claim.status.indemnise', refuse: 'claim.status.refuse',
+};
+export const CLAIM_STATUS_TONE: Record<ClaimStatus, BadgeTone> = {
+  declare: 'warning', en_instruction: 'info', indemnise: 'success', refuse: 'danger',
+};
+export const claimStatusLabel = (s: ClaimStatus) => t(CLAIM_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

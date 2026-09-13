@@ -85,6 +85,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M20', labelKey: 'mod.m20', route: 'risques' },
       { code: 'HSSE', labelKey: 'mod.hsse', route: 'hsse' },
       { code: 'LIT', labelKey: 'mod.litige', route: 'litiges' },
+      { code: 'SIN', labelKey: 'mod.sinistre', route: 'sinistres' },
       { code: 'EXP', labelKey: 'mod.bascule', route: 'bascule' },
       { code: 'M21', labelKey: 'mod.m21', route: 'reporting' },
       { code: 'M22', labelKey: 'mod.m22', route: 'documents' },
