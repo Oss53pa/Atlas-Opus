@@ -57,7 +57,8 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo } from '../repo';
+import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1423,6 +1424,35 @@ export function createSupabaseMembershipRepo(client: SupabaseClient, session: Se
     async revoke(userId: string) {
       { const { error } = await client.from('ao_tenant_roles').delete().eq('tenant_id', t).eq('user_id', userId); if (error) throw new Error(error.message); }
       { const { error } = await client.from('ao_operation_members').delete().eq('tenant_id', t).eq('user_id', userId); if (error) throw new Error(error.message); }
+    },
+  };
+}
+
+// ── F5 — console d'intégration (lecture) ─────────────────────────────────────
+interface EndpointRow { id: string; tenant_id: string; system: string; status: string; circuit_state: string; circuit_failures: number; circuit_opened_at: string | null }
+interface OutboxRow { id: string; tenant_id: string; system: string; kind: string; business_id: string; idempotency_key: string; payload_hash: string; status: string; attempts: number; last_error: string | null; next_attempt_at: string | null; created_at: string }
+function toEndpoint(r: EndpointRow): IntegrationEndpoint {
+  return {
+    id: r.id, tenantId: r.tenant_id, system: r.system as IntegrationSystem, status: r.status as 'active' | 'paused',
+    circuit: { state: r.circuit_state as CircuitState, failures: r.circuit_failures, openedAt: r.circuit_opened_at },
+  };
+}
+function toOutbox(r: OutboxRow): OutboxMessage {
+  return {
+    id: r.id, tenantId: r.tenant_id, system: r.system as IntegrationSystem, kind: r.kind, businessId: r.business_id,
+    idempotencyKey: r.idempotency_key, payloadHash: r.payload_hash, status: r.status as DeliveryStatus,
+    attempts: r.attempts, lastError: r.last_error, nextAttemptAt: r.next_attempt_at, createdAt: r.created_at,
+  };
+}
+export function createSupabaseIntegrationsRepo(client: SupabaseClient, session: Session): IntegrationsRepo {
+  return {
+    async endpoints() {
+      const rows = unwrap(await client.from('ao_integration_endpoints').select('*').eq('tenant_id', session.tenantId).order('system')) as EndpointRow[];
+      return rows.map(toEndpoint);
+    },
+    async outbox(limit = 50) {
+      const rows = unwrap(await client.from('ao_outbox').select('*').eq('tenant_id', session.tenantId).order('created_at', { ascending: false }).limit(limit)) as OutboxRow[];
+      return rows.map(toOutbox);
     },
   };
 }

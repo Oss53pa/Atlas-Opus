@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   idempotencyKey, payloadHash, backoffDelayMs, shouldRetry, applyOutcome, isDue,
-  circuitAllows, recordCircuit, effectiveCircuitState,
+  circuitAllows, recordCircuit, effectiveCircuitState, outboxBacklog,
 } from './contract';
 import { createIntegrationGateway } from './gateway';
 import { CLOSED_CIRCUIT, DEFAULT_RETRY, type CallOutcome, type OutboxMessage } from './types';
@@ -168,5 +168,17 @@ describe('F5 — passerelle outbox : panne tierce gérée', () => {
     expect(r.skipped).toBe(true);
     expect(r.reason).toBe('circuit_open');
     expect(calls).toBe(callsBefore); // aucun appel supplémentaire
+  });
+});
+
+describe('F5 — outboxBacklog', () => {
+  it('compte par statut avec tous les statuts présents (0 par défaut)', () => {
+    const b = outboxBacklog([
+      { status: 'pending' }, { status: 'pending' }, { status: 'dead' }, { status: 'delivered' },
+    ]);
+    expect(b).toEqual({ pending: 2, inflight: 0, delivered: 1, retrying: 0, dead: 1 });
+  });
+  it('liste vide ⇒ tous à 0', () => {
+    expect(outboxBacklog([])).toEqual({ pending: 0, inflight: 0, delivered: 0, retrying: 0, dead: 0 });
   });
 });

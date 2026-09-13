@@ -57,6 +57,7 @@ import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/t
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput } from '../domain/admin/types';
 import { normalizeScope } from '../domain/admin/onboarding';
+import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -111,6 +112,7 @@ import type {
   HandoverRepo,
   AdminRepo,
   MembershipRepo,
+  IntegrationsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -166,6 +168,8 @@ export interface MockDb {
   approvals: ApprovalTask[];
   priceRevisions: PriceRevision[];
   memberGrants: MemberGrant[];
+  integrationEndpoints: IntegrationEndpoint[];
+  outbox: OutboxMessage[];
 }
 
 interface Deps {
@@ -581,8 +585,19 @@ export function createMockDb(): MockDb {
 
   const priceRevisions: PriceRevision[] = [];
   const memberGrants: MemberGrant[] = [];
+  const integrationEndpoints: IntegrationEndpoint[] = [
+    { id: 'ie-1', tenantId: T, system: 'atlas_finance', status: 'active', circuit: { state: 'closed', failures: 0, openedAt: null } },
+    { id: 'ie-2', tenantId: T, system: 'cinetpay', status: 'active', circuit: { state: 'open', failures: 5, openedAt: '2026-09-12T08:00:00.000Z' } },
+    { id: 'ie-3', tenantId: T, system: 'advist', status: 'paused', circuit: { state: 'closed', failures: 0, openedAt: null } },
+  ];
+  const outbox: OutboxMessage[] = [
+    { id: 'ob-1', tenantId: T, system: 'atlas_finance', kind: 'ecriture_compta', businessId: 'dec-7', idempotencyKey: 'atlas_finance:ecriture_compta:dec-7', payloadHash: 'h1', status: 'delivered', attempts: 1, lastError: null, nextAttemptAt: null, createdAt: '2026-09-12T09:10:00.000Z' },
+    { id: 'ob-2', tenantId: T, system: 'cinetpay', kind: 'encaissement', businessId: 'rec-3', idempotencyKey: 'cinetpay:encaissement:rec-3', payloadHash: 'h2', status: 'retrying', attempts: 2, lastError: 'timeout', nextAttemptAt: '2026-09-12T09:20:00.000Z', createdAt: '2026-09-12T09:12:00.000Z' },
+    { id: 'ob-3', tenantId: T, system: 'cinetpay', kind: 'encaissement', businessId: 'rec-4', idempotencyKey: 'cinetpay:encaissement:rec-4', payloadHash: 'h3', status: 'dead', attempts: 5, lastError: 'gateway_unreachable', nextAttemptAt: null, createdAt: '2026-09-11T18:00:00.000Z' },
+    { id: 'ob-4', tenantId: T, system: 'advist', kind: 'attestation', businessId: 'att-1', idempotencyKey: 'advist:attestation:att-1', payloadHash: 'h4', status: 'pending', attempts: 0, lastError: null, nextAttemptAt: null, createdAt: '2026-09-12T09:15:00.000Z' },
+  ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1460,6 +1475,22 @@ export function createMembershipRepo(db: MockDb, session: Session): MembershipRe
     },
     async revoke(userId: string) {
       db.memberGrants = db.memberGrants.filter((g) => !(g.tenantId === session.tenantId && g.userId === userId));
+    },
+  };
+}
+
+export function createIntegrationsRepo(db: MockDb, session: Session): IntegrationsRepo {
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async endpoints() {
+      return mine(db.integrationEndpoints).map((e) => ({ ...e, circuit: { ...e.circuit } }));
+    },
+    async outbox(limit = 50) {
+      return mine(db.outbox)
+        .slice()
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, limit)
+        .map((m) => ({ ...m }));
     },
   };
 }

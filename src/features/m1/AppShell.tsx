@@ -215,6 +215,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         { name: 'notifications', labelKey: 'notif.title' },
         { name: 'syncQueue', labelKey: 'sync.nav' },
         { name: 'membres', labelKey: 'membres.title' },
+        { name: 'integrations', labelKey: 'f5.title' },
         { name: 'etats', labelKey: 'etats.title' },
       ] as const).map((link) => (
         <button

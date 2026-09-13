@@ -72,3 +72,14 @@ export interface CircuitStatus {
   openedAt: string | null;
 }
 export const CLOSED_CIRCUIT: CircuitStatus = { state: 'closed', failures: 0, openedAt: null };
+
+/** Configuration + santé d'un système tiers (lecture console F5). */
+export interface IntegrationEndpoint {
+  id: string;
+  tenantId: string;
+  system: IntegrationSystem;
+  /** Actif ou mis en pause manuellement. */
+  status: 'active' | 'paused';
+  /** État du disjoncteur (persisté ; l'état effectif tient compte du cooldown). */
+  circuit: CircuitStatus;
+}
