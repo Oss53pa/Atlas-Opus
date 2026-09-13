@@ -44,6 +44,7 @@ import {
   createShipmentsRepo,
   createBudgetLinesRepo,
   createEvaluationCriteriaRepo,
+  createOfferScoresRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -93,6 +94,7 @@ import type {
   ShipmentsRepo,
   BudgetLinesRepo,
   EvaluationCriteriaRepo,
+  OfferScoresRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -135,6 +137,7 @@ import type { EiesItem } from '../domain/eiesItem/types';
 import type { Shipment } from '../domain/shipment/types';
 import type { BudgetLine } from '../domain/budgetLine/types';
 import type { EvaluationCriterion } from '../domain/evaluationCriterion/types';
+import type { OfferScore } from '../domain/offerScore/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -186,6 +189,7 @@ import {
   createSupabaseShipmentsRepo,
   createSupabaseBudgetLinesRepo,
   createSupabaseEvaluationCriteriaRepo,
+  createSupabaseOfferScoresRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -236,6 +240,7 @@ interface DataApi {
   shipments: ShipmentsRepo;
   budgetLines: BudgetLinesRepo;
   evaluationCriteria: EvaluationCriteriaRepo;
+  offerScores: OfferScoresRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -297,6 +302,7 @@ function buildMockApi(): DataApi {
     shipments: createShipmentsRepo(db, session, { telemetry }),
     budgetLines: createBudgetLinesRepo(db, session, { telemetry }),
     evaluationCriteria: createEvaluationCriteriaRepo(db, session, { telemetry }),
+    offerScores: createOfferScoresRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -406,6 +412,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           shipments: createSupabaseShipmentsRepo(supabase, session),
           budgetLines: createSupabaseBudgetLinesRepo(supabase, session),
           evaluationCriteria: createSupabaseEvaluationCriteriaRepo(supabase, session),
+          offerScores: createSupabaseOfferScoresRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -718,6 +725,11 @@ export function useBudgetLines(operationId: string): AsyncState<BudgetLine[]> {
 export function useEvaluationCriteria(operationId: string): AsyncState<EvaluationCriterion[]> {
   const { evaluationCriteria } = useData();
   return useAsync(() => evaluationCriteria.list(operationId), [evaluationCriteria, operationId]);
+}
+
+export function useOfferScores(operationId: string): AsyncState<OfferScore[]> {
+  const { offerScores } = useData();
+  return useAsync(() => offerScores.list(operationId), [offerScores, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

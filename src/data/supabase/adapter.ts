@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -72,6 +72,7 @@ import type { EiesItem, EiesItemInput, Milieu, Severity, EiesStatus } from '../.
 import type { Shipment, ShipmentInput, Incoterm, CustomsStatus } from '../../domain/shipment/types';
 import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
+import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1681,6 +1682,35 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M23 — notation des offres ────────────────────────────────────────────────
+interface OfferScoreRow { id: string; tenant_id: string; operation_id: string; offer_id: string; criteria_id: string; raw_score: number | string; weighted_score: number | string }
+function toOfferScore(r: OfferScoreRow): OfferScore {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, offerId: r.offer_id, criteriaId: r.criteria_id,
+    rawScore: Number(r.raw_score), weightedScore: Number(r.weighted_score),
+  };
+}
+export function createSupabaseOfferScoresRepo(client: SupabaseClient, session: Session): OfferScoresRepo {
+  const TB = 'ao_offer_scores';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId)) as OfferScoreRow[];
+      return rows.map(toOfferScore);
+    },
+    async setScore(opId, input: OfferScoreInput) {
+      const row = unwrap(await client.from(TB).upsert({
+        tenant_id: session.tenantId, operation_id: opId, offer_id: input.offerId, criteria_id: input.criteriaId,
+        raw_score: input.rawScore, weighted_score: input.weightedScore,
+      }, { onConflict: 'offer_id,criteria_id' }).select('*').single()) as OfferScoreRow;
+      return toOfferScore(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

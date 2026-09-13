@@ -31,7 +31,7 @@ import type { Incoterm } from '../domain/shipment/types';
 import type { CriterionType } from '../domain/evaluationCriterion/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -172,6 +172,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M23 — note d'offre (non écriture) : upsert idempotent (rejouable), JSON-safe.
+interface OfferScoreCreatePayload {
+  operationId: string;
+  offerId: string;
+  criteriaId: string;
+  rawScore: number;
+  weightedScore: number;
 }
 
 // M23 — critère d'évaluation (non écriture) : poids fraction 0..1 (JSON-safe).
@@ -473,6 +482,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M23 — note d'offre saisie hors-ligne : upsert idempotent, rejouable tel quel.
+  if (m.entity === 'offerScores' && m.op === 'create') {
+    const p = m.payload as unknown as OfferScoreCreatePayload;
+    await api.offerScores.setScore(p.operationId, {
+      offerId: p.offerId, criteriaId: p.criteriaId, rawScore: p.rawScore, weightedScore: p.weightedScore,
+    });
     return { ok: true };
   }
   // M23 — critère d'évaluation créé hors-ligne : rejouable tel quel.

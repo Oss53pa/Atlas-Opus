@@ -77,6 +77,7 @@ import type { Shipment, ShipmentInput } from '../domain/shipment/types';
 import { canTransitionShipment } from '../domain/shipment';
 import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
+import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -145,6 +146,7 @@ import type {
   ShipmentsRepo,
   BudgetLinesRepo,
   EvaluationCriteriaRepo,
+  OfferScoresRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -215,6 +217,7 @@ export interface MockDb {
   shipments: Shipment[];
   budgetLines: BudgetLine[];
   evaluationCriteria: EvaluationCriterion[];
+  offerScores: OfferScore[];
 }
 
 interface Deps {
@@ -673,6 +676,13 @@ export function createMockDb(): MockDb {
     { id: 'ec-2', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Prix des prestations', type: 'financier', weight: 0.45 },
     { id: 'ec-3', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Délai d’exécution', type: 'delai', weight: 0.15 },
   ];
+  const offerScores: OfferScore[] = [
+    { id: 'osc-1', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p1', criteriaId: 'ec-1', rawScore: 85, weightedScore: 34 },
+    { id: 'osc-2', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p1', criteriaId: 'ec-2', rawScore: 78, weightedScore: 35.1 },
+    { id: 'osc-3', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p1', criteriaId: 'ec-3', rawScore: 80, weightedScore: 12 },
+    { id: 'osc-4', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p2', criteriaId: 'ec-1', rawScore: 76, weightedScore: 30.4 },
+    { id: 'osc-5', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p2', criteriaId: 'ec-2', rawScore: 88, weightedScore: 39.6 },
+  ];
   const budgetLines: BudgetLine[] = [
     { id: 'bl-p1', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2211', label: 'Terrain', amountBac: 180_000_000 },
     { id: 'bl-p2', tenantId: T, operationId: 'op-palmiers', syscohadaAccount: '2313', label: 'Bâtiments — gros œuvre', amountBac: 620_000_000 },
@@ -713,7 +723,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1678,6 +1688,37 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createOfferScoresRepo(db: MockDb, session: Session, deps: Deps): OfferScoresRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.offerScores).filter((s) => s.operationId === opId).map((s) => ({ ...s }));
+    },
+    async setScore(opId, input: OfferScoreInput) {
+      // Upsert sur le couple (offre, critère).
+      const existing = db.offerScores.find(
+        (s) => s.tenantId === session.tenantId && s.offerId === input.offerId && s.criteriaId === input.criteriaId,
+      );
+      if (existing) {
+        existing.rawScore = input.rawScore;
+        existing.weightedScore = input.weightedScore;
+        return { ...existing };
+      }
+      const s: OfferScore = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        offerId: input.offerId, criteriaId: input.criteriaId,
+        rawScore: input.rawScore, weightedScore: input.weightedScore,
+      };
+      db.offerScores.push(s);
+      return { ...s };
+    },
+    async remove(sid) {
+      db.offerScores = db.offerScores.filter((x) => x.id !== sid);
     },
   };
 }
