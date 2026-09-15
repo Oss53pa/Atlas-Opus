@@ -91,6 +91,7 @@ import type { Shipment, ShipmentInput, CustomsStatus } from '../domain/shipment/
 import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
+import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -421,6 +422,14 @@ export interface OfferScoresRepo {
   list(operationId: string): Promise<OfferScore[]>;
   /** Enregistre (upsert) la note d'un couple offre/critère. */
   setScore(operationId: string, input: OfferScoreInput): Promise<OfferScore>;
+  remove(id: string): Promise<void>;
+}
+
+/** M19 (E&S) — Plan de Gestion E&S : actions de gestion/atténuation. */
+export interface PgesActionsRepo {
+  list(operationId: string): Promise<PgesAction[]>;
+  add(operationId: string, input: PgesActionInput): Promise<PgesAction>;
+  setStatus(id: string, status: PgesStatus): Promise<PgesAction>;
   remove(id: string): Promise<void>;
 }
 

@@ -45,6 +45,7 @@ import {
   createBudgetLinesRepo,
   createEvaluationCriteriaRepo,
   createOfferScoresRepo,
+  createPgesActionsRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -95,6 +96,7 @@ import type {
   BudgetLinesRepo,
   EvaluationCriteriaRepo,
   OfferScoresRepo,
+  PgesActionsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -138,6 +140,7 @@ import type { Shipment } from '../domain/shipment/types';
 import type { BudgetLine } from '../domain/budgetLine/types';
 import type { EvaluationCriterion } from '../domain/evaluationCriterion/types';
 import type { OfferScore } from '../domain/offerScore/types';
+import type { PgesAction } from '../domain/pgesAction/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -190,6 +193,7 @@ import {
   createSupabaseBudgetLinesRepo,
   createSupabaseEvaluationCriteriaRepo,
   createSupabaseOfferScoresRepo,
+  createSupabasePgesActionsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -241,6 +245,7 @@ interface DataApi {
   budgetLines: BudgetLinesRepo;
   evaluationCriteria: EvaluationCriteriaRepo;
   offerScores: OfferScoresRepo;
+  pgesActions: PgesActionsRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -303,6 +308,7 @@ function buildMockApi(): DataApi {
     budgetLines: createBudgetLinesRepo(db, session, { telemetry }),
     evaluationCriteria: createEvaluationCriteriaRepo(db, session, { telemetry }),
     offerScores: createOfferScoresRepo(db, session, { telemetry }),
+    pgesActions: createPgesActionsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -413,6 +419,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           budgetLines: createSupabaseBudgetLinesRepo(supabase, session),
           evaluationCriteria: createSupabaseEvaluationCriteriaRepo(supabase, session),
           offerScores: createSupabaseOfferScoresRepo(supabase, session),
+          pgesActions: createSupabasePgesActionsRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -730,6 +737,11 @@ export function useEvaluationCriteria(operationId: string): AsyncState<Evaluatio
 export function useOfferScores(operationId: string): AsyncState<OfferScore[]> {
   const { offerScores } = useData();
   return useAsync(() => offerScores.list(operationId), [offerScores, operationId]);
+}
+
+export function usePgesActions(operationId: string): AsyncState<PgesAction[]> {
+  const { pgesActions } = useData();
+  return useAsync(() => pgesActions.list(operationId), [pgesActions, operationId]);
 }
 
 export function useNotifications(): AsyncState<NotificationItem[]> {

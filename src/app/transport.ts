@@ -31,7 +31,7 @@ import type { Incoterm } from '../domain/shipment/types';
 import type { CriterionType } from '../domain/evaluationCriterion/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores' | 'pgesActions'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -172,6 +172,15 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M19 (PGES) — action E&S relevée hors-ligne (non écriture) : créée « ouvert ».
+interface PgesActionCreatePayload {
+  operationId: string;
+  action: string;
+  responsable: string;
+  echeance?: string | null;
+  indicateur?: string | null;
 }
 
 // M23 — note d'offre (non écriture) : upsert idempotent (rejouable), JSON-safe.
@@ -482,6 +491,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true };
+  }
+  // M19 (PGES) — action E&S créée « ouvert » : rejouable telle quelle.
+  if (m.entity === 'pgesActions' && m.op === 'create') {
+    const p = m.payload as unknown as PgesActionCreatePayload;
+    await api.pgesActions.add(p.operationId, {
+      action: p.action, responsable: p.responsable, echeance: p.echeance ?? null, indicateur: p.indicateur ?? null,
+    });
     return { ok: true };
   }
   // M23 — note d'offre saisie hors-ligne : upsert idempotent, rejouable tel quel.

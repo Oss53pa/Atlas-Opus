@@ -228,6 +228,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
   });
 
+  it('pgesActions.create → appelle pgesActions.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      pgesActions: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'pgesActions', op: 'create', payload: { operationId: 'op-1', action: 'Arrosage', responsable: 'HSE', echeance: '2026-09-30', indicateur: 'Fréquence' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { action: 'Arrosage', responsable: 'HSE', echeance: '2026-09-30', indicateur: 'Fréquence' } });
+  });
+
   it('offerScores.create → appelle offerScores.setScore et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

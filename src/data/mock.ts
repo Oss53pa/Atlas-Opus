@@ -78,6 +78,8 @@ import { canTransitionShipment } from '../domain/shipment';
 import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
+import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
+import { canTransitionPges } from '../domain/pgesAction';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -147,6 +149,7 @@ import type {
   BudgetLinesRepo,
   EvaluationCriteriaRepo,
   OfferScoresRepo,
+  PgesActionsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -218,6 +221,7 @@ export interface MockDb {
   budgetLines: BudgetLine[];
   evaluationCriteria: EvaluationCriterion[];
   offerScores: OfferScore[];
+  pgesActions: PgesAction[];
 }
 
 interface Deps {
@@ -676,6 +680,11 @@ export function createMockDb(): MockDb {
     { id: 'ec-2', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Prix des prestations', type: 'financier', weight: 0.45 },
     { id: 'ec-3', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Délai d’exécution', type: 'delai', weight: 0.15 },
   ];
+  const pgesActions: PgesAction[] = [
+    { id: 'pg-1', tenantId: T, operationId: 'op-palmiers', action: 'Arrosage des pistes en phase terrassement', responsable: 'HSE chantier', echeance: '2026-09-30', indicateur: 'Fréquence d’arrosage / jour', status: 'en_cours' },
+    { id: 'pg-2', tenantId: T, operationId: 'op-palmiers', action: 'Plan de gestion des déchets de chantier', responsable: 'Entreprise gros œuvre', echeance: '2026-08-31', indicateur: 'Taux de tri des déchets', status: 'ouvert' },
+    { id: 'pg-3', tenantId: T, operationId: 'op-palmiers', action: 'Sensibilisation HSE des ouvriers', responsable: 'MOE', echeance: null, indicateur: 'Nombre de sessions', status: 'soldee' },
+  ];
   const offerScores: OfferScore[] = [
     { id: 'osc-1', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p1', criteriaId: 'ec-1', rawScore: 85, weightedScore: 34 },
     { id: 'osc-2', tenantId: T, operationId: 'op-palmiers', offerId: 'of-p1', criteriaId: 'ec-2', rawScore: 78, weightedScore: 35.1 },
@@ -723,7 +732,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1688,6 +1697,35 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createPgesActionsRepo(db: MockDb, session: Session, deps: Deps): PgesActionsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.pgesActions).filter((a) => a.operationId === opId).map((a) => ({ ...a }));
+    },
+    async add(opId, input: PgesActionInput) {
+      const a: PgesAction = {
+        id: id(), tenantId: session.tenantId, operationId: opId,
+        action: input.action.trim(), responsable: input.responsable.trim(),
+        echeance: input.echeance ?? null, indicateur: input.indicateur?.trim() || null, status: 'ouvert',
+      };
+      db.pgesActions.push(a);
+      return { ...a };
+    },
+    async setStatus(aid, status) {
+      const a = db.pgesActions.find((x) => x.id === aid);
+      if (!a) throw new Error('pges_action_not_found');
+      if (!canTransitionPges(a.status, status)) throw new Error('pges_action_transition_invalid');
+      a.status = status;
+      return { ...a };
+    },
+    async remove(aid) {
+      db.pgesActions = db.pgesActions.filter((x) => x.id !== aid);
     },
   };
 }

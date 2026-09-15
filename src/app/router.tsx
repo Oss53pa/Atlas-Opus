@@ -23,6 +23,7 @@ export type Route =
   | { name: 'budget'; id: string }
   | { name: 'criteres'; id: string }
   | { name: 'notation'; id: string }
+  | { name: 'pges'; id: string }
   | { name: 'passation'; id: string }
   | { name: 'etudes'; id: string }
   | { name: 'analyse'; id: string }

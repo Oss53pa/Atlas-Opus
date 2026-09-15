@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -73,6 +73,7 @@ import type { Shipment, ShipmentInput, Incoterm, CustomsStatus } from '../../dom
 import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
+import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1682,6 +1683,39 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M19 (E&S) — Plan de Gestion E&S (PGES) ───────────────────────────────────
+interface PgesActionRow { id: string; tenant_id: string; operation_id: string; action: string; responsable: string; echeance: string | null; indicateur: string | null; status: string }
+function toPgesAction(r: PgesActionRow): PgesAction {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, action: r.action,
+    responsable: r.responsable, echeance: r.echeance, indicateur: r.indicateur, status: r.status as PgesStatus,
+  };
+}
+export function createSupabasePgesActionsRepo(client: SupabaseClient, session: Session): PgesActionsRepo {
+  const TB = 'ao_pges_actions';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('created_at')) as PgesActionRow[];
+      return rows.map(toPgesAction);
+    },
+    async add(opId, input: PgesActionInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, action: input.action.trim(),
+        responsable: input.responsable.trim(), echeance: input.echeance ?? null, indicateur: input.indicateur?.trim() || null,
+      }).select('*').single()) as PgesActionRow;
+      return toPgesAction(row);
+    },
+    async setStatus(id, status) {
+      const row = unwrap(await client.from(TB).update({ status }).eq('id', id).select('*').single()) as PgesActionRow;
+      return toPgesAction(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

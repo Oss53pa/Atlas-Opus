@@ -28,6 +28,7 @@ import type { ServiceOrderType, ServiceOrderStatus } from '../../domain/serviceO
 import type { Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { CustomsStatus } from '../../domain/shipment/types';
 import type { CriterionType } from '../../domain/evaluationCriterion/types';
+import type { PgesStatus } from '../../domain/pgesAction/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -628,6 +629,15 @@ export const CRITERION_TYPE_TONE: Record<CriterionType, BadgeTone> = {
   technique: 'info', financier: 'accent', administratif: 'neutral', delai: 'warning',
 };
 export const criterionTypeLabel = (c: CriterionType) => t(CRITERION_TYPE_KEY[c]);
+
+// ── Plan de Gestion E&S (M19) ────────────────────────────────────────────────
+const PGES_STATUS_KEY: Record<PgesStatus, MessageKey> = {
+  ouvert: 'pges.status.ouvert', en_cours: 'pges.status.en_cours', soldee: 'pges.status.soldee',
+};
+export const PGES_STATUS_TONE: Record<PgesStatus, BadgeTone> = {
+  ouvert: 'warning', en_cours: 'info', soldee: 'success',
+};
+export const pgesStatusLabel = (s: PgesStatus) => t(PGES_STATUS_KEY[s]);
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

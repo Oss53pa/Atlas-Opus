@@ -28,6 +28,7 @@ import { ShipmentsScreen } from './features/m1/ShipmentsScreen';
 import { BudgetScreen } from './features/m1/BudgetScreen';
 import { CriteresScreen } from './features/m1/CriteresScreen';
 import { NotationScreen } from './features/m1/NotationScreen';
+import { PgesScreen } from './features/m1/PgesScreen';
 import { PassationScreen } from './features/m1/PassationScreen';
 import { EtudesScreen } from './features/m1/EtudesScreen';
 import { AnalyseScreen } from './features/m1/AnalyseScreen';
@@ -122,6 +123,8 @@ function RouteView() {
       return <CriteresScreen id={route.id} />;
     case 'notation':
       return <NotationScreen id={route.id} />;
+    case 'pges':
+      return <PgesScreen id={route.id} />;
     case 'passation':
       return <PassationScreen id={route.id} />;
     case 'etudes':
