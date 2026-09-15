@@ -367,278 +367,278 @@ interface LandParcelCreatePayload {
 async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleResult> {
   if (m.entity === 'siteReports' && m.op === 'create') {
     const p = m.payload as unknown as SiteReportCreatePayload;
-    await api.siteReports.add(p.operationId, {
+    const __rec = await api.siteReports.add(p.operationId, {
       date: p.date, author: p.author, progress: p.progress, summary: p.summary, blockers: p.blockers,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M15 — un décompte capturé hors-ligne est nécessairement un brouillon (§4) ;
   // sa création (statut draft par construction) est rejouable. Les transitions
   // sensibles (validation/mandatement) restent en ligne (Edge Functions gardées).
   if (m.entity === 'decomptes' && m.op === 'create') {
     const p = m.payload as unknown as DecompteCreatePayload;
-    await api.payments.addDecompte(p.operationId, {
+    const __rec = await api.payments.addDecompte(p.operationId, {
       contractId: p.contractId, number: p.number, amountGross: p.amountGross, retentionRate: p.retentionRate,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M11 — RFI (collaboration terrain), non financier : rejouable tel quel.
   if (m.entity === 'rfis' && m.op === 'create') {
     const p = m.payload as unknown as RfiCreatePayload;
-    await api.rfis.add(p.operationId, {
+    const __rec = await api.rfis.add(p.operationId, {
       number: p.number, subject: p.subject, question: p.question, raisedBy: p.raisedBy,
       priority: p.priority, dueDate: p.dueDate ?? null, documentRef: p.documentRef ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 — réserve de réception, non financière : rejouable tel quel.
   if (m.entity === 'reserves' && m.op === 'create') {
     const p = m.payload as unknown as ReserveCreatePayload;
-    await api.reception.addReserve(p.operationId, {
+    const __rec = await api.reception.addReserve(p.operationId, {
       label: p.label, location: p.location, severity: p.severity, raisedAt: p.raisedAt,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M9 — bon d'achat capturé hors-ligne = brouillon (§4) ; sa création est
   // rejouable. L'engagement (passage hors brouillon) reste en ligne.
   if (m.entity === 'purchaseOrders' && m.op === 'create') {
     const p = m.payload as unknown as PurchaseOrderCreatePayload;
-    await api.purchasing.add(p.operationId, {
+    const __rec = await api.purchasing.add(p.operationId, {
       reference: p.reference, supplier: p.supplier, item: p.item, quantity: p.quantity, unit: p.unit, amount: p.amount,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M10 — document GED (non financier) : rejouable tel quel.
   if (m.entity === 'documents' && m.op === 'create') {
     const p = m.payload as unknown as DocumentCreatePayload;
-    await api.documents.add(p.operationId, {
+    const __rec = await api.documents.add(p.operationId, {
       reference: p.reference, title: p.title, discipline: p.discipline, indice: p.indice,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M6 — unité (inventaire physique, non financier).
   if (m.entity === 'units' && m.op === 'create') {
     const p = m.payload as unknown as UnitCreatePayload;
-    await api.commercialisation.addUnit(p.operationId, {
+    const __rec = await api.commercialisation.addUnit(p.operationId, {
       lotId: p.lotId ?? null, typology: p.typology, area: p.area, price: Money.of(p.priceMajor, p.currency),
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M6 — vente/bail capturée hors-ligne = brouillon (§4) ; création rejouable.
   if (m.entity === 'sales' && m.op === 'create') {
     const p = m.payload as unknown as SaleCreatePayload;
-    await api.commercialisation.addSale(p.operationId, {
+    const __rec = await api.commercialisation.addSale(p.operationId, {
       kind: p.kind, unitId: p.unitId ?? null, counterpart: p.counterpart,
       amount: Money.of(p.amountMajor, p.currency), schedule: p.schedule ?? [],
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M2 — parcelle foncière (montage juridique) créée en « prospection », rejouable.
   if (m.entity === 'landParcels' && m.op === 'create') {
     const p = m.payload as unknown as LandParcelCreatePayload;
-    await api.compliance.addLandParcel(p.operationId, {
+    const __rec = await api.compliance.addLandParcel(p.operationId, {
       reference: p.reference, area: p.area, tenureType: p.tenureType, price: p.price,
       notary: p.notary ?? null, suspensiveConditions: p.suspensiveConditions ?? [],
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M8 — révision de prix (v4.1). Coefficient/montant révisé calculés en TS (F6).
   if (m.entity === 'priceRevisions' && m.op === 'create') {
     const p = m.payload as unknown as PriceRevisionCreatePayload;
-    await api.revisions.add(p.operationId, {
+    const __rec = await api.revisions.add(p.operationId, {
       contractId: p.contractId, baseAmount: p.baseAmount, a0: p.a0, terms: p.terms,
       coefficient: p.coefficient, revisedAmount: p.revisedAmount,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M7 — intervenant (alimente le poste honoraires du bilan).
   if (m.entity === 'stakeholders' && m.op === 'create') {
     const p = m.payload as unknown as StakeholderCreatePayload;
-    await api.stakeholders.add(p.operationId, {
+    const __rec = await api.stakeholders.add(p.operationId, {
       type: p.type, name: p.name, email: p.email ?? null, phone: p.phone ?? null,
       mission: p.mission ?? null, feeAmount: p.feeAmount ?? 0,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M6 — encaissement d'une vente (recette ; imputation « settled » en ligne).
   if (m.entity === 'receipts' && m.op === 'create') {
     const p = m.payload as unknown as ReceiptCreatePayload;
-    await api.commercialisation.addReceipt(p.saleId, { amount: Money.of(p.amountMajor, p.currency), method: p.method, reference: p.reference ?? null });
-    return { ok: true };
+    const __rec = await api.commercialisation.addReceipt(p.saleId, { amount: Money.of(p.amountMajor, p.currency), method: p.method, reference: p.reference ?? null });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M5 — déblocage d'une tranche de financement (alimente les frais financiers).
   if (m.entity === 'drawdowns' && m.op === 'create') {
     const p = m.payload as unknown as DrawdownCreatePayload;
-    await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
-    return { ok: true };
+    const __rec = await api.financing.addDrawdown(p.financingId, { amount: Money.of(p.amountMajor, p.currency), condition: p.condition });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M20 (actifs) — inventaire relevé hors-ligne : rejouable tel quel.
   if (m.entity === 'handoverAssets' && m.op === 'create') {
     const p = m.payload as unknown as HandoverAssetCreatePayload;
-    await api.handoverAssets.add(p.operationId, {
+    const __rec = await api.handoverAssets.add(p.operationId, {
       label: p.label, assetType: p.assetType, location: p.location ?? null,
       warrantyEnd: p.warrantyEnd ?? null, targetSystem: p.targetSystem ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M20 (DOE) — pièce collectée hors-ligne (non validée) : rejouable telle quelle.
   if (m.entity === 'doeDocuments' && m.op === 'create') {
     const p = m.payload as unknown as DoeCreatePayload;
-    await api.doe.add(p.operationId, { category: p.category, fileRef: p.fileRef ?? null });
-    return { ok: true };
+    const __rec = await api.doe.add(p.operationId, { category: p.category, fileRef: p.fileRef ?? null });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M12 (planning) — capture de baseline hors-ligne : rejouable telle quelle.
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
-    await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
-    return { ok: true };
+    const __rec = await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (PGES) — action E&S créée « ouvert » : rejouable telle quelle.
   if (m.entity === 'pgesActions' && m.op === 'create') {
     const p = m.payload as unknown as PgesActionCreatePayload;
-    await api.pgesActions.add(p.operationId, {
+    const __rec = await api.pgesActions.add(p.operationId, {
       action: p.action, responsable: p.responsable, echeance: p.echeance ?? null, indicateur: p.indicateur ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M23 — note d'offre saisie hors-ligne : upsert idempotent, rejouable tel quel.
   if (m.entity === 'offerScores' && m.op === 'create') {
     const p = m.payload as unknown as OfferScoreCreatePayload;
-    await api.offerScores.setScore(p.operationId, {
+    const __rec = await api.offerScores.setScore(p.operationId, {
       offerId: p.offerId, criteriaId: p.criteriaId, rawScore: p.rawScore, weightedScore: p.weightedScore,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M23 — critère d'évaluation créé hors-ligne : rejouable tel quel.
   if (m.entity === 'evaluationCriteria' && m.op === 'create') {
     const p = m.payload as unknown as EvaluationCriterionCreatePayload;
-    await api.evaluationCriteria.add(p.operationId, { label: p.label, type: p.type, weight: p.weight });
-    return { ok: true };
+    const __rec = await api.evaluationCriteria.add(p.operationId, { label: p.label, type: p.type, weight: p.weight });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M4/M5 — ligne budgétaire (brouillon financier hors-ligne) : rejouable telle quelle.
   if (m.entity === 'budgetLines' && m.op === 'create') {
     const p = m.payload as unknown as BudgetLineCreatePayload;
-    await api.budgetLines.add(p.operationId, {
+    const __rec = await api.budgetLines.add(p.operationId, {
       syscohadaAccount: p.syscohadaAccount, label: p.label, amountBac: p.amountBac,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M9 (logistique) — expédition créée « en_attente » : rejouable telle quelle.
   if (m.entity === 'shipments' && m.op === 'create') {
     const p = m.payload as unknown as ShipmentCreatePayload;
-    await api.shipments.add(p.operationId, {
+    const __rec = await api.shipments.add(p.operationId, {
       reference: p.reference, poId: p.poId ?? null, incoterm: p.incoterm ?? null, eta: p.eta ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (E&S) — impact EIES créé « planifiee » : rejouable tel quel.
   if (m.entity === 'eiesItems' && m.op === 'create') {
     const p = m.payload as unknown as EiesItemCreatePayload;
-    await api.eiesItems.add(p.operationId, {
+    const __rec = await api.eiesItems.add(p.operationId, {
       impact: p.impact, milieu: p.milieu, severity: p.severity, mesureAttenuation: p.mesureAttenuation ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M13/M15 — OS rédigé « projet » : rejouable tel quel (notification hors-ligne).
   if (m.entity === 'serviceOrders' && m.op === 'create') {
     const p = m.payload as unknown as ServiceOrderCreatePayload;
-    await api.serviceOrders.add(p.operationId, {
+    const __rec = await api.serviceOrders.add(p.operationId, {
       type: p.type, reference: p.reference, content: p.content, contractId: p.contractId ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M13 (pilotage) — action créée « ouvert » : rejouable telle quelle.
   if (m.entity === 'actionItems' && m.op === 'create') {
     const p = m.payload as unknown as ActionItemCreatePayload;
-    await api.actionItems.add(p.operationId, {
+    const __rec = await api.actionItems.add(p.operationId, {
       description: p.description, owner: p.owner, dueDate: p.dueDate, siteReportId: p.siteReportId ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M2 (montage juridique) — structure créée « projet » : rejouable telle quelle.
   if (m.entity === 'legalEntities' && m.op === 'create') {
     const p = m.payload as unknown as LegalEntityCreatePayload;
-    await api.legalEntities.add(p.operationId, {
+    const __rec = await api.legalEntities.add(p.operationId, {
       structureType: p.structureType, name: p.name, rccm: p.rccm ?? null, shareholders: p.shareholders ?? [],
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (sinistres) — déclaration créée « déclaré » : rejouable telle quelle.
   if (m.entity === 'claims' && m.op === 'create') {
     const p = m.payload as unknown as ClaimCreatePayload;
-    await api.claims.add(p.operationId, { event: p.event, amount: p.amount, insuranceId: p.insuranceId ?? null });
-    return { ok: true };
+    const __rec = await api.claims.add(p.operationId, { event: p.event, amount: p.amount, insuranceId: p.insuranceId ?? null });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (litiges) — litige créé « ouvert » : rejouable tel quel.
   if (m.entity === 'disputes' && m.op === 'create') {
     const p = m.payload as unknown as DisputeCreatePayload;
-    await api.disputes.add(p.operationId, {
+    const __rec = await api.disputes.add(p.operationId, {
       counterpart: p.counterpart, object: p.object, amountAtStake: p.amountAtStake, fileRef: p.fileRef ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (HSSE) — incident terrain créé « déclaré » : rejouable tel quel.
   if (m.entity === 'hsseIncidents' && m.op === 'create') {
     const p = m.payload as unknown as HsseCreatePayload;
-    await api.hsse.add(p.operationId, {
+    const __rec = await api.hsse.add(p.operationId, {
       reference: p.reference, kind: p.kind, severity: p.severity, occurredAt: p.occurredAt,
       location: p.location ?? null, description: p.description, correctiveAction: p.correctiveAction ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M3 — étude amont (diagnostic, non écriture) créée « planifiée » : rejouable.
   if (m.entity === 'studies' && m.op === 'create') {
     const p = m.payload as unknown as StudyCreatePayload;
-    await api.studies.add(p.operationId, {
+    const __rec = await api.studies.add(p.operationId, {
       kind: p.kind, provider: p.provider, cost: p.cost,
       dueDate: p.dueDate ?? null, summary: p.summary ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M12 — tâche de planning (jalon/ligne de temps, non écriture) : rejouable.
   if (m.entity === 'tasks' && m.op === 'create') {
     const p = m.payload as unknown as TaskCreatePayload;
-    await api.planning.add(p.operationId, {
+    const __rec = await api.planning.add(p.operationId, {
       name: p.name, startDate: p.startDate ?? null, endDate: p.endDate ?? null,
       isMilestone: p.isMilestone ?? false, isCritical: p.isCritical ?? false, progress: p.progress ?? 0,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M18 — demande de raccordement (créée « demande ») : rejouable tel quel.
   // Le paiement du devis (« payé ») reste une transition en ligne.
   if (m.entity === 'connections' && m.op === 'create') {
     const p = m.payload as unknown as ConnectionCreatePayload;
-    await api.connections.add(p.operationId, {
+    const __rec = await api.connections.add(p.operationId, {
       utility: p.utility, concessionaire: p.concessionaire, reference: p.reference,
       cost: p.cost, requestedAt: p.requestedAt,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M20 — risque (registre, dont HSSE) créé « ouvert » : rejouable tel quel.
   if (m.entity === 'risks' && m.op === 'create') {
     const p = m.payload as unknown as RiskCreatePayload;
-    await api.risks.add(p.operationId, {
+    const __rec = await api.risks.add(p.operationId, {
       code: p.code, label: p.label, category: p.category,
       probability: p.probability, impact: p.impact, mitigation: p.mitigation ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M14 — demande de modification (créée « requested ») : rejouable tel quel.
   // L'instruction d'impact et l'arbitrage (rôle-gardés) restent en ligne.
   if (m.entity === 'changeOrders' && m.op === 'create') {
     const p = m.payload as unknown as ChangeOrderCreatePayload;
-    await api.changeOrders.add(p.operationId, {
+    const __rec = await api.changeOrders.add(p.operationId, {
       contractId: p.contractId, origin: p.origin, description: p.description,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M17 — caution/garantie (document, non écriture) : rejouable tel quel.
   if (m.entity === 'guarantees' && m.op === 'create') {
     const p = m.payload as unknown as GuaranteeCreatePayload;
-    await api.guarantees.add(p.operationId, {
+    const __rec = await api.guarantees.add(p.operationId, {
       type: p.type, issuer: p.issuer, amount: p.amount, validFrom: p.validFrom, validUntil: p.validUntil ?? null,
     });
-    return { ok: true };
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   return { ok: false, retriable: false, error: `unsupported:${m.entity}.${m.op}` };
 }

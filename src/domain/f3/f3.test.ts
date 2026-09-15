@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   admitOffline, enqueue, orderQueue, planSync, settle, pending, serializeQueue, deserializeQueue, drainQueue,
+  reconcileIds,
 } from './sync';
 import type { PendingMutation } from './types';
 
@@ -138,6 +139,48 @@ describe('F3 — drainQueue (rejeu via transport)', () => {
     expect(called).toBe(0);
     expect(res.conflicts).toBe(1);
     expect(res.queue[0].status).toBe('conflict');
+  });
+});
+
+describe('F3 — réconciliation d’id post-synchro', () => {
+  it('reconcileIds remappe entityId et les références de payload (dont tableaux)', () => {
+    const map = { 'local-A': 'srv-A', 'local-B': 'srv-B' };
+    const queue = [
+      base({ id: 'u', op: 'setStatus', entityId: 'local-A', payload: { status: 'valide' } }),
+      base({ id: 'c', op: 'create', entityId: null, payload: { parentId: 'local-A', tags: ['local-B', 'x'] } }),
+      base({ id: 'z', op: 'update', entityId: 'e9', payload: { foo: 'bar' } }),
+    ];
+    const out = reconcileIds(queue, map);
+    expect(out[0].entityId).toBe('srv-A'); // update cible désormais l'id serveur
+    expect(out[1].payload).toEqual({ parentId: 'srv-A', tags: ['srv-B', 'x'] }); // FK + tableau
+    expect(out[2]).toBe(queue[2]); // inchangé → même référence (pas de copie)
+  });
+
+  it('reconcileIds : mapping vide → file inchangée (même référence)', () => {
+    const queue = [base({ entityId: 'local-A' })];
+    expect(reconcileIds(queue, {})).toBe(queue);
+  });
+
+  it('drainQueue expose la table de réconciliation pour les create synchronisés', async () => {
+    const queue = [
+      base({ id: 'p', op: 'create', entityId: null, localId: 'local-P', payload: { name: 'Parent' } }),
+      base({ id: 'child', op: 'create', entityId: null, payload: { parentId: 'local-P' } }, ),
+    ];
+    // Le transport n'arrive à joindre le serveur que pour le parent (l'enfant échoue, reste en file).
+    const transport = async (m: PendingMutation) => (m.id === 'p'
+      ? { ok: true as const, serverId: 'srv-P' }
+      : { ok: false as const, retriable: true, error: 'net' });
+    const res = await drainQueue(queue, transport);
+    expect(res.reconciliation).toEqual({ 'local-P': 'srv-P' });
+    // L'enfant, encore en file, pointe maintenant vers l'id serveur du parent.
+    const child = res.queue.find((m) => m.id === 'child')!;
+    expect(child.payload.parentId).toBe('srv-P');
+    expect(child.status).toBe('queued');
+  });
+
+  it('drainQueue : un create sans localId ne produit pas de réconciliation', async () => {
+    const res = await drainQueue([base({ id: 'p', op: 'create', entityId: null, payload: {} })], async () => ({ ok: true, serverId: 'srv-P' }));
+    expect(res.reconciliation).toEqual({});
   });
 });
 

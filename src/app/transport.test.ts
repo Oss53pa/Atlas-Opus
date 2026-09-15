@@ -22,7 +22,8 @@ describe('createRepoTransport — rejeu concret', () => {
       },
     };
     const res = await createRepoTransport(api)(mutation());
-    expect(res).toEqual({ ok: true });
+    // Le create renvoie l'id serveur (pivot de la réconciliation post-synchro).
+    expect(res).toEqual({ ok: true, serverId: 's1' });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { author: 'Koffi', progress: 0.62, blockers: 0 } });
   });

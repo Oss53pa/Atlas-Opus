@@ -33,6 +33,12 @@ interface OfflineApi {
    * remplacer leurs lignes optimistes « local-… » par les entités serveur.
    */
   syncedAt: number;
+  /**
+   * Réconciliation d'id du dernier drainage : id local optimiste (« local-… ») →
+   * id serveur attribué. Les écrans peuvent y remapper leurs lignes optimistes
+   * sans re-fetch. Vide tant qu'aucun create hors-ligne n'a été rejoué.
+   */
+  reconciliation: Record<string, string>;
   /** Capture une mutation hors-ligne. Renvoie le verdict de recevabilité (§4). */
   capture(input: CaptureInput): { admitted: boolean; reason?: string };
   /** Vide la file via le transport (no-op si aucun transport ou hors-ligne). */
@@ -70,6 +76,7 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
   const [online, setOnline] = useState<boolean>(readOnline);
   const [queue, setQueue] = useState<PendingMutation[]>(loadQueue);
   const [syncedAt, setSyncedAt] = useState(0);
+  const [reconciliation, setReconciliation] = useState<Record<string, string>>({});
   const flushing = useRef(false);
 
   // Persistance : toute évolution de la file est sauvegardée localement.
@@ -120,11 +127,15 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
     try {
       const current = loadQueue();
       const res = await drainQueue(current, transport);
-      // Ne conserve que ce qui reste à faire (queued/conflict/rejected).
+      // Ne conserve que ce qui reste à faire (queued/conflict/rejected) ; la file
+      // est déjà réconciliée (id locaux → id serveur) par drainQueue.
       setQueue(res.queue.filter((m) => m.status !== 'synced'));
-      // Réconciliation : signale aux écrans de se rafraîchir (lignes optimistes
-      // remplacées par les entités serveur) uniquement si quelque chose a été livré.
-      if (res.synced > 0) setSyncedAt(Date.now());
+      // Réconciliation : expose la table id local → id serveur et signale aux
+      // écrans de se rafraîchir, uniquement si quelque chose a été livré.
+      if (res.synced > 0) {
+        if (Object.keys(res.reconciliation).length > 0) setReconciliation(res.reconciliation);
+        setSyncedAt(Date.now());
+      }
     } finally {
       flushing.current = false;
     }
@@ -148,6 +159,7 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
       rejectedCount,
       canSync: Boolean(transport),
       syncedAt,
+      reconciliation,
       capture,
       flush,
       discardResolved,
@@ -155,7 +167,7 @@ export function OfflineProvider({ transport, children }: { transport?: OfflineTr
       discard,
       admits: (input) => admitOffline(input).ok,
     };
-  }, [online, queue, transport, syncedAt, capture, flush, discardResolved, retry, discard]);
+  }, [online, queue, transport, syncedAt, reconciliation, capture, flush, discardResolved, retry, discard]);
 
   return <OfflineCtx.Provider value={value}>{children}</OfflineCtx.Provider>;
 }

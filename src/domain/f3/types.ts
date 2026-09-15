@@ -22,6 +22,13 @@ export interface PendingMutation {
   op: MutationOp;
   /** Id de l'entité (null pour un create : le serveur l'attribue). */
   entityId: string | null;
+  /**
+   * Id local optimiste attribué à l'entité créée hors-ligne (« local-… »), pivot
+   * de la réconciliation post-synchro : une fois le create rejoué, il est remappé
+   * vers l'id serveur dans les mutations dépendantes encore en file. null/absent
+   * pour un create sans ligne optimiste ou pour les op non-create.
+   */
+  localId?: string | null;
   payload: Record<string, unknown>;
   /** Version de base pour la concurrence optimiste (null pour un create). */
   baseVersion: number | null;

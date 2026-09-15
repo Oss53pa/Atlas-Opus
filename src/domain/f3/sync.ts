@@ -110,8 +110,12 @@ function resolveConflict(
   }
 }
 
-/** Résultat de l'exécution d'une mutation par le transport. */
-export type SettleResult = { ok: true } | { ok: false; retriable: boolean; error: string };
+/**
+ * Résultat de l'exécution d'une mutation par le transport. Sur succès d'un
+ * create, `serverId` porte l'id attribué par le serveur (pivot de la
+ * réconciliation post-synchro).
+ */
+export type SettleResult = { ok: true; serverId?: string } | { ok: false; retriable: boolean; error: string };
 
 /**
  * Fait progresser une mutation après tentative de synchro : succès → synced ;
@@ -130,6 +134,40 @@ export function pending(queue: PendingMutation[]): PendingMutation[] {
   return orderQueue(queue.filter((m) => m.status === 'queued'));
 }
 
+/**
+ * Réconciliation d'id post-synchro. Une fois un create rejoué, le serveur a
+ * attribué un id réel : `mapping` associe l'id local optimiste (« local-… ») à
+ * l'id serveur. On remappe alors, dans toutes les mutations, l'`entityId` et les
+ * références (chaînes de `payload`, y compris dans des tableaux) portant un id
+ * local — pour que les mutations dépendantes encore en file (update/setStatus/
+ * delete sur l'entité, ou create enfant pointant vers elle) ciblent l'id serveur.
+ * Pur, sans mutation d'entrée ; renvoie la file inchangée si `mapping` est vide.
+ */
+export function reconcileIds(queue: PendingMutation[], mapping: Record<string, string>): PendingMutation[] {
+  if (Object.keys(mapping).length === 0) return queue;
+  const remap = (v: unknown): unknown => {
+    if (typeof v === 'string') return mapping[v] ?? v;
+    if (Array.isArray(v)) {
+      let changed = false;
+      const out = v.map((e) => { const r = remap(e); if (r !== e) changed = true; return r; });
+      return changed ? out : v;
+    }
+    return v;
+  };
+  return queue.map((m) => {
+    const entityId = m.entityId !== null && mapping[m.entityId] !== undefined ? mapping[m.entityId] : m.entityId;
+    let payloadChanged = false;
+    const nextPayload: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(m.payload)) {
+      const rv = remap(val);
+      if (rv !== val) payloadChanged = true;
+      nextPayload[k] = rv;
+    }
+    if (entityId === m.entityId && !payloadChanged) return m;
+    return { ...m, entityId, payload: payloadChanged ? nextPayload : m.payload };
+  });
+}
+
 /** Transport de rejeu : exécute une mutation contre le backend (repo/Edge Fn). */
 export type OfflineTransport = (mutation: PendingMutation) => Promise<SettleResult>;
 
@@ -138,6 +176,8 @@ export interface DrainResult {
   synced: number;
   conflicts: number;
   failed: number;
+  /** Réconciliation post-synchro : id local optimiste → id serveur attribué. */
+  reconciliation: Record<string, string>;
 }
 
 /**
@@ -155,6 +195,7 @@ export async function drainQueue(
   const strategy = opts.strategy ?? 'client_wins';
   const plan = planSync(queue, opts.serverVersions ?? {}, { strategy, serverTimes: opts.serverTimes });
   const byId = new Map(queue.map((m) => [m.id, m]));
+  const reconciliation: Record<string, string> = {};
   let synced = 0;
   let conflicts = 0;
   let failed = 0;
@@ -169,12 +210,19 @@ export async function drainQueue(
     const result = await transport(entry.mutation);
     const next = settle(entry.mutation, result);
     byId.set(entry.mutation.id, next);
-    if (next.status === 'synced') synced++;
-    else if (next.status === 'conflict') conflicts++;
+    if (next.status === 'synced') {
+      synced++;
+      // Create rejoué : le serveur a rendu l'id réel → prépare la réconciliation.
+      if (entry.mutation.op === 'create' && entry.mutation.localId && result.ok && result.serverId) {
+        reconciliation[entry.mutation.localId] = result.serverId;
+      }
+    } else if (next.status === 'conflict') conflicts++;
     else if (next.status === 'rejected') failed++;
   }
 
-  return { queue: [...byId.values()], synced, conflicts, failed };
+  // Remappe les mutations restantes (dépendantes) vers les id serveur attribués.
+  const queueOut = reconcileIds([...byId.values()], reconciliation);
+  return { queue: queueOut, synced, conflicts, failed, reconciliation };
 }
 
 // ── Persistance (sérialisation déterministe pour IndexedDB/localStorage) ──────
