@@ -66,6 +66,7 @@ export type Route =
   | { name: 'onboarding' }
   | { name: 'membres' }
   | { name: 'integrations' }
+  | { name: 'alertes' }
   | { name: 'notifications' }
   | { name: 'approbations' }
   | { name: 'syncQueue' };

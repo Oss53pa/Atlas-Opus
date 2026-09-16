@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -74,6 +74,7 @@ import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types'
 import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
+import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1683,6 +1684,41 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M21 (cockpit) — règles d'alerte (tenant-scopées) ─────────────────────────
+interface AlertRuleRow { id: string; tenant_id: string; metric: string; threshold: number | string | null; severity: string }
+function toAlertRule(r: AlertRuleRow): AlertRule {
+  return {
+    id: r.id, tenantId: r.tenant_id, metric: r.metric,
+    threshold: r.threshold === null ? null : Number(r.threshold), severity: r.severity as AlertSeverity,
+  };
+}
+export function createSupabaseAlertRulesRepo(client: SupabaseClient, session: Session): AlertRulesRepo {
+  const TB = 'ao_alert_rules';
+  return {
+    async list() {
+      const rows = unwrap(await client.from(TB).select('*').order('created_at')) as AlertRuleRow[];
+      return rows.map(toAlertRule);
+    },
+    async add(input: AlertRuleInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, metric: input.metric.trim(), threshold: input.threshold, severity: input.severity,
+      }).select('*').single()) as AlertRuleRow;
+      return toAlertRule(row);
+    },
+    async update(id, patch) {
+      const row = unwrap(await client.from(TB).update({
+        ...(patch.threshold !== undefined ? { threshold: patch.threshold } : {}),
+        ...(patch.severity !== undefined ? { severity: patch.severity } : {}),
+      }).eq('id', id).select('*').single()) as AlertRuleRow;
+      return toAlertRule(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

@@ -80,6 +80,7 @@ import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/ev
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
+import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -150,6 +151,7 @@ import type {
   EvaluationCriteriaRepo,
   OfferScoresRepo,
   PgesActionsRepo,
+  AlertRulesRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -222,6 +224,7 @@ export interface MockDb {
   evaluationCriteria: EvaluationCriterion[];
   offerScores: OfferScore[];
   pgesActions: PgesAction[];
+  alertRules: AlertRule[];
 }
 
 interface Deps {
@@ -680,6 +683,12 @@ export function createMockDb(): MockDb {
     { id: 'ec-2', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Prix des prestations', type: 'financier', weight: 0.45 },
     { id: 'ec-3', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Délai d’exécution', type: 'delai', weight: 0.15 },
   ];
+  const alertRules: AlertRule[] = [
+    { id: 'ar-1', tenantId: T, metric: 'depassement_budget_pct', threshold: 5, severity: 'critical' },
+    { id: 'ar-2', tenantId: T, metric: 'retard_jours', threshold: 15, severity: 'warning' },
+    { id: 'ar-3', tenantId: T, metric: 'cautions_expirant_30j', threshold: 1, severity: 'warning' },
+    { id: 'ar-4', tenantId: T, metric: 'reserves_ouvertes', threshold: 10, severity: 'info' },
+  ];
   const pgesActions: PgesAction[] = [
     { id: 'pg-1', tenantId: T, operationId: 'op-palmiers', action: 'Arrosage des pistes en phase terrassement', responsable: 'HSE chantier', echeance: '2026-09-30', indicateur: 'Fréquence d’arrosage / jour', status: 'en_cours' },
     { id: 'pg-2', tenantId: T, operationId: 'op-palmiers', action: 'Plan de gestion des déchets de chantier', responsable: 'Entreprise gros œuvre', echeance: '2026-08-31', indicateur: 'Taux de tri des déchets', status: 'ouvert' },
@@ -732,7 +741,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1697,6 +1706,34 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createAlertRulesRepo(db: MockDb, session: Session, deps: Deps): AlertRulesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list() {
+      return mine(db.alertRules).map((r) => ({ ...r }));
+    },
+    async add(input: AlertRuleInput) {
+      const r: AlertRule = {
+        id: id(), tenantId: session.tenantId, metric: input.metric.trim(),
+        threshold: input.threshold, severity: input.severity,
+      };
+      db.alertRules.push(r);
+      return { ...r };
+    },
+    async update(rid, patch) {
+      const r = db.alertRules.find((x) => x.id === rid && x.tenantId === session.tenantId);
+      if (!r) throw new Error('alert_rule_not_found');
+      if (patch.threshold !== undefined) r.threshold = patch.threshold;
+      if (patch.severity !== undefined) r.severity = patch.severity;
+      return { ...r };
+    },
+    async remove(rid) {
+      db.alertRules = db.alertRules.filter((x) => x.id !== rid);
     },
   };
 }

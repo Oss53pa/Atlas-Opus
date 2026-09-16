@@ -71,6 +71,7 @@ import { InvitationScreen } from './features/m1/InvitationScreen';
 import { OnboardingScreen } from './features/m1/OnboardingScreen';
 import { MembresScreen } from './features/m1/MembresScreen';
 import { IntegrationsScreen } from './features/m1/IntegrationsScreen';
+import { AlertesScreen } from './features/m1/AlertesScreen';
 import { NotificationsScreen } from './features/m1/NotificationsScreen';
 import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
@@ -209,6 +210,8 @@ function RouteView() {
       return <MembresScreen />;
     case 'integrations':
       return <IntegrationsScreen />;
+    case 'alertes':
+      return <AlertesScreen />;
     case 'notifications':
       return <NotificationsScreen />;
     case 'approbations':

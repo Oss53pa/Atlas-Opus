@@ -29,6 +29,7 @@ import type { Milieu, Severity, EiesStatus } from '../../domain/eiesItem/types';
 import type { CustomsStatus } from '../../domain/shipment/types';
 import type { CriterionType } from '../../domain/evaluationCriterion/types';
 import type { PgesStatus } from '../../domain/pgesAction/types';
+import type { AlertSeverity } from '../../domain/alertRule/types';
 import type { AuditAction } from '../../domain/m23/types';
 import type { ChangeOrigin, ChangeStatus } from '../../domain/m14/types';
 import type { DocDiscipline, DocStatus } from '../../domain/ged/types';
@@ -638,6 +639,20 @@ export const PGES_STATUS_TONE: Record<PgesStatus, BadgeTone> = {
   ouvert: 'warning', en_cours: 'info', soldee: 'success',
 };
 export const pgesStatusLabel = (s: PgesStatus) => t(PGES_STATUS_KEY[s]);
+
+// ── Règles d'alerte (M21) ────────────────────────────────────────────────────
+const ALERT_SEVERITY_KEY: Record<AlertSeverity, MessageKey> = {
+  info: 'alert.sev.info', warning: 'alert.sev.warning', critical: 'alert.sev.critical',
+};
+export const ALERT_SEVERITY_TONE: Record<AlertSeverity, BadgeTone> = {
+  info: 'neutral', warning: 'warning', critical: 'danger',
+};
+export const alertSeverityLabel = (s: AlertSeverity) => t(ALERT_SEVERITY_KEY[s]);
+/** Libellé lisible d'une métrique connue, sinon la clé brute. */
+export function alertMetricLabel(metric: string): string {
+  const label = t(`alert.metric.${metric}` as MessageKey) as string | undefined;
+  return label ?? metric;
+}
 
 // ── Journal d'audit (M23) ────────────────────────────────────────────────────
 const AUDIT_ACTION_KEY: Record<AuditAction, MessageKey> = {

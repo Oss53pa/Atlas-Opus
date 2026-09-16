@@ -92,6 +92,7 @@ import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
+import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -430,6 +431,14 @@ export interface PgesActionsRepo {
   list(operationId: string): Promise<PgesAction[]>;
   add(operationId: string, input: PgesActionInput): Promise<PgesAction>;
   setStatus(id: string, status: PgesStatus): Promise<PgesAction>;
+  remove(id: string): Promise<void>;
+}
+
+/** M21 (cockpit) — règles d'alerte configurables (tenant-scopées). */
+export interface AlertRulesRepo {
+  list(): Promise<AlertRule[]>;
+  add(input: AlertRuleInput): Promise<AlertRule>;
+  update(id: string, patch: Partial<Pick<AlertRule, 'threshold' | 'severity'>>): Promise<AlertRule>;
   remove(id: string): Promise<void>;
 }
 
