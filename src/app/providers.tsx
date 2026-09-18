@@ -47,6 +47,7 @@ import {
   createOfferScoresRepo,
   createPgesActionsRepo,
   createAlertRulesRepo,
+  createBpuItemsRepo,
 } from '../data/mock';
 import type {
   BilanLineRecord,
@@ -99,6 +100,7 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  BpuItemsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
 import type { Authorization } from '../domain/m2/authorizations';
@@ -144,6 +146,7 @@ import type { EvaluationCriterion } from '../domain/evaluationCriterion/types';
 import type { OfferScore } from '../domain/offerScore/types';
 import type { PgesAction } from '../domain/pgesAction/types';
 import type { AlertRule } from '../domain/alertRule/types';
+import type { BpuItem } from '../domain/bpuItem/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
 import type { Operation, ProgramItem, Role } from '../domain/m1/types';
@@ -198,6 +201,7 @@ import {
   createSupabaseOfferScoresRepo,
   createSupabasePgesActionsRepo,
   createSupabaseAlertRulesRepo,
+  createSupabaseBpuItemsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
 import { resolveOperationScope, resolveRole } from './scope';
@@ -251,6 +255,7 @@ interface DataApi {
   offerScores: OfferScoresRepo;
   pgesActions: PgesActionsRepo;
   alertRules: AlertRulesRepo;
+  bpuItems: BpuItemsRepo;
   session: Session;
   countries: CountryConfig[];
 }
@@ -315,6 +320,7 @@ function buildMockApi(): DataApi {
     offerScores: createOfferScoresRepo(db, session, { telemetry }),
     pgesActions: createPgesActionsRepo(db, session, { telemetry }),
     alertRules: createAlertRulesRepo(db, session, { telemetry }),
+    bpuItems: createBpuItemsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
   };
@@ -427,6 +433,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           offerScores: createSupabaseOfferScoresRepo(supabase, session),
           pgesActions: createSupabasePgesActionsRepo(supabase, session),
           alertRules: createSupabaseAlertRulesRepo(supabase, session),
+          bpuItems: createSupabaseBpuItemsRepo(supabase, session),
           session,
           countries: COUNTRIES,
         });
@@ -749,6 +756,11 @@ export function useOfferScores(operationId: string): AsyncState<OfferScore[]> {
 export function useAlertRules(): AsyncState<AlertRule[]> {
   const { alertRules } = useData();
   return useAsync(() => alertRules.list(), [alertRules]);
+}
+
+export function useBpuItems(contractId: string): AsyncState<BpuItem[]> {
+  const { bpuItems } = useData();
+  return useAsync(() => bpuItems.list(contractId), [bpuItems, contractId]);
 }
 
 export function usePgesActions(operationId: string): AsyncState<PgesAction[]> {

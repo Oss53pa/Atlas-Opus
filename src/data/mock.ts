@@ -81,6 +81,7 @@ import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
+import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
 import { nextTenderStatus } from '../domain/m8/tender';
 import { canTransitionStudy } from '../domain/m3/studies';
@@ -152,6 +153,7 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  BpuItemsRepo,
 } from './repo';
 
 interface BilanSeed {
@@ -225,6 +227,7 @@ export interface MockDb {
   offerScores: OfferScore[];
   pgesActions: PgesAction[];
   alertRules: AlertRule[];
+  bpuItems: BpuItem[];
 }
 
 interface Deps {
@@ -683,6 +686,12 @@ export function createMockDb(): MockDb {
     { id: 'ec-2', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Prix des prestations', type: 'financier', weight: 0.45 },
     { id: 'ec-3', tenantId: T, operationId: 'op-palmiers', contextId: null, label: 'Délai d’exécution', type: 'delai', weight: 0.15 },
   ];
+  const bpuItems: BpuItem[] = [
+    { id: 'bpu-1', tenantId: T, contractId: 'ct-p1', code: '01.01', label: 'Béton dosé à 350 kg/m³', unit: 'm3', unitPrice: 95_000 },
+    { id: 'bpu-2', tenantId: T, contractId: 'ct-p1', code: '01.02', label: 'Acier HA (façonné, posé)', unit: 'kg', unitPrice: 1_250 },
+    { id: 'bpu-3', tenantId: T, contractId: 'ct-p1', code: '02.01', label: 'Maçonnerie agglos creux 15', unit: 'm2', unitPrice: 8_500 },
+    { id: 'bpu-4', tenantId: T, contractId: 'ct-p1', code: '03.01', label: 'Enduit ciment tramé', unit: 'm2', unitPrice: 4_200 },
+  ];
   const alertRules: AlertRule[] = [
     { id: 'ar-1', tenantId: T, metric: 'depassement_budget_pct', threshold: 5, severity: 'critical' },
     { id: 'ar-2', tenantId: T, metric: 'retard_jours', threshold: 15, severity: 'warning' },
@@ -741,7 +750,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1706,6 +1715,27 @@ export function createBaselinesRepo(db: MockDb, session: Session, deps: Deps): B
     },
     async remove(bid) {
       db.baselines = db.baselines.filter((x) => x.id !== bid);
+    },
+  };
+}
+
+export function createBpuItemsRepo(db: MockDb, session: Session, deps: Deps): BpuItemsRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(contractId) {
+      return mine(db.bpuItems).filter((b) => b.contractId === contractId).map((b) => ({ ...b }));
+    },
+    async add(contractId, input: BpuItemInput) {
+      const b: BpuItem = {
+        id: id(), tenantId: session.tenantId, contractId,
+        code: input.code.trim(), label: input.label.trim(), unit: input.unit.trim(), unitPrice: input.unitPrice,
+      };
+      db.bpuItems.push(b);
+      return { ...b };
+    },
+    async remove(bid) {
+      db.bpuItems = db.bpuItems.filter((x) => x.id !== bid);
     },
   };
 }

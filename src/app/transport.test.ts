@@ -229,6 +229,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ opId: 'op-1', input: { label: 'OS', snapshot } });
   });
 
+  it('bpuItems.create → appelle bpuItems.add (marché) et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      bpuItems: { add: async (contractId: string, input: unknown) => { calls.push({ contractId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'bpuItems', op: 'create', payload: { contractId: 'ct-1', code: '01.01', label: 'Béton', unit: 'm3', unitPrice: 95000 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ contractId: 'ct-1', input: { code: '01.01', label: 'Béton', unit: 'm3', unitPrice: 95000 } });
+  });
+
   it('pgesActions.create → appelle pgesActions.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

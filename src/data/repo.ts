@@ -93,6 +93,7 @@ import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/ev
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
+import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
 import type { PriceRevision, PriceRevisionInput } from '../domain/m8/revision';
 
@@ -439,6 +440,13 @@ export interface AlertRulesRepo {
   list(): Promise<AlertRule[]>;
   add(input: AlertRuleInput): Promise<AlertRule>;
   update(id: string, patch: Partial<Pick<AlertRule, 'threshold' | 'severity'>>): Promise<AlertRule>;
+  remove(id: string): Promise<void>;
+}
+
+/** M8 (passation) — bordereau de prix unitaires d'un marché (contrat-scopé). */
+export interface BpuItemsRepo {
+  list(contractId: string): Promise<BpuItem[]>;
+  add(contractId: string, input: BpuItemInput): Promise<BpuItem>;
   remove(id: string): Promise<void>;
 }
 

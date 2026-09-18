@@ -31,7 +31,7 @@ import type { Incoterm } from '../domain/shipment/types';
 import type { CriterionType } from '../domain/evaluationCriterion/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores' | 'pgesActions'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores' | 'pgesActions' | 'bpuItems'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -172,6 +172,16 @@ interface BaselineCreatePayload {
   operationId: string;
   label: string;
   snapshot: BaselineTask[];
+}
+
+// M8 (BPU) — ligne de bordereau (écriture financière) en brouillon hors-ligne ;
+// prix unitaire `number` (unités majeures, JSON-safe). Rattachée à un marché.
+interface BpuItemCreatePayload {
+  contractId: string;
+  code: string;
+  label: string;
+  unit: string;
+  unitPrice: number;
 }
 
 // M19 (PGES) — action E&S relevée hors-ligne (non écriture) : créée « ouvert ».
@@ -491,6 +501,14 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
   if (m.entity === 'baselines' && m.op === 'create') {
     const p = m.payload as unknown as BaselineCreatePayload;
     const __rec = await api.baselines.add(p.operationId, { label: p.label, snapshot: p.snapshot });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
+  }
+  // M8 (BPU) — ligne de bordereau (brouillon financier hors-ligne) : rejouable telle quelle.
+  if (m.entity === 'bpuItems' && m.op === 'create') {
+    const p = m.payload as unknown as BpuItemCreatePayload;
+    const __rec = await api.bpuItems.add(p.contractId, {
+      code: p.code, label: p.label, unit: p.unit, unitPrice: p.unitPrice,
+    });
     return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }
   // M19 (PGES) — action E&S créée « ouvert » : rejouable telle quelle.

@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -75,6 +75,7 @@ import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } fro
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
 import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
+import type { BpuItem, BpuItemInput } from '../../domain/bpuItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
 import type { RevisionTerm } from '../../domain/f6/types';
 import { fiscalContext, travauxNet } from '../../domain/f6';
@@ -1684,6 +1685,35 @@ export function createSupabaseBaselinesRepo(client: SupabaseClient, session: Ses
       if (off.error) throw new Error(off.error.message);
       const row = unwrap(await client.from(TB).update({ is_active: true }).eq('id', id).select('*').single()) as BaselineRow;
       return toBaseline(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M8 (passation) — bordereau de prix unitaires (contrat-scopé) ─────────────
+interface BpuItemRow { id: string; tenant_id: string; contract_id: string; code: string; label: string; unit: string; unit_price: number | string }
+function toBpuItem(r: BpuItemRow): BpuItem {
+  return {
+    id: r.id, tenantId: r.tenant_id, contractId: r.contract_id, code: r.code, label: r.label,
+    unit: r.unit, unitPrice: Number(r.unit_price),
+  };
+}
+export function createSupabaseBpuItemsRepo(client: SupabaseClient, session: Session): BpuItemsRepo {
+  const TB = 'ao_bpu_items';
+  return {
+    async list(contractId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('contract_id', contractId).order('code')) as BpuItemRow[];
+      return rows.map(toBpuItem);
+    },
+    async add(contractId, input: BpuItemInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, contract_id: contractId, code: input.code.trim(),
+        label: input.label.trim(), unit: input.unit.trim(), unit_price: input.unitPrice,
+      }).select('*').single()) as BpuItemRow;
+      return toBpuItem(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);
