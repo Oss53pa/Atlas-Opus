@@ -59,7 +59,7 @@ import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
 import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
-import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus, HsseInspection, HsseInspectionInput } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
@@ -1492,12 +1492,24 @@ export function createSupabaseIntegrationsRepo(client: SupabaseClient, session: 
 interface HsseRow {
   id: string; tenant_id: string; operation_id: string; reference: string; kind: string; severity: string;
   occurred_at: string; location: string | null; description: string; corrective_action: string | null; status: string;
+  days_lost: number | null;
+}
+interface HsseInspectionRow {
+  id: string; tenant_id: string; operation_id: string; date: string; title: string;
+  score: number; hours_worked: number | string; observations: string | null;
+}
+function toHsseInspection(r: HsseInspectionRow): HsseInspection {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, date: r.date, title: r.title,
+    score: Number(r.score), hoursWorked: Number(r.hours_worked), observations: r.observations,
+  };
 }
 function toHsse(r: HsseRow): HsseIncident {
   return {
     id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference,
     kind: r.kind as HsseKind, severity: r.severity as HsseSeverity, occurredAt: r.occurred_at,
     location: r.location, description: r.description, correctiveAction: r.corrective_action, status: r.status as HsseStatus,
+    daysLost: r.days_lost ?? 0,
   };
 }
 export function createSupabaseHsseRepo(client: SupabaseClient, session: Session): HsseRepo {
@@ -1512,6 +1524,7 @@ export function createSupabaseHsseRepo(client: SupabaseClient, session: Session)
         tenant_id: session.tenantId, operation_id: opId, reference: input.reference.trim(), kind: input.kind,
         severity: input.severity, occurred_at: input.occurredAt, location: input.location ?? null,
         description: input.description.trim(), corrective_action: input.correctiveAction ?? null,
+        days_lost: Math.max(0, Math.round(input.daysLost ?? 0)),
       }).select('*').single()) as HsseRow;
       return toHsse(row);
     },
@@ -1521,6 +1534,22 @@ export function createSupabaseHsseRepo(client: SupabaseClient, session: Session)
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async inspections(opId) {
+      const rows = unwrap(await client.from('ao_hsse_inspections').select('*').eq('operation_id', opId).order('date', { ascending: false })) as HsseInspectionRow[];
+      return rows.map(toHsseInspection);
+    },
+    async addInspection(opId, input: HsseInspectionInput) {
+      const row = unwrap(await client.from('ao_hsse_inspections').insert({
+        tenant_id: session.tenantId, operation_id: opId, date: input.date, title: input.title.trim(),
+        score: Math.min(100, Math.max(0, Math.round(input.score))),
+        hours_worked: Math.max(0, Math.round(input.hoursWorked ?? 0)), observations: input.observations ?? null,
+      }).select('*').single()) as HsseInspectionRow;
+      return toHsseInspection(row);
+    },
+    async removeInspection(id) {
+      const { error } = await client.from('ao_hsse_inspections').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };

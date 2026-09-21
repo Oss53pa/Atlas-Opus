@@ -286,6 +286,14 @@ interface DisputeCreatePayload {
 
 // M19 (HSSE) — incident terrain (fait, non écriture) : créé « déclaré » ;
 // payload JSON-safe (dates ISO, énumérés).
+interface HsseInspectionCreatePayload {
+  operationId: string;
+  date: string;
+  title: string;
+  score: number;
+  hoursWorked?: number;
+  observations?: string | null;
+}
 interface HsseCreatePayload {
   operationId: string;
   reference: string;
@@ -295,6 +303,7 @@ interface HsseCreatePayload {
   location?: string | null;
   description: string;
   correctiveAction?: string | null;
+  daysLost?: number;
 }
 
 // M3 — étude amont (diagnostic, non écriture) : créée « planifiée » ;
@@ -601,6 +610,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
     const __rec = await api.hsse.add(p.operationId, {
       reference: p.reference, kind: p.kind, severity: p.severity, occurredAt: p.occurredAt,
       location: p.location ?? null, description: p.description, correctiveAction: p.correctiveAction ?? null,
+      daysLost: p.daysLost ?? 0,
+    });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
+  }
+  // M19 (HSSE) — visite de sécurité relevée sur site : rejouable telle quelle.
+  if (m.entity === 'hsseInspections' && m.op === 'create') {
+    const p = m.payload as unknown as HsseInspectionCreatePayload;
+    const __rec = await api.hsse.addInspection(p.operationId, {
+      date: p.date, title: p.title, score: p.score, hoursWorked: p.hoursWorked ?? 0, observations: p.observations ?? null,
     });
     return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }

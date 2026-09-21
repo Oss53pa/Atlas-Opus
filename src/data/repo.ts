@@ -77,7 +77,7 @@ import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/t
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
-import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseStatus, HsseInspection, HsseInspectionInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
@@ -321,6 +321,10 @@ export interface HsseRepo {
   add(operationId: string, input: HsseIncidentInput): Promise<HsseIncident>;
   setStatus(id: string, status: HsseStatus): Promise<HsseIncident>;
   remove(id: string): Promise<void>;
+  /** Visites de sécurité — portent les heures travaillées (dénominateur TF/TG). */
+  inspections(operationId: string): Promise<HsseInspection[]>;
+  addInspection(operationId: string, input: HsseInspectionInput): Promise<HsseInspection>;
+  removeInspection(id: string): Promise<void>;
 }
 
 /** M19 (litiges) — registre des litiges & contentieux d'une opération. */

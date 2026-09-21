@@ -130,7 +130,7 @@ import type { LibraryDoc } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
-import type { HsseIncident } from '../domain/hsse/types';
+import type { HsseIncident, HsseInspection } from '../domain/hsse/types';
 import type { Dispute } from '../domain/litige/types';
 import type { Claim } from '../domain/claim/types';
 import type { DoeDocument } from '../domain/doe/types';
@@ -686,6 +686,11 @@ export function useOutbox(limit?: number): AsyncState<OutboxMessage[]> {
 export function useHsseIncidents(operationId: string): AsyncState<HsseIncident[]> {
   const { hsse } = useData();
   return useAsync(() => hsse.list(operationId), [hsse, operationId]);
+}
+
+export function useHsseInspections(operationId: string): AsyncState<HsseInspection[]> {
+  const { hsse } = useData();
+  return useAsync(() => hsse.inspections(operationId), [hsse, operationId]);
 }
 
 export function useDisputes(operationId: string): AsyncState<Dispute[]> {

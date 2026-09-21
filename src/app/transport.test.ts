@@ -242,6 +242,31 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ contractId: 'ct-1', input: { code: '01.01', label: 'Béton', unit: 'm3', unitPrice: 95000 } });
   });
 
+  it('hsseInspections.create → appelle hsse.addInspection avec les heures déclarées', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      hsse: { addInspection: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'hsseInspections', op: 'create', payload: { operationId: 'op-1', date: '2026-09-30', title: 'Visite HSE', score: 84, hoursWorked: 90000 } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { date: '2026-09-30', title: 'Visite HSE', score: 84, hoursWorked: 90000, observations: null } });
+  });
+
+  it('hsseIncidents.create → transmet les journées d’arrêt (0 par défaut)', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      hsse: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    await createRepoTransport(api as never)(
+      mutation({ entity: 'hsseIncidents', op: 'create', payload: { operationId: 'op-1', reference: 'H-1', kind: 'accident', severity: 'grave', occurredAt: '2026-09-01', description: 'Chute' } }),
+    );
+    expect(calls[0]).toMatchObject({ input: { daysLost: 0 } });
+  });
+
   it('pgesActions.create → appelle pgesActions.add et renvoie ok', async () => {
     const calls: unknown[] = [];
     const api = {

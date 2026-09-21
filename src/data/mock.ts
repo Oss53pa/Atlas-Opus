@@ -59,7 +59,7 @@ import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantIn
 import { normalizeScope } from '../domain/admin/onboarding';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { canManualRetry } from '../domain/f5/contract';
-import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseInspection, HsseInspectionInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput } from '../domain/litige/types';
 import type { Claim, ClaimInput } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
@@ -212,6 +212,7 @@ export interface MockDb {
   integrationEndpoints: IntegrationEndpoint[];
   outbox: OutboxMessage[];
   hsseIncidents: HsseIncident[];
+  hsseInspections: HsseInspection[];
   disputes: Dispute[];
   claims: Claim[];
   doeDocuments: DoeDocument[];
@@ -657,8 +658,13 @@ export function createMockDb(): MockDb {
   ];
 
   const hsseIncidents: HsseIncident[] = [
-    { id: 'hs-1', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-003', kind: 'accident', severity: 'grave', occurredAt: '2026-08-28', location: 'R+2 aile B', description: 'Chute de plain-pied, arrêt 3 jours.', correctiveAction: 'Balisage renforcé, causerie sécurité.', status: 'en_analyse' },
-    { id: 'hs-2', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-004', kind: 'presqu_accident', severity: 'mineure', occurredAt: '2026-09-02', location: 'Zone grue', description: 'Charge balancée à proximité d’un ouvrier.', correctiveAction: null, status: 'declare' },
+    { id: 'hs-1', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-003', kind: 'accident', severity: 'grave', occurredAt: '2026-08-28', location: 'R+2 aile B', description: 'Chute de plain-pied, arrêt 3 jours.', correctiveAction: 'Balisage renforcé, causerie sécurité.', status: 'en_analyse', daysLost: 3 },
+    { id: 'hs-2', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-004', kind: 'presqu_accident', severity: 'mineure', occurredAt: '2026-09-02', location: 'Zone grue', description: 'Charge balancée à proximité d’un ouvrier.', correctiveAction: null, status: 'declare', daysLost: 0 },
+  ];
+  // Visites HSSE — chaque visite déclare les heures travaillées de la période (dénominateur TF/TG).
+  const hsseInspections: HsseInspection[] = [
+    { id: 'hi-1', tenantId: T, operationId: 'op-palmiers', date: '2026-07-31', title: 'Visite HSE mensuelle — juillet', score: 86, hoursWorked: 92_000, observations: 'EPI conformes, signalétique à compléter.' },
+    { id: 'hi-2', tenantId: T, operationId: 'op-palmiers', date: '2026-08-31', title: 'Visite HSE mensuelle — août', score: 72, hoursWorked: 96_000, observations: 'Garde-corps manquants au R+3.' },
   ];
 
   const disputes: Dispute[] = [
@@ -751,7 +757,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1647,7 +1653,7 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
         reference: input.reference.trim(), kind: input.kind, severity: input.severity,
         occurredAt: input.occurredAt, location: input.location ?? null,
         description: input.description.trim(), correctiveAction: input.correctiveAction ?? null,
-        status: 'declare',
+        status: 'declare', daysLost: Math.max(0, Math.round(input.daysLost ?? 0)),
       };
       db.hsseIncidents.push(i);
       return { ...i };
@@ -1660,6 +1666,22 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
     },
     async remove(iid) {
       db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
+    },
+    async inspections(opId) {
+      return mine(db.hsseInspections).filter((i) => i.operationId === opId).map((i) => ({ ...i }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    },
+    async addInspection(opId, input: HsseInspectionInput) {
+      const i: HsseInspection = {
+        id: id(), tenantId: session.tenantId, operationId: opId, date: input.date, title: input.title.trim(),
+        score: Math.min(100, Math.max(0, Math.round(input.score))),
+        hoursWorked: Math.max(0, Math.round(input.hoursWorked ?? 0)), observations: input.observations ?? null,
+      };
+      db.hsseInspections.push(i);
+      return { ...i };
+    },
+    async removeInspection(iid) {
+      db.hsseInspections = db.hsseInspections.filter((x) => !(x.id === iid && x.tenantId === session.tenantId));
     },
   };
 }
