@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus, HsseInspection, HsseInspectionInput } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -74,6 +74,7 @@ import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types'
 import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch, PropertyType, OpportunityStatus, Decision as OpportunityDecision } from '../../domain/landOpportunity/types';
 import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../../domain/bpuItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
@@ -2588,6 +2589,65 @@ export function createSupabaseRevisionsRepo(client: SupabaseClient, session: Ses
         }).select('*').single(),
       ) as PriceRevisionRow;
       return toRevision(row);
+    },
+  };
+}
+
+// ── M2 (amont) — opportunités foncières ─────────────────────────────────────
+interface LandOpportunityRow {
+  id: string; tenant_id: string; reference: string; name: string; property_type: string; country_code: string;
+  city: string | null; total_surface: number | string; buildable_surface: number | string;
+  price_asked: number | string; estimated_value: number | string; status: string; decision: string;
+  probability: number | string; discovery_date: string; decision_deadline: string | null; notes: string | null;
+  operation_id: string | null;
+}
+function toLandOpportunity(r: LandOpportunityRow): LandOpportunity {
+  return {
+    id: r.id, tenantId: r.tenant_id, reference: r.reference, name: r.name,
+    propertyType: r.property_type as PropertyType, countryCode: r.country_code, city: r.city,
+    totalSurface: Number(r.total_surface), buildableSurface: Number(r.buildable_surface),
+    priceAsked: Number(r.price_asked), estimatedValue: Number(r.estimated_value),
+    status: r.status as OpportunityStatus, decision: r.decision as OpportunityDecision, probability: Number(r.probability),
+    discoveryDate: r.discovery_date, decisionDeadline: r.decision_deadline, notes: r.notes, operationId: r.operation_id,
+  };
+}
+export function createSupabaseLandOpportunitiesRepo(client: SupabaseClient, session: Session): LandOpportunitiesRepo {
+  const TB = 'ao_land_opportunities';
+  return {
+    async list() {
+      const rows = unwrap(await client.from(TB).select('*').order('discovery_date', { ascending: false })) as LandOpportunityRow[];
+      return rows.map(toLandOpportunity);
+    },
+    async add(input: LandOpportunityInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, reference: input.reference.trim(), name: input.name.trim(),
+        property_type: input.propertyType, country_code: input.countryCode, city: input.city ?? null,
+        total_surface: input.totalSurface ?? 0, buildable_surface: input.buildableSurface ?? 0,
+        price_asked: input.priceAsked ?? 0, estimated_value: input.estimatedValue ?? 0,
+        probability: input.probability ?? 0.5, decision_deadline: input.decisionDeadline ?? null, notes: input.notes ?? null,
+      }).select('*').single()) as LandOpportunityRow;
+      return toLandOpportunity(row);
+    },
+    async update(id, patch: LandOpportunityPatch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.status !== undefined) upd.status = patch.status;
+      if (patch.decision !== undefined) upd.decision = patch.decision;
+      if (patch.probability !== undefined) upd.probability = patch.probability;
+      if (patch.priceAsked !== undefined) upd.price_asked = patch.priceAsked;
+      if (patch.estimatedValue !== undefined) upd.estimated_value = patch.estimatedValue;
+      if (patch.notes !== undefined) upd.notes = patch.notes;
+      let q = client.from(TB).update(upd).eq('id', id);
+      if (patch.operationId !== undefined) {
+        upd.operation_id = patch.operationId;
+        // Conversion unique : on ne lie que si aucune opération n'est déjà liée.
+        q = client.from(TB).update(upd).eq('id', id).is('operation_id', null);
+      }
+      const row = unwrap(await q.select('*').single()) as LandOpportunityRow;
+      return toLandOpportunity(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
   };
 }

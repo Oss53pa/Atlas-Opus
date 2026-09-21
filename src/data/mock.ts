@@ -80,6 +80,7 @@ import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/ev
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
@@ -153,6 +154,7 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  LandOpportunitiesRepo,
   BpuItemsRepo,
 } from './repo';
 
@@ -228,6 +230,7 @@ export interface MockDb {
   offerScores: OfferScore[];
   pgesActions: PgesAction[];
   alertRules: AlertRule[];
+  landOpportunities: LandOpportunity[];
   bpuItems: BpuItem[];
 }
 
@@ -699,6 +702,12 @@ export function createMockDb(): MockDb {
     { id: 'bpu-3', tenantId: T, contractId: 'ct-p1', code: '02.01', label: 'Maçonnerie agglos creux 15', unit: 'm2', unitPrice: 8_500 },
     { id: 'bpu-4', tenantId: T, contractId: 'ct-p1', code: '03.01', label: 'Enduit ciment tramé', unit: 'm2', unitPrice: 4_200 },
   ];
+  // Opportunités foncières (M2 amont) — pipeline de l'espace, avant création d'opération.
+  const landOpportunities: LandOpportunity[] = [
+    { id: 'lo-1', tenantId: T, reference: 'OPP-2026-001', name: 'Parcelle Cocody Angré', propertyType: 'terrain_nu', countryCode: 'CI', city: 'Abidjan', totalSurface: 2400, buildableSurface: 5800, priceAsked: 520_000_000, estimatedValue: 690_000_000, status: 'negociation', decision: 'pending', probability: 0.65, discoveryDate: '2026-02-14', decisionDeadline: '2026-10-31', notes: 'Zone UB — COS favorable.', operationId: null },
+    { id: 'lo-2', tenantId: T, reference: 'OPP-2026-002', name: 'Friche industrielle Yopougon', propertyType: 'friche', countryCode: 'CI', city: 'Abidjan', totalSurface: 8600, buildableSurface: 9200, priceAsked: 410_000_000, estimatedValue: 430_000_000, status: 'etude', decision: 'pending', probability: 0.3, discoveryDate: '2026-04-02', decisionDeadline: '2026-11-15', notes: 'Dépollution à chiffrer.', operationId: null },
+    { id: 'lo-3', tenantId: T, reference: 'OPP-2025-014', name: 'Terrain Almadies', propertyType: 'terrain_viabilise', countryCode: 'SN', city: 'Dakar', totalSurface: 1800, buildableSurface: 4300, priceAsked: 780_000_000, estimatedValue: 760_000_000, status: 'abandonnee', decision: 'no_go', probability: 0, discoveryDate: '2025-11-20', decisionDeadline: null, notes: 'Charge foncière hors marché.', operationId: null },
+  ];
   const alertRules: AlertRule[] = [
     { id: 'ar-1', tenantId: T, metric: 'depassement_budget_pct', threshold: 5, severity: 'critical' },
     { id: 'ar-2', tenantId: T, metric: 'retard_jours', threshold: 15, severity: 'warning' },
@@ -757,7 +766,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -2552,6 +2561,39 @@ export function createTendersRepo(db: MockDb, session: Session, deps: Deps): Ten
     },
     async remove(tid) {
       db.tenders = db.tenders.filter((td) => !(td.id === tid && td.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createLandOpportunitiesRepo(db: MockDb, session: Session, deps: Deps): LandOpportunitiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = () => db.landOpportunities.filter((o) => o.tenantId === session.tenantId);
+  return {
+    async list() {
+      return mine().map((o) => ({ ...o })).sort((a, b) => b.discoveryDate.localeCompare(a.discoveryDate));
+    },
+    async add(input: LandOpportunityInput) {
+      const o: LandOpportunity = {
+        id: id(), tenantId: session.tenantId, reference: input.reference.trim(), name: input.name.trim(),
+        propertyType: input.propertyType, countryCode: input.countryCode, city: input.city ?? null,
+        totalSurface: input.totalSurface ?? 0, buildableSurface: input.buildableSurface ?? 0,
+        priceAsked: input.priceAsked ?? 0, estimatedValue: input.estimatedValue ?? 0,
+        status: 'prospection', decision: 'pending', probability: input.probability ?? 0.5,
+        discoveryDate: new Date().toISOString().slice(0, 10), decisionDeadline: input.decisionDeadline ?? null,
+        notes: input.notes ?? null, operationId: null,
+      };
+      db.landOpportunities.push(o);
+      return { ...o };
+    },
+    async update(oid, patch: LandOpportunityPatch) {
+      const o = db.landOpportunities.find((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (!o) throw new Error('opportunity_not_found');
+      if (patch.operationId !== undefined && o.operationId !== null) throw new Error('already_converted');
+      Object.assign(o, patch);
+      return { ...o };
+    },
+    async remove(oid) {
+      db.landOpportunities = db.landOpportunities.filter((x) => !(x.id === oid && x.tenantId === session.tenantId));
     },
   };
 }

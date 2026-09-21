@@ -13,7 +13,7 @@ import type { Role } from '../../domain/m1/types';
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ');
 
 /** Route names portant un id d'opération. */
-type OpRouteName = Exclude<Route['name'], 'dashboard' | 'portfolio' | 'create'>;
+type OpRouteName = Exclude<Route['name'], 'dashboard' | 'portfolio' | 'create' | 'foncier'>;
 
 interface ModuleDef {
   code: string;
@@ -177,6 +177,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       </button>
       <button className={cx('ax-nav-item', route.name === 'portfolio' && 'is-active')} aria-current={route.name === 'portfolio' ? 'page' : undefined} onClick={() => go({ name: 'portfolio' })}>
         {t('nav.portfolio')}
+      </button>
+      <button className={cx('ax-nav-item', route.name === 'foncier' && 'is-active')} aria-current={route.name === 'foncier' ? 'page' : undefined} onClick={() => go({ name: 'foncier' })}>
+        {t('nav.foncier')}
       </button>
 
       {/* Contexte opération — familles de modules (handoff) */}

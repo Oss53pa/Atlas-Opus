@@ -92,6 +92,7 @@ import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
@@ -440,6 +441,14 @@ export interface PgesActionsRepo {
 }
 
 /** M21 (cockpit) — règles d'alerte configurables (tenant-scopées). */
+/** M2 (amont) — pipeline d'opportunités foncières (niveau espace, avant l'opération). */
+export interface LandOpportunitiesRepo {
+  list(): Promise<LandOpportunity[]>;
+  add(input: LandOpportunityInput): Promise<LandOpportunity>;
+  update(id: string, patch: LandOpportunityPatch): Promise<LandOpportunity>;
+  remove(id: string): Promise<void>;
+}
+
 export interface AlertRulesRepo {
   list(): Promise<AlertRule[]>;
   add(input: AlertRuleInput): Promise<AlertRule>;
