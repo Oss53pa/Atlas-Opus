@@ -2260,6 +2260,17 @@ export const fr = {
   'foncier.sim.nego': "Marge de négociation",
   'foncier.sim.tooExpensive': "Le prix demandé dépasse la charge foncière admissible : à ce prix, l’opération ne dégage pas la marge cible.",
   'foncier.sim.hint': "Renseignez le chiffre d’affaires prévisionnel et les coûts pour obtenir le prix plafond du terrain.",
+  'search.label': "Recherche globale",
+  'search.empty': "Aucun résultat pour « {term} ».",
+  'search.kind.operation': "Opération",
+  'search.kind.opportunity': "Foncier",
+  'search.kind.stakeholder': "Intervenant",
+  'search.kind.contract': "Marché",
+  'search.kind.document': "Document",
+  'search.kind.rfi': "RFI",
+  'common.exported': "Export CSV généré.",
+  'portfolio.exportCsv': "Exporter (CSV)",
+  'reporting.exportCsv': "Historique (CSV)",
 } as const;
 
 export type Dict = typeof fr;

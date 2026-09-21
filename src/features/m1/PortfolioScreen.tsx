@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, FolderOpen, Archive, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Search, Plus, FolderOpen, Archive, RotateCcw, AlertTriangle, FileDown } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Money, Panel, Select, Skeleton, useToast } from '../../ui';
 import { PhaseBadge } from './PhaseBadge';
 import { countryLabel, opTypeLabel, phaseLabel, statusLabel, STATUS_TONE } from './labels';
@@ -7,6 +7,7 @@ import { useData, useOperations } from '../../app/providers';
 import { useNav } from '../../app/router';
 import { locale, t } from '../../i18n';
 import { formatPercent } from '../../lib/format';
+import { downloadCsv, toCsv } from '../../lib/csv';
 import { OP_TYPES, PHASES, type Operation, type OpType, type OperationStatus, type Phase } from '../../domain/m1/types';
 import { can } from '../../domain/m1/permissions';
 import type { OperationFilter } from '../../data/repo';
@@ -50,14 +51,30 @@ export function PortfolioScreen() {
     refetch();
   }
 
+  /** Export CSV de la liste telle que filtrée à l'écran (valeurs brutes). */
+  function exportCsv() {
+    const headers = ['operation', 'pays', 'type', 'phase', 'statut', 'devise', 'budget_bac', 'avancement', 'debut', 'fin'];
+    const lines = (data ?? []).map((o) => [
+      o.name, countryLabel(o.countryCode), opTypeLabel(o.opType), phaseLabel(o.phase), statusLabel(o.status),
+      o.currency, o.budgetBac, Number((o.progress ?? 0).toFixed(4)), o.startDate, o.endDate,
+    ]);
+    downloadCsv(`portefeuille-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, lines));
+    toast.push(t('common.exported'), 'success');
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="mb-1 flex items-end justify-between gap-3">
         <h1 className="text-[26px] font-semibold leading-tight" style={{ letterSpacing: '-0.02em' }}>{t('portfolio.title')}</h1>
-        <Button variant="primary" size="sm" onClick={() => navigate({ name: 'create' })}>
-          <Plus size={16} />
-          {t('portfolio.new')}
-        </Button>
+        <div className="flex gap-2">
+          {(data?.length ?? 0) > 0 && (
+            <Button variant="ghost" size="sm" onClick={exportCsv}><FileDown size={16} />{t('portfolio.exportCsv')}</Button>
+          )}
+          <Button variant="primary" size="sm" onClick={() => navigate({ name: 'create' })}>
+            <Plus size={16} />
+            {t('portfolio.new')}
+          </Button>
+        </div>
       </div>
 
       {/* Barre d'actions : recherche + filtres */}

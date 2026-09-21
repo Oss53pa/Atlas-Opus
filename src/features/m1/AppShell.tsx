@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Menu, X, LogOut, ChevronRight, Search, Users } from 'lucide-react';
+import { Plus, Menu, X, LogOut, ChevronRight, Users } from 'lucide-react';
 import { Brand, Button } from '../../ui';
 import { useNav, type Route } from '../../app/router';
 import { useAuth } from '../../app/auth';
@@ -8,6 +8,7 @@ import { t, locale, type MessageKey } from '../../i18n';
 import { formatPercent } from '../../lib/format';
 import { phaseLabel } from './labels';
 import { OfflineBanner } from './OfflineBanner';
+import { GlobalSearch } from './GlobalSearch';
 import type { Role } from '../../domain/m1/types';
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ');
@@ -142,17 +143,6 @@ function TenantContextCard() {
   );
 }
 
-function SearchField({ operation }: { operation: boolean }) {
-  return (
-    <div className="ax-search" aria-hidden="true">
-      <Search size={14} className="text-ink-3" />
-      <span className="flex-1 truncate text-[13px] text-ink-3">
-        {t(operation ? 'shell.search.operation' : 'shell.search.tenant')}
-      </span>
-      <span className="mono text-[11px] text-ink-3">{t('shell.search.hint')}</span>
-    </div>
-  );
-}
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { route, navigate } = useNav();
@@ -168,7 +158,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex h-full flex-col">
       {/* Carte de contexte */}
       {opId ? <OperationContextCard opId={opId} /> : <TenantContextCard />}
-      <SearchField operation={!!opId} />
+      <GlobalSearch operationId={opId} />
 
       {/* Pilotage — toujours visible */}
       <div className="ax-nav-group">{t('nav.group.pilotage')}</div>

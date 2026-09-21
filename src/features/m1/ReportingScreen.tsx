@@ -3,6 +3,7 @@ import { ChevronLeft, Plus, Trash2, FileDown } from 'lucide-react';
 import { Badge, Banner, Button, Card, DataTable, EmptyState, Modal, Panel, Skeleton, Textarea, useToast, type TableRowData } from '../../ui';
 import { useData, useOperation, useBilan, useReports } from '../../app/providers';
 import { useNav } from '../../app/router';
+import { downloadCsv, toCsv } from '../../lib/csv';
 import { t, locale, type MessageKey } from '../../i18n';
 import { formatDate, formatPercent } from '../../lib/format';
 import { isReadOnlyForRole } from '../../domain/m1/rules';
@@ -11,6 +12,7 @@ import {
   REPORT_TYPES,
   compareReports,
   reportToMarkdown,
+  reportHistoryRows,
   deriveOperationAlerts,
   countBySeverity,
   type ReportType,
@@ -76,6 +78,11 @@ export function ReportingScreen({ id }: { id: string }) {
     setRows((r) => r.filter((x) => x.id !== rid));
     toast.push(t('reporting.removed'), 'info');
   }
+  function exportHistory() {
+    const headers = ['date', 'type', 'periode', 'cout_total', 'recettes', 'recettes_realisees', 'marge', 'taux_marge', 'tri', 'avancement', 'alertes_critiques', 'alertes_echeance'];
+    downloadCsv(`reporting-${op?.name ?? id}-${new Date().toISOString().slice(0, 10)}`, toCsv(headers, reportHistoryRows(rows)));
+    toast.push(t('common.exported'), 'success');
+  }
   function openExport(snap: ReportSnapshot) {
     setExportMd(reportToMarkdown({ operationName: op?.name ?? '', currency }, snap));
   }
@@ -100,6 +107,9 @@ export function ReportingScreen({ id }: { id: string }) {
         </div>
         {canEdit && (
           <div className="flex flex-wrap gap-2">
+            {rows.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={exportHistory}><FileDown size={14} />{t('reporting.exportCsv')}</Button>
+            )}
             {REPORT_TYPES.map((ty) => (
               <Button key={ty} variant={ty === 'deep_dive' ? 'primary' : 'glass'} size="sm" onClick={() => generate(ty)}>
                 <Plus size={16} />
