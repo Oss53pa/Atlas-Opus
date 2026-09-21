@@ -450,7 +450,8 @@ export function createMockDb(): MockDb {
   // Financement (M5) — Palmiers : crédit promoteur avec deux tranches débloquées
   // (alimentent les frais_financiers du bilan, RG-M5-02).
   const financings: Financing[] = [
-    { id: 'fin-p1', tenantId: T, operationId: 'op-palmiers', source: 'credit_promoteur', amount: Money.of(1_500_000_000, 'XOF'), rate: 0.09, status: 'en_cours' },
+    { id: 'fin-p1', tenantId: T, operationId: 'op-palmiers', source: 'credit_promoteur', amount: Money.of(1_500_000_000, 'XOF'), rate: 0.09, status: 'en_cours', durationMonths: 24, repayment: 'in_fine' },
+    { id: 'fin-p2', tenantId: T, operationId: 'op-palmiers', source: 'fonds_propres', amount: Money.of(600_000_000, 'XOF'), rate: 0, status: 'accorde', durationMonths: null, repayment: 'in_fine' },
   ];
   const drawdowns: Drawdown[] = [
     { id: 'dw-p1', tenantId: T, financingId: 'fin-p1', amount: Money.of(600_000_000, 'XOF'), condition: 0.2, status: 'debloque', date: '2026-03-01' },
@@ -1321,6 +1322,7 @@ export function createFinancingRepo(db: MockDb, session: Session, deps: Deps): F
       const f: Financing = {
         id: id(), tenantId: session.tenantId, operationId: opId,
         source: input.source, amount: input.amount, rate: input.rate, status: 'negocie',
+        durationMonths: input.durationMonths ?? null, repayment: input.repayment ?? 'in_fine',
       };
       db.financings.push(f);
       return { ...f };

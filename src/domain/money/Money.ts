@@ -95,6 +95,19 @@ export class Money {
     return new Money(minor, this.currency, this.scale);
   }
 
+  /**
+   * Divise par un diviseur fractionnaire (quantité, surface, indice), avec
+   * arrondi. Exact au centime : on divise en précision étendue plutôt que de
+   * multiplier par l'inverse (qui perdrait la périodicité de 1/3, 1/60…).
+   */
+  divide(divisor: number, rounding: Rounding = 'half-up'): Money {
+    if (divisor === 0) throw new Error('Money.divide: division par zéro');
+    const d = BigInt(Math.round(divisor * Number(RATE_PRECISION)));
+    const num = this.minor * RATE_PRECISION;
+    const minor = rounding === 'down' ? num / d : divRoundHalfUp(num, d);
+    return new Money(minor, this.currency, this.scale);
+  }
+
   /** Pourcentage : 0.05 → 5 %. Alias lisible de mulRate. */
   percentage(rate: number): Money {
     return this.mulRate(rate);

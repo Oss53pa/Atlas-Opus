@@ -8,6 +8,14 @@ import type { Money } from '../money/Money';
 export const FINANCING_SOURCES = ['credit_promoteur', 'bailleur', 'fonds_propres'] as const;
 export type FinancingSource = (typeof FINANCING_SOURCES)[number];
 
+/**
+ * Mode de remboursement (transposé du plan de financement d'Advancity).
+ * Un crédit promoteur est classiquement remboursé in fine, sur le produit des
+ * ventes ; un prêt d'investissement s'amortit par échéances constantes.
+ */
+export const REPAYMENT_MODES = ['in_fine', 'amortissable'] as const;
+export type RepaymentMode = (typeof REPAYMENT_MODES)[number];
+
 /** Machine financing : négocié → accordé → en_cours → soldé (§4). */
 export const FINANCING_STATUSES = ['negocie', 'accorde', 'en_cours', 'solde'] as const;
 export type FinancingStatus = (typeof FINANCING_STATUSES)[number];
@@ -25,6 +33,9 @@ export interface Financing {
   /** Taux annuel (ex. 0.09 = 9 %). */
   rate: number;
   status: FinancingStatus;
+  /** Durée de remboursement en mois (null tant que non négociée). */
+  durationMonths: number | null;
+  repayment: RepaymentMode;
 }
 
 export interface Drawdown {
@@ -43,6 +54,8 @@ export interface FinancingInput {
   source: FinancingSource;
   amount: Money;
   rate: number;
+  durationMonths?: number | null;
+  repayment?: RepaymentMode;
 }
 
 export interface DrawdownInput {

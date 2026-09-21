@@ -40,4 +40,11 @@ describe('Money — exactitude (bigint, pas de flottant)', () => {
   it('refuse les devises incompatibles', () => {
     expect(() => Money.of('1', 'XOF').add(Money.of('1', 'XAF'))).toThrow();
   });
+
+  it('divise au centime exact, sans passer par l’inverse', () => {
+    // 60 000 000 / 60 : l'inverse (0,0166…) introduirait 2 centimes d'écart.
+    expect(Money.of(60_000_000, 'XOF').divide(60).toMajorString()).toBe('1000000.00');
+    expect(Money.of(10, 'EUR').divide(3).toMajorString()).toBe('3.33');
+    expect(() => Money.of(1, 'EUR').divide(0)).toThrow();
+  });
 });

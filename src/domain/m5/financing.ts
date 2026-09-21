@@ -4,7 +4,7 @@
  * RG-M5-02 : intérêts intercalaires → poste « frais_financiers » (M4).
  */
 import { Money, sumMoney, type Currency } from '../money/Money';
-import type { DrawdownStatus, FinancingStatus } from './types';
+import type { DrawdownStatus, Financing, FinancingStatus } from './types';
 
 // ── Machine financing ───────────────────────────────────────────────────────
 const FINANCING_TRANSITIONS: Record<FinancingStatus, FinancingStatus[]> = {
@@ -87,4 +87,77 @@ export function fraisFinanciersFromDrawdowns(
  */
 export function sommeTranchesValide(tranches: Money[], montantAccorde: Money, currency: Currency): boolean {
   return sumMoney(tranches, currency).lte(montantAccorde);
+}
+
+// ── Remboursement & plan de financement (transposé d'Advancity) ─────────────
+
+/**
+ * Échéance mensuelle d'un financement. In fine : intérêts seuls, le capital est
+ * dû au terme. Amortissable : m = P·i / (1 − (1+i)^−n), i = taux/12 (taux nul →
+ * amortissement linéaire). null si la durée n'est pas connue ou pour des fonds propres.
+ */
+export function echeanceMensuelle(
+  f: Pick<Financing, 'amount' | 'rate' | 'durationMonths' | 'repayment' | 'source'>,
+): Money | null {
+  if (f.source === 'fonds_propres') return null;
+  if (f.repayment === 'in_fine') return f.amount.mulRate(f.rate / 12);
+  if (!f.durationMonths || f.durationMonths <= 0) return null;
+  if (f.rate === 0) return f.amount.divide(f.durationMonths);
+  const i = f.rate / 12;
+  return f.amount.mulRate(i / (1 - Math.pow(1 + i, -f.durationMonths)));
+}
+
+/** Coût total du crédit (intérêts cumulés sur la durée). null si durée inconnue. */
+export function coutCredit(
+  f: Pick<Financing, 'amount' | 'rate' | 'durationMonths' | 'repayment' | 'source'>,
+): Money | null {
+  if (f.source === 'fonds_propres' || !f.durationMonths || f.durationMonths <= 0) return null;
+  if (f.repayment === 'in_fine') return f.amount.mulRate(f.rate * (f.durationMonths / 12));
+  const m = echeanceMensuelle(f);
+  return m ? m.multiplyInt(f.durationMonths).subtract(f.amount) : null;
+}
+
+/** Financements considérés comme acquis (hors simple négociation). */
+export function isMobilise(f: Pick<Financing, 'status'>): boolean {
+  return f.status !== 'negocie';
+}
+
+export interface PlanFinancement {
+  besoin: Money;
+  fondsPropres: Money;
+  dette: Money;
+  /** Ressources acquises (fonds propres + dette hors négociation). */
+  ressources: Money;
+  /** Montant encore en négociation (non compté dans les ressources). */
+  enNegociation: Money;
+  /** ressources / besoin (0 si besoin nul). */
+  couverture: number;
+  /** ressources − besoin : négatif = financement à boucler. */
+  ecart: Money;
+  /** dette / ressources. */
+  levier: number;
+}
+
+/** Plan de financement : confronte le besoin (coût total du bilan M4) aux ressources. */
+export function planFinancement(besoin: Money, financings: Financing[]): PlanFinancement {
+  const c = besoin.currency;
+  const acquis = financings.filter(isMobilise);
+  const fondsPropres = sumMoney(acquis.filter((f) => f.source === 'fonds_propres').map((f) => f.amount), c);
+  const dette = sumMoney(acquis.filter((f) => f.source !== 'fonds_propres').map((f) => f.amount), c);
+  const enNegociation = sumMoney(financings.filter((f) => !isMobilise(f)).map((f) => f.amount), c);
+  const ressources = fondsPropres.add(dette);
+  return {
+    besoin, fondsPropres, dette, ressources, enNegociation,
+    couverture: besoin.isZero() ? 0 : ressources.toMajorNumber() / besoin.toMajorNumber(),
+    ecart: ressources.subtract(besoin),
+    levier: ressources.isZero() ? 0 : dette.toMajorNumber() / ressources.toMajorNumber(),
+  };
+}
+
+/** Service de la dette mensuel (financements acquis dont l'échéance est connue). */
+export function serviceDetteMensuel(financings: Financing[], currency: Currency): Money {
+  return sumMoney(
+    financings.filter(isMobilise).map((f) => echeanceMensuelle(f)).filter((m): m is Money => m !== null),
+    currency,
+  );
 }

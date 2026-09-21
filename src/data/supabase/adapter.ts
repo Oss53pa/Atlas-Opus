@@ -34,7 +34,7 @@ import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
 import { recettesEncaissees } from '../../domain/m6/commercialisation';
 import type { ReportSnapshot, ReportInput, ReportType, ReportData } from '../../domain/m21/reporting';
-import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
+import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus, RepaymentMode } from '../../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
 import type { Insurance, InsuranceInput, InsuranceType, RaciAssignment, RaciInput, Raci, Decision, DecisionInput, DecisionKind } from '../../domain/m7/types';
 import { canAssignAccountable } from '../../domain/m7/validation';
@@ -958,6 +958,7 @@ export function createSupabaseComplianceRepo(client: SupabaseClient, session: Se
 interface FinancingRow {
   id: string; tenant_id: string; operation_id: string;
   source: string; amount: number | string; rate: number | string; status: string;
+  duration_months: number | null; repayment: string | null;
 }
 interface DrawdownRow {
   id: string; tenant_id: string; financing_id: string;
@@ -968,6 +969,7 @@ function toFinancing(r: FinancingRow, currency: string): Financing {
     id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
     source: r.source as FinancingSource, amount: Money.of(Number(r.amount), currency),
     rate: Number(r.rate), status: r.status as FinancingStatus,
+    durationMonths: r.duration_months ?? null, repayment: (r.repayment as RepaymentMode | null) ?? 'in_fine',
   };
 }
 function toDrawdown(r: DrawdownRow, currency: string): Drawdown {
@@ -1002,6 +1004,7 @@ export function createSupabaseFinancingRepo(client: SupabaseClient, session: Ses
         await client.from(FIN).insert({
           tenant_id: session.tenantId, operation_id: opId,
           source: input.source, amount: input.amount.toMajorNumber(), rate: input.rate, status: 'negocie',
+          duration_months: input.durationMonths ?? null, repayment: input.repayment ?? 'in_fine',
         }).select('*').single(),
       ) as FinancingRow;
       return toFinancing(row, currency);

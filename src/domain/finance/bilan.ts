@@ -71,7 +71,7 @@ export function spi(ev: Money, pv: Money): number {
 }
 export function eac(bac: Money, cpiValue: number): Money {
   if (cpiValue === 0) return bac;
-  return bac.mulRate(1 / cpiValue);
+  return bac.divide(cpiValue);
 }
 export function etc(eacValue: Money, ac: Money): Money {
   return eacValue.subtract(ac);

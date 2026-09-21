@@ -75,6 +75,7 @@ import { AlertesScreen } from './features/m1/AlertesScreen';
 import { NotificationsScreen } from './features/m1/NotificationsScreen';
 import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
+import { ScenariosScreen } from './features/m1/ScenariosScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -118,6 +119,8 @@ function RouteView() {
       return <EiesScreen id={route.id} />;
     case 'shipments':
       return <ShipmentsScreen id={route.id} />;
+    case 'scenarios':
+      return <ScenariosScreen id={route.id} />;
     case 'budget':
       return <BudgetScreen id={route.id} />;
     case 'criteres':
