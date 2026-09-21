@@ -66,7 +66,7 @@ export function FoncierScreen() {
     setRows((r) => [rec, ...r]);
     setDraft(emptyDraft);
     setAdding(false);
-    toast.push(t('foncier.added'), 'success');
+    toast.push(t('landopp.added'), 'success');
   }
   async function patch(o: LandOpportunity, p: { status?: OpportunityStatus; decision?: Decision }) {
     const rec = await landOpportunities.update(o.id, p);
@@ -75,7 +75,7 @@ export function FoncierScreen() {
   async function remove(o: LandOpportunity) {
     await landOpportunities.remove(o.id);
     setRows((r) => r.filter((x) => x.id !== o.id));
-    toast.push(t('foncier.removed'), 'info');
+    toast.push(t('landopp.removed'), 'info');
   }
   async function convert(o: LandOpportunity) {
     // Passe par la création d'opération standard (RG-M1 : phase amont, devise héritée du pays).
@@ -83,7 +83,7 @@ export function FoncierScreen() {
     if (o.priceAsked > 0) await bilan.addLine(op.id, { kind: 'cost', poste: 'foncier', amountPlanned: o.priceAsked });
     const rec = await landOpportunities.update(o.id, { operationId: op.id, status: 'acquise' });
     setRows((r) => r.map((x) => (x.id === o.id ? rec : x)));
-    toast.push(t('foncier.converted'), 'success');
+    toast.push(t('landopp.converted'), 'success');
     navigate({ name: 'cockpit', id: op.id });
   }
 
@@ -108,7 +108,7 @@ export function FoncierScreen() {
         <span>
           <span className="block font-medium">{o.name}</span>
           <span className="block text-[12px] text-ink-3">
-            <span className="mono">{o.reference}</span> · {lbl('foncier.property', o.propertyType)} · {o.city ?? countryLabel(o.countryCode)}
+            <span className="mono">{o.reference}</span> · {lbl('landopp.property', o.propertyType)} · {o.city ?? countryLabel(o.countryCode)}
           </span>
           <span className="block text-[12px] text-ink-3">
             {o.totalSurface.toLocaleString(locale)} m² · COS {constructibilityRatio(o).toFixed(2)} · {formatDate(o.discoveryDate, locale)}
@@ -116,35 +116,35 @@ export function FoncierScreen() {
         </span>,
         <span className="text-right">
           <span className="mono block">{money(o.priceAsked, o.countryCode)}</span>
-          <span className="block text-[11px] text-ink-3">{t('foncier.col.probability', { pct: formatPercent(o.probability, locale, 0) })}</span>
+          <span className="block text-[11px] text-ink-3">{t('landopp.col.probability', { pct: formatPercent(o.probability, locale, 0) })}</span>
         </span>,
         <span className="text-right">
           <span className="mono block text-[15px]" style={{ color: 'var(--ax-accent-strong)' }}>{score}</span>
-          <span className="block text-[11px] text-ink-3">{t('foncier.suggested', { d: lbl('foncier.decision', suggestedDecision(score)) })}</span>
+          <span className="block text-[11px] text-ink-3">{t('landopp.suggested', { d: lbl('landopp.decision', suggestedDecision(score)) })}</span>
         </span>,
         canEdit ? (
           <span className="flex flex-col gap-1">
             <Select id={`lo-st-${o.id}`} value={o.status} onChange={(e) => patch(o, { status: e.target.value as OpportunityStatus })} disabled={o.operationId !== null}>
-              {OPPORTUNITY_STATUSES.map((s) => <option key={s} value={s}>{lbl('foncier.status', s)}</option>)}
+              {OPPORTUNITY_STATUSES.map((s) => <option key={s} value={s}>{lbl('landopp.status', s)}</option>)}
             </Select>
             <Select id={`lo-dec-${o.id}`} value={o.decision} onChange={(e) => patch(o, { decision: e.target.value as Decision })} disabled={o.operationId !== null}>
-              {DECISIONS.map((d) => <option key={d} value={d}>{lbl('foncier.decision', d)}</option>)}
+              {DECISIONS.map((d) => <option key={d} value={d}>{lbl('landopp.decision', d)}</option>)}
             </Select>
           </span>
         ) : (
           <span className="flex flex-col gap-1">
-            <Badge tone={STATUS_TONE[o.status]}>{lbl('foncier.status', o.status)}</Badge>
-            <Badge tone={DECISION_TONE[o.decision]}>{lbl('foncier.decision', o.decision)}</Badge>
+            <Badge tone={STATUS_TONE[o.status]}>{lbl('landopp.status', o.status)}</Badge>
+            <Badge tone={DECISION_TONE[o.decision]}>{lbl('landopp.decision', o.decision)}</Badge>
           </span>
         ),
         <span className="flex justify-end gap-1">
           {o.operationId ? (
-            <Button variant="glass" size="sm" onClick={() => navigate({ name: 'cockpit', id: o.operationId as string })}><ArrowUpRight size={14} />{t('foncier.open')}</Button>
+            <Button variant="glass" size="sm" onClick={() => navigate({ name: 'cockpit', id: o.operationId as string })}><ArrowUpRight size={14} />{t('landopp.open')}</Button>
           ) : canEdit && canConvert(o) ? (
-            <Button variant="primary" size="sm" onClick={() => convert(o)}><ArrowUpRight size={14} />{t('foncier.convert')}</Button>
+            <Button variant="primary" size="sm" onClick={() => convert(o)}><ArrowUpRight size={14} />{t('landopp.convert')}</Button>
           ) : null}
           {canEdit && o.operationId === null && (
-            <Button variant="ghost" size="sm" icon aria-label={t('foncier.removed')} onClick={() => remove(o)}><Trash2 size={15} /></Button>
+            <Button variant="ghost" size="sm" icon aria-label={t('landopp.removed')} onClick={() => remove(o)}><Trash2 size={15} /></Button>
           )}
         </span>,
       ],
@@ -155,38 +155,38 @@ export function FoncierScreen() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[13px] text-ink-3"><MapPin size={12} className="mb-0.5 inline" /> {t('foncier.kicker')}</div>
-          <h1 className="text-[24px] font-semibold" style={{ letterSpacing: '-0.02em' }}>{t('foncier.title')}</h1>
+          <div className="text-[13px] text-ink-3"><MapPin size={12} className="mb-0.5 inline" /> {t('landopp.kicker')}</div>
+          <h1 className="text-[24px] font-semibold" style={{ letterSpacing: '-0.02em' }}>{t('landopp.title')}</h1>
         </div>
-        {canEdit && <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}><Plus size={16} />{t('foncier.add')}</Button>}
+        {canEdit && <Button variant="primary" size="sm" onClick={() => setAdding((a) => !a)}><Plus size={16} />{t('landopp.add')}</Button>}
       </div>
 
       <KpiRow
         items={[
-          { label: t('foncier.kpi.total'), value: rows.length },
-          { label: t('foncier.kpi.active'), value: active.length },
-          { label: t('foncier.kpi.go'), value: rows.filter((o) => canConvert(o)).length, accent: rows.some((o) => canConvert(o)) },
-          { label: t('foncier.kpi.score'), value: avgScore },
+          { label: t('landopp.kpi.total'), value: rows.length },
+          { label: t('landopp.kpi.active'), value: active.length },
+          { label: t('landopp.kpi.go'), value: rows.filter((o) => canConvert(o)).length, accent: rows.some((o) => canConvert(o)) },
+          { label: t('landopp.kpi.score'), value: avgScore },
         ]}
       />
 
       {adding && canEdit && (
         <Panel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Field id="lo-ref" label={t('foncier.field.reference')} value={draft.reference} onChange={(e) => setDraft((d) => ({ ...d, reference: e.target.value }))} placeholder="OPP-2026-003" />
-            <Field id="lo-name" label={t('foncier.field.name')} value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
-            <Select id="lo-type" label={t('foncier.field.propertyType')} value={draft.propertyType} onChange={(e) => setDraft((d) => ({ ...d, propertyType: e.target.value as PropertyType }))}>
-              {PROPERTY_TYPES.map((p) => <option key={p} value={p}>{lbl('foncier.property', p)}</option>)}
+            <Field id="lo-ref" label={t('landopp.field.reference')} value={draft.reference} onChange={(e) => setDraft((d) => ({ ...d, reference: e.target.value }))} placeholder="OPP-2026-003" />
+            <Field id="lo-name" label={t('landopp.field.name')} value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))} />
+            <Select id="lo-type" label={t('landopp.field.propertyType')} value={draft.propertyType} onChange={(e) => setDraft((d) => ({ ...d, propertyType: e.target.value as PropertyType }))}>
+              {PROPERTY_TYPES.map((p) => <option key={p} value={p}>{lbl('landopp.property', p)}</option>)}
             </Select>
-            <Select id="lo-country" label={t('foncier.field.country')} value={draft.countryCode} onChange={(e) => setDraft((d) => ({ ...d, countryCode: e.target.value }))}>
+            <Select id="lo-country" label={t('landopp.field.country')} value={draft.countryCode} onChange={(e) => setDraft((d) => ({ ...d, countryCode: e.target.value }))}>
               {countries.map((c) => <option key={c.code} value={c.code}>{countryLabel(c.code)}</option>)}
             </Select>
-            <Field id="lo-city" label={t('foncier.field.city')} value={draft.city} onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))} />
-            <Field id="lo-prob" label={t('foncier.field.probability')} inputMode="numeric" value={draft.probability} onChange={(e) => setDraft((d) => ({ ...d, probability: e.target.value }))} />
-            <Field id="lo-surf" label={t('foncier.field.totalSurface')} inputMode="numeric" value={draft.totalSurface} onChange={(e) => setDraft((d) => ({ ...d, totalSurface: e.target.value }))} />
-            <Field id="lo-build" label={t('foncier.field.buildableSurface')} inputMode="numeric" value={draft.buildableSurface} onChange={(e) => setDraft((d) => ({ ...d, buildableSurface: e.target.value }))} />
-            <Field id="lo-price" label={t('foncier.field.priceAsked', { cur: currencyOf(draft.countryCode) })} inputMode="numeric" value={draft.priceAsked} onChange={(e) => setDraft((d) => ({ ...d, priceAsked: e.target.value }))} />
-            <Field id="lo-value" label={t('foncier.field.estimatedValue', { cur: currencyOf(draft.countryCode) })} inputMode="numeric" value={draft.estimatedValue} onChange={(e) => setDraft((d) => ({ ...d, estimatedValue: e.target.value }))} />
+            <Field id="lo-city" label={t('landopp.field.city')} value={draft.city} onChange={(e) => setDraft((d) => ({ ...d, city: e.target.value }))} />
+            <Field id="lo-prob" label={t('landopp.field.probability')} inputMode="numeric" value={draft.probability} onChange={(e) => setDraft((d) => ({ ...d, probability: e.target.value }))} />
+            <Field id="lo-surf" label={t('landopp.field.totalSurface')} inputMode="numeric" value={draft.totalSurface} onChange={(e) => setDraft((d) => ({ ...d, totalSurface: e.target.value }))} />
+            <Field id="lo-build" label={t('landopp.field.buildableSurface')} inputMode="numeric" value={draft.buildableSurface} onChange={(e) => setDraft((d) => ({ ...d, buildableSurface: e.target.value }))} />
+            <Field id="lo-price" label={t('landopp.field.priceAsked', { cur: currencyOf(draft.countryCode) })} inputMode="numeric" value={draft.priceAsked} onChange={(e) => setDraft((d) => ({ ...d, priceAsked: e.target.value }))} />
+            <Field id="lo-value" label={t('landopp.field.estimatedValue', { cur: currencyOf(draft.countryCode) })} inputMode="numeric" value={draft.estimatedValue} onChange={(e) => setDraft((d) => ({ ...d, estimatedValue: e.target.value }))} />
           </div>
           <div className="mt-3 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>{t('common.cancel')}</Button>
@@ -198,16 +198,16 @@ export function FoncierScreen() {
       {loading ? (
         <Panel><div className="flex flex-col gap-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} style={{ height: 52 }} />)}</div></Panel>
       ) : rows.length === 0 ? (
-        <Card><EmptyState title={t('foncier.title')} description={t('foncier.empty')} /></Card>
+        <Card><EmptyState title={t('landopp.title')} description={t('landopp.empty')} /></Card>
       ) : (
-        <Panel title={t('foncier.pipeline')} meta="M2" bodyPadded={false}>
+        <Panel title={t('landopp.pipeline')} meta="M2" bodyPadded={false}>
           <DataTable
             template="2.2fr 1.1fr 0.8fr 1.2fr auto"
             columns={[
-              { label: t('foncier.col.opportunity') },
-              { label: t('foncier.col.price'), align: 'right' },
-              { label: t('foncier.col.score'), align: 'right' },
-              { label: t('foncier.col.decision') },
+              { label: t('landopp.col.opportunity') },
+              { label: t('landopp.col.price'), align: 'right' },
+              { label: t('landopp.col.score'), align: 'right' },
+              { label: t('landopp.col.decision') },
               { label: '' },
             ]}
             rows={tableRows}
@@ -216,37 +216,37 @@ export function FoncierScreen() {
       )}
 
       {rows.length > 0 && (
-        <Panel title={t('foncier.sim.title')} meta={t('foncier.sim.meta')}>
+        <Panel title={t('landopp.sim.title')} meta={t('landopp.sim.meta')}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-            <Select id="sim-opp" label={t('foncier.sim.pick')} value={simOpp?.id ?? ''} onChange={(e) => setSimId(e.target.value)}>
+            <Select id="sim-opp" label={t('landopp.sim.pick')} value={simOpp?.id ?? ''} onChange={(e) => setSimId(e.target.value)}>
               {rows.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
             </Select>
-            <Field id="sim-ca" label={t('foncier.sim.ca')} inputMode="numeric" value={sim.ca} onChange={(e) => setSim((s) => ({ ...s, ca: e.target.value }))} />
-            <Field id="sim-constr" label={t('foncier.sim.construction')} inputMode="numeric" value={sim.construction} onChange={(e) => setSim((s) => ({ ...s, construction: e.target.value }))} />
-            <Field id="sim-autres" label={t('foncier.sim.autres')} inputMode="numeric" value={sim.autres} onChange={(e) => setSim((s) => ({ ...s, autres: e.target.value }))} />
-            <Field id="sim-marge" label={t('foncier.sim.marge')} inputMode="decimal" value={sim.marge} onChange={(e) => setSim((s) => ({ ...s, marge: e.target.value }))} />
+            <Field id="sim-ca" label={t('landopp.sim.ca')} inputMode="numeric" value={sim.ca} onChange={(e) => setSim((s) => ({ ...s, ca: e.target.value }))} />
+            <Field id="sim-constr" label={t('landopp.sim.construction')} inputMode="numeric" value={sim.construction} onChange={(e) => setSim((s) => ({ ...s, construction: e.target.value }))} />
+            <Field id="sim-autres" label={t('landopp.sim.autres')} inputMode="numeric" value={sim.autres} onChange={(e) => setSim((s) => ({ ...s, autres: e.target.value }))} />
+            <Field id="sim-marge" label={t('landopp.sim.marge')} inputMode="decimal" value={sim.marge} onChange={(e) => setSim((s) => ({ ...s, marge: e.target.value }))} />
           </div>
           {simResult && simOpp ? (
             <>
               <div className="mt-4">
                 <KpiRow
                   items={[
-                    { label: t('foncier.sim.result'), value: money(simResult.chargeAdmissible.toMajorNumber(), simOpp.countryCode), accent: simResult.chargeAdmissible.isNegative() },
-                    { label: t('foncier.sim.perM2'), value: simM2 ? money(simM2.toMajorNumber(), simOpp.countryCode) : '—' },
-                    { label: t('foncier.col.price'), value: money(simOpp.priceAsked, simOpp.countryCode) },
-                    { label: t('foncier.sim.nego'), value: simNego ? money(simNego.toMajorNumber(), simOpp.countryCode) : '—', accent: simNego?.isNegative() ?? false },
+                    { label: t('landopp.sim.result'), value: money(simResult.chargeAdmissible.toMajorNumber(), simOpp.countryCode), accent: simResult.chargeAdmissible.isNegative() },
+                    { label: t('landopp.sim.perM2'), value: simM2 ? money(simM2.toMajorNumber(), simOpp.countryCode) : '—' },
+                    { label: t('landopp.col.price'), value: money(simOpp.priceAsked, simOpp.countryCode) },
+                    { label: t('landopp.sim.nego'), value: simNego ? money(simNego.toMajorNumber(), simOpp.countryCode) : '—', accent: simNego?.isNegative() ?? false },
                   ]}
                 />
               </div>
-              {simNego?.isNegative() && <div className="mt-3"><Banner tone="danger">{t('foncier.sim.tooExpensive')}</Banner></div>}
+              {simNego?.isNegative() && <div className="mt-3"><Banner tone="danger">{t('landopp.sim.tooExpensive')}</Banner></div>}
             </>
           ) : (
-            <div className="mt-3 text-[13px] text-ink-3">{t('foncier.sim.hint')}</div>
+            <div className="mt-3 text-[13px] text-ink-3">{t('landopp.sim.hint')}</div>
           )}
         </Panel>
       )}
 
-      <div className="text-[12px] text-ink-3">{t('foncier.subtitle')}</div>
+      <div className="text-[12px] text-ink-3">{t('landopp.subtitle')}</div>
     </div>
   );
 }

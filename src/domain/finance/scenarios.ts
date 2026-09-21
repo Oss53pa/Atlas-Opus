@@ -78,11 +78,11 @@ export function sensitivity(base: BilanBase, axis: SensitivityAxis, deltas: numb
 /**
  * Point mort sur un axe : delta (au 0,1 % près) à partir duquel la marge
  * s'annule — baisse des recettes ou hausse des coûts. null si la marge ne
- * bascule pas dans l'intervalle ±50 %, ou si elle est déjà nulle ou négative.
+ * bascule pas dans l'intervalle ±100 %, ou si elle est déjà nulle ou négative.
  */
 export function pointMort(base: BilanBase, axis: SensitivityAxis): number | null {
   const sign = axis === 'revenue' ? -1 : 1;
-  for (let i = 0; i <= 500; i++) {
+  for (let i = 0; i <= 1000; i++) {
     const delta = sign * i * 0.001;
     if (!applyScenario(base, onAxis(axis, delta)).marge.isPositive()) return i === 0 ? null : delta;
   }
