@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo, NonConformitiesRepo, NonConformityPatch } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo, NonConformitiesRepo, NonConformityPatch, SuppliersRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus, HsseInspection, HsseInspectionInput } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -76,6 +76,9 @@ import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types'
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch, PropertyType, OpportunityStatus, Decision as OpportunityDecision } from '../../domain/landOpportunity/types';
 import type { NonConformity, NonConformityInput, NcSource, NcSeverity, NcStatus } from '../../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch, SupplierCategory, SupplierStatus } from '../../domain/supplier/types';
+import { canTransitionSupplier } from '../../domain/supplier/supplier';
+import type { Delivery, DeliveryInput } from '../../domain/m10/types';
 import { evaluateNcTransition } from '../../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../../domain/bpuItem/types';
@@ -2436,12 +2439,12 @@ export function createSupabaseReceptionRepo(client: SupabaseClient, session: Ses
 
 // ── Achats & logistique (M10) ────────────────────────────────────────────────
 interface PurchaseOrderRow {
-  id: string; tenant_id: string; operation_id: string; reference: string; supplier: string;
+  id: string; tenant_id: string; operation_id: string; reference: string; supplier: string; supplier_id: string | null;
   item: string; quantity: number | string; unit: string; amount: number | string; status: string;
 }
 function toPurchaseOrder(r: PurchaseOrderRow): PurchaseOrder {
   return {
-    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, supplier: r.supplier,
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, supplier: r.supplier, supplierId: r.supplier_id ?? null,
     item: r.item, quantity: Number(r.quantity), unit: r.unit, amount: Number(r.amount), status: r.status as PurchaseStatus,
   };
 }
@@ -2467,6 +2470,22 @@ export function createSupabasePurchasingRepo(client: SupabaseClient, session: Se
     },
     async remove(id) {
       const { error } = await client.from(PO).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async deliveries(opId) {
+      const rows = unwrap(await client.from('ao_deliveries').select('*').eq('operation_id', opId).order('date', { ascending: false })) as DeliveryRow[];
+      return rows.map(toDelivery);
+    },
+    async addDelivery(opId, input: DeliveryInput) {
+      const row = unwrap(await client.from('ao_deliveries').insert({
+        tenant_id: session.tenantId, operation_id: opId, purchase_order_id: input.purchaseOrderId,
+        date: input.date, received_rate: Math.min(1, Math.max(0, input.receivedRate)),
+        conform: input.conform ?? true, notes: input.notes?.trim() || null,
+      }).select('*').single()) as DeliveryRow;
+      return toDelivery(row);
+    },
+    async removeDelivery(id) {
+      const { error } = await client.from('ao_deliveries').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
@@ -2704,6 +2723,68 @@ export function createSupabaseNonConformitiesRepo(client: SupabaseClient, sessio
       return toNonConformity(row);
     },
     async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M10 — réceptions des bons de commande ───────────────────────────────────
+interface DeliveryRow {
+  id: string; tenant_id: string; operation_id: string; purchase_order_id: string;
+  date: string; received_rate: number | string; conform: boolean; notes: string | null;
+}
+function toDelivery(r: DeliveryRow): Delivery {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, purchaseOrderId: r.purchase_order_id,
+    date: r.date, receivedRate: Number(r.received_rate), conform: r.conform, notes: r.notes,
+  };
+}
+
+// ── M9 — référentiel fournisseurs ───────────────────────────────────────────
+interface SupplierRow {
+  id: string; tenant_id: string; name: string; category: string;
+  contact: string | null; email: string | null; tax_id: string | null; status: string;
+}
+function toSupplier(r: SupplierRow): Supplier {
+  return {
+    id: r.id, tenantId: r.tenant_id, name: r.name, category: r.category as SupplierCategory,
+    contact: r.contact, email: r.email, taxId: r.tax_id, status: r.status as SupplierStatus,
+  };
+}
+export function createSupabaseSuppliersRepo(client: SupabaseClient, session: Session): SuppliersRepo {
+  const TB = 'ao_suppliers';
+  return {
+    async list() {
+      const rows = unwrap(await client.from(TB).select('*').order('name')) as SupplierRow[];
+      return rows.map(toSupplier);
+    },
+    async add(input: SupplierInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, name: input.name.trim(), category: input.category,
+        contact: input.contact?.trim() || null, email: input.email?.trim() || null, tax_id: input.taxId?.trim() || null,
+      }).select('*').single()) as SupplierRow;
+      return toSupplier(row);
+    },
+    async update(id, patch: SupplierPatch) {
+      if (patch.status !== undefined) {
+        const current = toSupplier(unwrap(await client.from(TB).select('*').eq('id', id).single()) as SupplierRow);
+        if (patch.status !== current.status && !canTransitionSupplier(current.status, patch.status)) {
+          throw new Error('supplier_transition_invalid');
+        }
+      }
+      const upd: Record<string, unknown> = {};
+      if (patch.name !== undefined) upd.name = patch.name.trim();
+      if (patch.category !== undefined) upd.category = patch.category;
+      if (patch.contact !== undefined) upd.contact = patch.contact?.trim() || null;
+      if (patch.email !== undefined) upd.email = patch.email?.trim() || null;
+      if (patch.taxId !== undefined) upd.tax_id = patch.taxId?.trim() || null;
+      if (patch.status !== undefined) upd.status = patch.status;
+      const row = unwrap(await client.from(TB).update(upd).eq('id', id).select('*').single()) as SupplierRow;
+      return toSupplier(row);
+    },
+    async remove(id) {
+      // La contrainte ON DELETE RESTRICT protège les fournisseurs déjà commandés.
       const { error } = await client.from(TB).delete().eq('id', id);
       if (error) throw new Error(error.message);
     },

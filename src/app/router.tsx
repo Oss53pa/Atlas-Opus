@@ -71,6 +71,7 @@ export type Route =
   | { name: 'approbations' }
   | { name: 'scenarios'; id: string }
   | { name: 'nc'; id: string }
+  | { name: 'fournisseurs' }
   | { name: 'foncier' }
   | { name: 'syncQueue' };
 

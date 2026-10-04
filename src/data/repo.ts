@@ -63,7 +63,7 @@ import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
-import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
+import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus, Delivery, DeliveryInput } from '../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
@@ -94,6 +94,7 @@ import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
 import type { NonConformity, NonConformityInput, NcStatus } from '../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch } from '../domain/supplier/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
@@ -541,6 +542,18 @@ export interface PurchasingRepo {
   list(operationId: string): Promise<PurchaseOrder[]>;
   add(operationId: string, input: PurchaseOrderInput): Promise<PurchaseOrder>;
   setStatus(id: string, status: PurchaseStatus): Promise<PurchaseOrder>;
+  remove(id: string): Promise<void>;
+  /** Réceptions (totales ou partielles) des bons de commande de l'opération. */
+  deliveries(operationId: string): Promise<Delivery[]>;
+  addDelivery(operationId: string, input: DeliveryInput): Promise<Delivery>;
+  removeDelivery(id: string): Promise<void>;
+}
+
+/** M9 — référentiel fournisseurs (niveau espace, réutilisable entre opérations). */
+export interface SuppliersRepo {
+  list(): Promise<Supplier[]>;
+  add(input: SupplierInput): Promise<Supplier>;
+  update(id: string, patch: SupplierPatch): Promise<Supplier>;
   remove(id: string): Promise<void>;
 }
 

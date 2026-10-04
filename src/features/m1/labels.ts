@@ -1,4 +1,5 @@
 import type { NcSeverity, NcSource, NcStatus } from '../../domain/nonConformity/types';
+import type { SupplierCategory, SupplierStatus } from '../../domain/supplier/types';
 import { t, type MessageKey } from '../../i18n';
 import { getCountry } from '../../domain/country';
 import { posteKey } from '../../domain/finance/postes';
@@ -809,4 +810,11 @@ export const NC_SEVERITY_TONE: Record<NcSeverity, BadgeTone> = {
 };
 export const NC_STATUS_TONE: Record<NcStatus, BadgeTone> = {
   ouverte: 'warning', en_traitement: 'info', soldee: 'success',
+};
+
+// ── M9 — référentiel fournisseurs ──────────────────────────────────────────
+export const supplierCategoryLabel = (c: SupplierCategory) => t(`supplier.category.${c}` as MessageKey);
+export const supplierStatusLabel = (s: SupplierStatus) => t(`supplier.status.${s}` as MessageKey);
+export const SUPPLIER_STATUS_TONE: Record<SupplierStatus, BadgeTone> = {
+  en_referencement: 'neutral', actif: 'success', ecarte: 'danger',
 };

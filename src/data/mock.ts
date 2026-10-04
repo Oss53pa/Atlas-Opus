@@ -82,6 +82,9 @@ import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
 import type { NonConformity, NonConformityInput } from '../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch } from '../domain/supplier/types';
+import { canTransitionSupplier } from '../domain/supplier/supplier';
+import type { Delivery, DeliveryInput } from '../domain/m10/types';
 import { evaluateNcTransition } from '../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
@@ -157,6 +160,7 @@ import type {
   PgesActionsRepo,
   AlertRulesRepo,
   NonConformitiesRepo,
+  SuppliersRepo,
   NonConformityPatch,
   LandOpportunitiesRepo,
   BpuItemsRepo,
@@ -235,6 +239,8 @@ export interface MockDb {
   pgesActions: PgesAction[];
   alertRules: AlertRule[];
   nonConformities: NonConformity[];
+  suppliers: Supplier[];
+  deliveries: Delivery[];
   landOpportunities: LandOpportunity[];
   bpuItems: BpuItem[];
 }
@@ -520,10 +526,10 @@ export function createMockDb(): MockDb {
 
   // Achats & logistique (M10) — Palmiers : bons de commande d'approvisionnement.
   const purchaseOrders: PurchaseOrder[] = [
-    { id: 'po-p1', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-014', supplier: 'Ciments d\u2019Afrique', item: 'Ciment CPJ 42.5', quantity: 1200, unit: 'sacs', amount: 42_000_000, status: 'receptionne' },
-    { id: 'po-p2', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-021', supplier: 'Acier CI', item: 'Fer \u00e0 b\u00e9ton HA12', quantity: 18, unit: 't', amount: 27_000_000, status: 'livre' },
-    { id: 'po-p3', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-028', supplier: 'Menuiserie Alu Plus', item: 'Ch\u00e2ssis aluminium', quantity: 96, unit: 'u', amount: 33_000_000, status: 'commande' },
-    { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
+    { id: 'po-p1', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-014', supplierId: 'sup-1', supplier: 'Ciments d\u2019Afrique', item: 'Ciment CPJ 42.5', quantity: 1200, unit: 'sacs', amount: 42_000_000, status: 'receptionne' },
+    { id: 'po-p2', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-021', supplierId: null, supplier: 'Acier CI', item: 'Fer \u00e0 b\u00e9ton HA12', quantity: 18, unit: 't', amount: 27_000_000, status: 'livre' },
+    { id: 'po-p3', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-028', supplierId: null, supplier: 'Menuiserie Alu Plus', item: 'Ch\u00e2ssis aluminium', quantity: 96, unit: 'u', amount: 33_000_000, status: 'commande' },
+    { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplierId: null, supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
   ];
 
   // Réception & GPA (M19) — Palmiers : réserves de pré-réception (1 majeure ouverte).
@@ -713,6 +719,17 @@ export function createMockDb(): MockDb {
     { id: 'lo-2', tenantId: T, reference: 'OPP-2026-002', name: 'Friche industrielle Yopougon', propertyType: 'friche', countryCode: 'CI', city: 'Abidjan', totalSurface: 8600, buildableSurface: 9200, priceAsked: 410_000_000, estimatedValue: 430_000_000, status: 'etude', decision: 'pending', probability: 0.3, discoveryDate: '2026-04-02', decisionDeadline: '2026-11-15', notes: 'Dépollution à chiffrer.', operationId: null },
     { id: 'lo-3', tenantId: T, reference: 'OPP-2025-014', name: 'Terrain Almadies', propertyType: 'terrain_viabilise', countryCode: 'SN', city: 'Dakar', totalSurface: 1800, buildableSurface: 4300, priceAsked: 780_000_000, estimatedValue: 760_000_000, status: 'abandonnee', decision: 'no_go', probability: 0, discoveryDate: '2025-11-20', decisionDeadline: null, notes: 'Charge foncière hors marché.', operationId: null },
   ];
+  // Référentiel fournisseurs (M9) — niveau espace, réutilisé d'une opération à l'autre.
+  const suppliers: Supplier[] = [
+    { id: 'sup-1', tenantId: T, name: 'Ciments d’Afrique', category: 'fournitures', contact: 'K. Traoré', email: 'ventes@cimaf.ci', taxId: 'CI-RCCM-114277', status: 'actif' },
+    { id: 'sup-2', tenantId: T, name: 'Sogefi BTP', category: 'travaux', contact: 'A. Bamba', email: 'contact@sogefi.ci', taxId: null, status: 'actif' },
+    { id: 'sup-3', tenantId: T, name: 'Loca-Engins CI', category: 'services', contact: null, email: null, taxId: null, status: 'en_referencement' },
+  ];
+  // Réceptions (M10) — le cumul des parts reçues sert le rapprochement M4.
+  const deliveries: Delivery[] = [
+    { id: 'dl-1', tenantId: T, operationId: 'op-palmiers', purchaseOrderId: 'po-p1', date: '2026-05-25', receivedRate: 0.5, conform: true, notes: '200 t livrées.' },
+    { id: 'dl-2', tenantId: T, operationId: 'op-palmiers', purchaseOrderId: 'po-p1', date: '2026-06-08', receivedRate: 0.25, conform: false, notes: 'Sacs éventrés — 12 t rebutées.' },
+  ];
   // Non-conformités (M18 qualité) — écarts au référentiel, distincts des réserves de réception.
   const nonConformities: NonConformity[] = [
     { id: 'nc-1', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-004', label: 'Enrobage insuffisant poteaux P12-P14', source: 'chantier', severity: 'majeure', location: 'R+1 aile A', correctiveAction: 'Reprise par mortier de réparation structurel.', owner: 'BTP Ivoire SA', detectedAt: '2026-05-22', dueDate: '2026-06-30', closedAt: null, status: 'en_traitement' },
@@ -777,7 +794,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities, nonConformities };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities, nonConformities, suppliers, deliveries };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -2457,7 +2474,7 @@ export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): 
     async add(opId, input: PurchaseOrderInput) {
       const o: PurchaseOrder = {
         id: id(), tenantId: session.tenantId, operationId: opId,
-        reference: input.reference.trim(), supplier: input.supplier.trim(), item: input.item.trim(),
+        reference: input.reference.trim(), supplierId: input.supplierId ?? null, supplier: input.supplier.trim(), item: input.item.trim(),
         quantity: input.quantity, unit: input.unit.trim(), amount: input.amount, status: 'brouillon',
       };
       db.purchaseOrders.push(o);
@@ -2473,6 +2490,24 @@ export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): 
     async remove(oid) {
       const i = db.purchaseOrders.findIndex((x) => x.id === oid && x.tenantId === session.tenantId);
       if (i >= 0) db.purchaseOrders.splice(i, 1);
+    },
+    async deliveries(opId) {
+      return db.deliveries
+        .filter((d) => d.operationId === opId && d.tenantId === session.tenantId)
+        .map((d) => ({ ...d }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    },
+    async addDelivery(opId, input: DeliveryInput) {
+      const d: Delivery = {
+        id: id(), tenantId: session.tenantId, operationId: opId, purchaseOrderId: input.purchaseOrderId,
+        date: input.date, receivedRate: Math.min(1, Math.max(0, input.receivedRate)),
+        conform: input.conform ?? true, notes: input.notes?.trim() || null,
+      };
+      db.deliveries.push(d);
+      return { ...d };
+    },
+    async removeDelivery(did) {
+      db.deliveries = db.deliveries.filter((x) => !(x.id === did && x.tenantId === session.tenantId));
     },
   };
 }
@@ -2643,6 +2678,39 @@ export function createNonConformitiesRepo(db: MockDb, session: Session, deps: De
     },
     async remove(nid) {
       db.nonConformities = db.nonConformities.filter((x) => !(x.id === nid && x.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createSuppliersRepo(db: MockDb, session: Session, deps: Deps): SuppliersRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = () => db.suppliers.filter((s) => s.tenantId === session.tenantId);
+  return {
+    async list() {
+      return mine().map((s) => ({ ...s })).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    },
+    async add(input: SupplierInput) {
+      const s: Supplier = {
+        id: id(), tenantId: session.tenantId, name: input.name.trim(), category: input.category,
+        contact: input.contact?.trim() || null, email: input.email?.trim() || null,
+        taxId: input.taxId?.trim() || null, status: 'en_referencement',
+      };
+      db.suppliers.push(s);
+      return { ...s };
+    },
+    async update(sid, patch: SupplierPatch) {
+      const s = db.suppliers.find((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (!s) throw new Error('supplier_not_found');
+      if (patch.status !== undefined && patch.status !== s.status && !canTransitionSupplier(s.status, patch.status)) {
+        throw new Error('supplier_transition_invalid');
+      }
+      Object.assign(s, patch);
+      return { ...s };
+    },
+    async remove(sid) {
+      // Un fournisseur cité par un bon de commande n'est pas supprimé : il est écarté.
+      if (db.purchaseOrders.some((o) => o.supplierId === sid)) throw new Error('supplier_in_use');
+      db.suppliers = db.suppliers.filter((x) => !(x.id === sid && x.tenantId === session.tenantId));
     },
   };
 }

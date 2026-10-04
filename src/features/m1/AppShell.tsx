@@ -224,6 +224,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         { name: 'approbations', labelKey: 'appro.title' },
         { name: 'notifications', labelKey: 'notif.title' },
         { name: 'syncQueue', labelKey: 'sync.nav' },
+        { name: 'fournisseurs', labelKey: 'supplier.title' },
         { name: 'membres', labelKey: 'membres.title' },
         { name: 'integrations', labelKey: 'f5.title' },
         { name: 'alertes', labelKey: 'alert.title' },

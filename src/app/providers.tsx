@@ -49,6 +49,7 @@ import {
   createAlertRulesRepo,
   createLandOpportunitiesRepo,
   createNonConformitiesRepo,
+  createSuppliersRepo,
   createBpuItemsRepo,
 } from '../data/mock';
 import type {
@@ -104,6 +105,7 @@ import type {
   AlertRulesRepo,
   LandOpportunitiesRepo,
   NonConformitiesRepo,
+  SuppliersRepo,
   BpuItemsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
@@ -152,6 +154,8 @@ import type { PgesAction } from '../domain/pgesAction/types';
 import type { AlertRule } from '../domain/alertRule/types';
 import type { LandOpportunity } from '../domain/landOpportunity/types';
 import type { NonConformity } from '../domain/nonConformity/types';
+import type { Supplier } from '../domain/supplier/types';
+import type { Delivery } from '../domain/m10/types';
 import type { BpuItem } from '../domain/bpuItem/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
@@ -209,6 +213,7 @@ import {
   createSupabaseAlertRulesRepo,
   createSupabaseLandOpportunitiesRepo,
   createSupabaseNonConformitiesRepo,
+  createSupabaseSuppliersRepo,
   createSupabaseBpuItemsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
@@ -265,6 +270,7 @@ interface DataApi {
   alertRules: AlertRulesRepo;
   landOpportunities: LandOpportunitiesRepo;
   nonConformities: NonConformitiesRepo;
+  suppliers: SuppliersRepo;
   bpuItems: BpuItemsRepo;
   session: Session;
   countries: CountryConfig[];
@@ -332,6 +338,7 @@ function buildMockApi(): DataApi {
     alertRules: createAlertRulesRepo(db, session, { telemetry }),
     landOpportunities: createLandOpportunitiesRepo(db, session, { telemetry }),
     nonConformities: createNonConformitiesRepo(db, session, { telemetry }),
+    suppliers: createSuppliersRepo(db, session, { telemetry }),
     bpuItems: createBpuItemsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
@@ -447,6 +454,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           alertRules: createSupabaseAlertRulesRepo(supabase, session),
           landOpportunities: createSupabaseLandOpportunitiesRepo(supabase, session),
           nonConformities: createSupabaseNonConformitiesRepo(supabase, session),
+          suppliers: createSupabaseSuppliersRepo(supabase, session),
           bpuItems: createSupabaseBpuItemsRepo(supabase, session),
           session,
           countries: COUNTRIES,
@@ -785,6 +793,16 @@ export function useLandOpportunities(): AsyncState<LandOpportunity[]> {
 export function useNonConformities(operationId: string): AsyncState<NonConformity[]> {
   const { nonConformities } = useData();
   return useAsync(() => nonConformities.list(operationId), [nonConformities, operationId]);
+}
+
+export function useSuppliers(): AsyncState<Supplier[]> {
+  const { suppliers } = useData();
+  return useAsync(() => suppliers.list(), [suppliers]);
+}
+
+export function useDeliveries(operationId: string): AsyncState<Delivery[]> {
+  const { purchasing } = useData();
+  return useAsync(() => purchasing.deliveries(operationId), [purchasing, operationId]);
 }
 
 export function useBpuItems(contractId: string): AsyncState<BpuItem[]> {
