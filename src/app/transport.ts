@@ -21,6 +21,7 @@ import type { RiskCategory } from '../domain/m20/types';
 import type { UtilityType } from '../domain/m18/types';
 import type { StudyKind } from '../domain/m3/types';
 import type { HsseKind, HsseSeverity } from '../domain/hsse/types';
+import type { NcSeverity, NcSource } from '../domain/nonConformity/types';
 import type { DoeCategory } from '../domain/doe/types';
 import type { AssetType } from '../domain/handoverAssets/types';
 import type { BaselineTask } from '../domain/baseline/types';
@@ -31,7 +32,7 @@ import type { Incoterm } from '../domain/shipment/types';
 import type { CriterionType } from '../domain/evaluationCriterion/types';
 import { Money } from '../domain/money/Money';
 
-type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores' | 'pgesActions' | 'bpuItems'>;
+type TransportDeps = Pick<DataApi, 'siteReports' | 'payments' | 'rfis' | 'reception' | 'purchasing' | 'documents' | 'commercialisation' | 'compliance' | 'revisions' | 'stakeholders' | 'financing' | 'guarantees' | 'changeOrders' | 'risks' | 'connections' | 'planning' | 'studies' | 'hsse' | 'disputes' | 'claims' | 'doe' | 'handoverAssets' | 'baselines' | 'legalEntities' | 'actionItems' | 'serviceOrders' | 'eiesItems' | 'shipments' | 'budgetLines' | 'evaluationCriteria' | 'offerScores' | 'pgesActions' | 'bpuItems' | 'nonConformities'>;
 
 interface SiteReportCreatePayload {
   operationId: string;
@@ -286,6 +287,17 @@ interface DisputeCreatePayload {
 
 // M19 (HSSE) — incident terrain (fait, non écriture) : créé « déclaré » ;
 // payload JSON-safe (dates ISO, énumérés).
+interface NonConformityCreatePayload {
+  operationId: string;
+  reference: string;
+  label: string;
+  source: NcSource;
+  severity: NcSeverity;
+  location?: string | null;
+  owner?: string | null;
+  detectedAt: string;
+  dueDate?: string | null;
+}
 interface HsseInspectionCreatePayload {
   operationId: string;
   date: string;
@@ -611,6 +623,15 @@ async function dispatch(api: TransportDeps, m: PendingMutation): Promise<SettleR
       reference: p.reference, kind: p.kind, severity: p.severity, occurredAt: p.occurredAt,
       location: p.location ?? null, description: p.description, correctiveAction: p.correctiveAction ?? null,
       daysLost: p.daysLost ?? 0,
+    });
+    return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
+  }
+  // M18 (qualité) — non-conformité constatée sur site, créée « ouverte » : rejouable.
+  if (m.entity === 'nonConformities' && m.op === 'create') {
+    const p = m.payload as unknown as NonConformityCreatePayload;
+    const __rec = await api.nonConformities.add(p.operationId, {
+      reference: p.reference, label: p.label, source: p.source, severity: p.severity,
+      location: p.location ?? null, owner: p.owner ?? null, detectedAt: p.detectedAt, dueDate: p.dueDate ?? null,
     });
     return { ok: true, serverId: (__rec as { id?: string } | undefined)?.id };
   }

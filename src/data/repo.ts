@@ -93,6 +93,7 @@ import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/ev
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput, NcStatus } from '../domain/nonConformity/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
@@ -540,6 +541,22 @@ export interface PurchasingRepo {
   list(operationId: string): Promise<PurchaseOrder[]>;
   add(operationId: string, input: PurchaseOrderInput): Promise<PurchaseOrder>;
   setStatus(id: string, status: PurchaseStatus): Promise<PurchaseOrder>;
+  remove(id: string): Promise<void>;
+}
+
+/** M18 (qualité) — registre des non-conformités d'une opération. */
+export interface NonConformityPatch {
+  status?: NcStatus;
+  correctiveAction?: string | null;
+  owner?: string | null;
+  dueDate?: string | null;
+}
+
+export interface NonConformitiesRepo {
+  list(operationId: string): Promise<NonConformity[]>;
+  add(operationId: string, input: NonConformityInput): Promise<NonConformity>;
+  /** Le solde exige une action corrective (RG-NC-02) : patch + statut en une étape. */
+  update(id: string, patch: NonConformityPatch): Promise<NonConformity>;
   remove(id: string): Promise<void>;
 }
 

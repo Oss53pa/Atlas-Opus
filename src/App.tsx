@@ -76,6 +76,7 @@ import { NotificationsScreen } from './features/m1/NotificationsScreen';
 import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
 import { ScenariosScreen } from './features/m1/ScenariosScreen';
+import { QualiteScreen } from './features/m1/QualiteScreen';
 import { FoncierScreen } from './features/m1/FoncierScreen';
 import { t } from './i18n';
 
@@ -204,6 +205,8 @@ function RouteView() {
       return <CopiloteScreen id={route.id} />;
     case 'etats':
       return <EtatsScreen />;
+    case 'nc':
+      return <QualiteScreen id={route.id} />;
     case 'foncier':
       return <FoncierScreen />;
     case 'workspaces':

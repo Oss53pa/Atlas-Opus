@@ -81,6 +81,8 @@ import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput } from '../domain/nonConformity/types';
+import { evaluateNcTransition } from '../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
@@ -154,6 +156,8 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  NonConformitiesRepo,
+  NonConformityPatch,
   LandOpportunitiesRepo,
   BpuItemsRepo,
 } from './repo';
@@ -230,6 +234,7 @@ export interface MockDb {
   offerScores: OfferScore[];
   pgesActions: PgesAction[];
   alertRules: AlertRule[];
+  nonConformities: NonConformity[];
   landOpportunities: LandOpportunity[];
   bpuItems: BpuItem[];
 }
@@ -708,6 +713,12 @@ export function createMockDb(): MockDb {
     { id: 'lo-2', tenantId: T, reference: 'OPP-2026-002', name: 'Friche industrielle Yopougon', propertyType: 'friche', countryCode: 'CI', city: 'Abidjan', totalSurface: 8600, buildableSurface: 9200, priceAsked: 410_000_000, estimatedValue: 430_000_000, status: 'etude', decision: 'pending', probability: 0.3, discoveryDate: '2026-04-02', decisionDeadline: '2026-11-15', notes: 'Dépollution à chiffrer.', operationId: null },
     { id: 'lo-3', tenantId: T, reference: 'OPP-2025-014', name: 'Terrain Almadies', propertyType: 'terrain_viabilise', countryCode: 'SN', city: 'Dakar', totalSurface: 1800, buildableSurface: 4300, priceAsked: 780_000_000, estimatedValue: 760_000_000, status: 'abandonnee', decision: 'no_go', probability: 0, discoveryDate: '2025-11-20', decisionDeadline: null, notes: 'Charge foncière hors marché.', operationId: null },
   ];
+  // Non-conformités (M18 qualité) — écarts au référentiel, distincts des réserves de réception.
+  const nonConformities: NonConformity[] = [
+    { id: 'nc-1', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-004', label: 'Enrobage insuffisant poteaux P12-P14', source: 'chantier', severity: 'majeure', location: 'R+1 aile A', correctiveAction: 'Reprise par mortier de réparation structurel.', owner: 'BTP Ivoire SA', detectedAt: '2026-05-22', dueDate: '2026-06-30', closedAt: null, status: 'en_traitement' },
+    { id: 'nc-2', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-005', label: 'Absence de PV d’essai béton — coulage du 14/04', source: 'audit', severity: 'critique', location: null, correctiveAction: null, owner: 'MOE', detectedAt: '2026-04-18', dueDate: '2026-05-15', closedAt: null, status: 'ouverte' },
+    { id: 'nc-3', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-003', label: 'Lot carrelage non conforme à l’échantillon', source: 'fournisseur', severity: 'mineure', location: null, correctiveAction: 'Remplacement intégral du lot livré.', owner: 'Achats', detectedAt: '2026-03-08', dueDate: '2026-04-01', closedAt: '2026-03-29', status: 'soldee' },
+  ];
   const alertRules: AlertRule[] = [
     { id: 'ar-1', tenantId: T, metric: 'depassement_budget_pct', threshold: 5, severity: 'critical' },
     { id: 'ar-2', tenantId: T, metric: 'retard_jours', threshold: 15, severity: 'warning' },
@@ -766,7 +777,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities, nonConformities };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -2594,6 +2605,44 @@ export function createLandOpportunitiesRepo(db: MockDb, session: Session, deps: 
     },
     async remove(oid) {
       db.landOpportunities = db.landOpportunities.filter((x) => !(x.id === oid && x.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createNonConformitiesRepo(db: MockDb, session: Session, deps: Deps): NonConformitiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.nonConformities).filter((n) => n.operationId === opId).map((n) => ({ ...n }));
+    },
+    async add(opId, input: NonConformityInput) {
+      const n: NonConformity = {
+        id: id(), tenantId: session.tenantId, operationId: opId, reference: input.reference.trim(),
+        label: input.label.trim(), source: input.source, severity: input.severity,
+        location: input.location?.trim() || null, correctiveAction: input.correctiveAction?.trim() || null,
+        owner: input.owner?.trim() || null, detectedAt: input.detectedAt, dueDate: input.dueDate ?? null,
+        closedAt: null, status: 'ouverte',
+      };
+      db.nonConformities.push(n);
+      return { ...n };
+    },
+    async update(nid, patch: NonConformityPatch) {
+      const n = db.nonConformities.find((x) => x.id === nid && x.tenantId === session.tenantId);
+      if (!n) throw new Error('nc_not_found');
+      if (patch.correctiveAction !== undefined) n.correctiveAction = patch.correctiveAction?.trim() || null;
+      if (patch.owner !== undefined) n.owner = patch.owner?.trim() || null;
+      if (patch.dueDate !== undefined) n.dueDate = patch.dueDate;
+      if (patch.status !== undefined && patch.status !== n.status) {
+        const d = evaluateNcTransition(n.status, patch.status, { correctiveAction: n.correctiveAction });
+        if (!d.ok) throw new Error(`nc_${d.code}`);
+        n.status = d.to;
+        n.closedAt = d.to === 'soldee' ? new Date().toISOString().slice(0, 10) : null;
+      }
+      return { ...n };
+    },
+    async remove(nid) {
+      db.nonConformities = db.nonConformities.filter((x) => !(x.id === nid && x.tenantId === session.tenantId));
     },
   };
 }

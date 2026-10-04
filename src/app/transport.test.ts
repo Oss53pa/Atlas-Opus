@@ -242,6 +242,19 @@ describe('createRepoTransport — rejeu concret', () => {
     expect(calls[0]).toMatchObject({ contractId: 'ct-1', input: { code: '01.01', label: 'Béton', unit: 'm3', unitPrice: 95000 } });
   });
 
+  it('nonConformities.create -> appelle nonConformities.add et renvoie ok', async () => {
+    const calls: unknown[] = [];
+    const api = {
+      siteReports: { add: async () => { throw new Error('nope'); } },
+      nonConformities: { add: async (opId: string, input: unknown) => { calls.push({ opId, input }); return {} as never; } },
+    };
+    const res = await createRepoTransport(api as never)(
+      mutation({ entity: 'nonConformities', op: 'create', payload: { operationId: 'op-1', reference: 'NC-9', label: 'Ecart', source: 'chantier', severity: 'critique', detectedAt: '2026-06-01' } }),
+    );
+    expect(res).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ opId: 'op-1', input: { reference: 'NC-9', severity: 'critique', source: 'chantier', dueDate: null } });
+  });
+
   it('hsseInspections.create → appelle hsse.addInspection avec les heures déclarées', async () => {
     const calls: unknown[] = [];
     const api = {

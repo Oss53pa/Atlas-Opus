@@ -57,7 +57,7 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo, NonConformitiesRepo, NonConformityPatch } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
 import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus, HsseInspection, HsseInspectionInput } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
@@ -75,6 +75,8 @@ import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } fro
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
 import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch, PropertyType, OpportunityStatus, Decision as OpportunityDecision } from '../../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput, NcSource, NcSeverity, NcStatus } from '../../domain/nonConformity/types';
+import { evaluateNcTransition } from '../../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../../domain/bpuItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
@@ -2644,6 +2646,62 @@ export function createSupabaseLandOpportunitiesRepo(client: SupabaseClient, sess
       }
       const row = unwrap(await q.select('*').single()) as LandOpportunityRow;
       return toLandOpportunity(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M18 (qualité) — non-conformités ─────────────────────────────────────────
+interface NonConformityRow {
+  id: string; tenant_id: string; operation_id: string; reference: string; label: string;
+  source: string; severity: string; location: string | null; corrective_action: string | null;
+  owner: string | null; detected_at: string; due_date: string | null; closed_at: string | null; status: string;
+}
+function toNonConformity(r: NonConformityRow): NonConformity {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, label: r.label,
+    source: r.source as NcSource, severity: r.severity as NcSeverity, location: r.location,
+    correctiveAction: r.corrective_action, owner: r.owner, detectedAt: r.detected_at,
+    dueDate: r.due_date, closedAt: r.closed_at, status: r.status as NcStatus,
+  };
+}
+export function createSupabaseNonConformitiesRepo(client: SupabaseClient, session: Session): NonConformitiesRepo {
+  const TB = 'ao_non_conformities';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('detected_at', { ascending: false })) as NonConformityRow[];
+      return rows.map(toNonConformity);
+    },
+    async add(opId, input: NonConformityInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, reference: input.reference.trim(), label: input.label.trim(),
+        source: input.source, severity: input.severity, location: input.location?.trim() || null,
+        corrective_action: input.correctiveAction?.trim() || null, owner: input.owner?.trim() || null,
+        detected_at: input.detectedAt, due_date: input.dueDate ?? null,
+      }).select('*').single()) as NonConformityRow;
+      return toNonConformity(row);
+    },
+    async update(id, patch: NonConformityPatch) {
+      const current = toNonConformity(unwrap(await client.from(TB).select('*').eq('id', id).single()) as NonConformityRow);
+      const corrective = patch.correctiveAction !== undefined
+        ? (patch.correctiveAction?.trim() || null)
+        : current.correctiveAction;
+      const upd: Record<string, unknown> = {};
+      if (patch.correctiveAction !== undefined) upd.corrective_action = corrective;
+      if (patch.owner !== undefined) upd.owner = patch.owner?.trim() || null;
+      if (patch.dueDate !== undefined) upd.due_date = patch.dueDate;
+      if (patch.status !== undefined && patch.status !== current.status) {
+        // RG-NC-02 revérifiée côté données : pas de solde sans action corrective.
+        const d = evaluateNcTransition(current.status, patch.status, { correctiveAction: corrective });
+        if (!d.ok) throw new Error(`nc_${d.code}`);
+        upd.status = d.to;
+        upd.closed_at = d.to === 'soldee' ? new Date().toISOString().slice(0, 10) : null;
+      }
+      const row = unwrap(await client.from(TB).update(upd).eq('id', id).select('*').single()) as NonConformityRow;
+      return toNonConformity(row);
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);

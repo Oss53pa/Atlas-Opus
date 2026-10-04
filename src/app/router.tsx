@@ -70,6 +70,7 @@ export type Route =
   | { name: 'notifications' }
   | { name: 'approbations' }
   | { name: 'scenarios'; id: string }
+  | { name: 'nc'; id: string }
   | { name: 'foncier' }
   | { name: 'syncQueue' };
 

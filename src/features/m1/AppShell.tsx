@@ -86,6 +86,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M15', labelKey: 'mod.m15', route: 'modifications' },
       { code: 'M18', labelKey: 'mod.m18', route: 'raccordements' },
       { code: 'M19', labelKey: 'mod.m19', route: 'reception' },
+      { code: 'NC', labelKey: 'mod.nc', route: 'nc' },
     ],
   },
   {
