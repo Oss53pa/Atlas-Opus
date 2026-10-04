@@ -1,3 +1,5 @@
+import type { NcSeverity, NcSource, NcStatus } from '../../domain/nonConformity/types';
+import type { SupplierCategory, SupplierStatus } from '../../domain/supplier/types';
 import { t, type MessageKey } from '../../i18n';
 import { getCountry } from '../../domain/country';
 import { posteKey } from '../../domain/finance/postes';
@@ -798,3 +800,21 @@ export const unitStatusLabel = (s: UnitStatus) => t(UNIT_STATUS_KEY[s]);
 export const saleKindLabel = (k: SaleKind) => t(SALE_KIND_KEY[k]);
 export const saleStatusLabel = (s: SaleStatus) => t(SALE_STATUS_KEY[s]);
 export const receiptStatusLabel = (s: ReceiptStatus) => t(RECEIPT_STATUS_KEY[s]);
+
+// ── M18 (qualité) — non-conformités ────────────────────────────────────────
+export const ncSourceLabel = (s: NcSource) => t(`nc.source.${s}` as MessageKey);
+export const ncSeverityLabel = (s: NcSeverity) => t(`nc.severity.${s}` as MessageKey);
+export const ncStatusLabel = (s: NcStatus) => t(`nc.status.${s}` as MessageKey);
+export const NC_SEVERITY_TONE: Record<NcSeverity, BadgeTone> = {
+  mineure: 'neutral', majeure: 'warning', critique: 'danger',
+};
+export const NC_STATUS_TONE: Record<NcStatus, BadgeTone> = {
+  ouverte: 'warning', en_traitement: 'info', soldee: 'success',
+};
+
+// ── M9 — référentiel fournisseurs ──────────────────────────────────────────
+export const supplierCategoryLabel = (c: SupplierCategory) => t(`supplier.category.${c}` as MessageKey);
+export const supplierStatusLabel = (s: SupplierStatus) => t(`supplier.status.${s}` as MessageKey);
+export const SUPPLIER_STATUS_TONE: Record<SupplierStatus, BadgeTone> = {
+  en_referencement: 'neutral', actif: 'success', ecarte: 'danger',
+};

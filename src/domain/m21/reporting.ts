@@ -105,3 +105,20 @@ export function reportToMarkdown(
     ``,
   ].join('\n');
 }
+
+/**
+ * Historique des clichés sous forme tabulaire (export CSV, transposé d'Advancity) :
+ * une ligne par cliché, du plus ancien au plus récent pour lire la tendance.
+ * Valeurs brutes (montants majeurs, ratios) : le formatage reste au tableur.
+ */
+export function reportHistoryRows(snaps: ReportSnapshot[]): (string | number | null)[][] {
+  return [...snaps]
+    .sort((a, b) => a.generatedAt.localeCompare(b.generatedAt))
+    .map((s) => [
+      s.generatedAt.slice(0, 10), s.type, s.period,
+      Math.round(s.data.coutTotal), Math.round(s.data.recettes), Math.round(s.data.recettesRealisees),
+      Math.round(s.data.marge), Number(s.data.tauxMarge.toFixed(4)),
+      s.data.tri === null ? null : Number(s.data.tri.toFixed(4)),
+      Number(s.data.progress.toFixed(4)), s.data.alertsDanger, s.data.alertsEcheance,
+    ]);
+}

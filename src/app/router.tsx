@@ -69,6 +69,11 @@ export type Route =
   | { name: 'alertes' }
   | { name: 'notifications' }
   | { name: 'approbations' }
+  | { name: 'scenarios'; id: string }
+  | { name: 'nc'; id: string }
+  | { name: 'portail'; id: string }
+  | { name: 'fournisseurs' }
+  | { name: 'foncier' }
   | { name: 'syncQueue' };
 
 interface NavApi {

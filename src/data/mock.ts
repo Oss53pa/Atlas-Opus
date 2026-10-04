@@ -59,7 +59,7 @@ import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantIn
 import { normalizeScope } from '../domain/admin/onboarding';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
 import { canManualRetry } from '../domain/f5/contract';
-import type { HsseIncident, HsseIncidentInput } from '../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseInspection, HsseInspectionInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput } from '../domain/litige/types';
 import type { Claim, ClaimInput } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
@@ -80,6 +80,12 @@ import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/ev
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput } from '../domain/pgesAction/types';
 import { canTransitionPges } from '../domain/pgesAction';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput } from '../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch } from '../domain/supplier/types';
+import { canTransitionSupplier } from '../domain/supplier/supplier';
+import type { Delivery, DeliveryInput } from '../domain/m10/types';
+import { evaluateNcTransition } from '../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import { decompteNet, nextDecompteStatus } from '../domain/payments/decompte';
@@ -153,6 +159,10 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  NonConformitiesRepo,
+  SuppliersRepo,
+  NonConformityPatch,
+  LandOpportunitiesRepo,
   BpuItemsRepo,
 } from './repo';
 
@@ -212,6 +222,7 @@ export interface MockDb {
   integrationEndpoints: IntegrationEndpoint[];
   outbox: OutboxMessage[];
   hsseIncidents: HsseIncident[];
+  hsseInspections: HsseInspection[];
   disputes: Dispute[];
   claims: Claim[];
   doeDocuments: DoeDocument[];
@@ -227,6 +238,10 @@ export interface MockDb {
   offerScores: OfferScore[];
   pgesActions: PgesAction[];
   alertRules: AlertRule[];
+  nonConformities: NonConformity[];
+  suppliers: Supplier[];
+  deliveries: Delivery[];
+  landOpportunities: LandOpportunity[];
   bpuItems: BpuItem[];
 }
 
@@ -450,7 +465,8 @@ export function createMockDb(): MockDb {
   // Financement (M5) — Palmiers : crédit promoteur avec deux tranches débloquées
   // (alimentent les frais_financiers du bilan, RG-M5-02).
   const financings: Financing[] = [
-    { id: 'fin-p1', tenantId: T, operationId: 'op-palmiers', source: 'credit_promoteur', amount: Money.of(1_500_000_000, 'XOF'), rate: 0.09, status: 'en_cours' },
+    { id: 'fin-p1', tenantId: T, operationId: 'op-palmiers', source: 'credit_promoteur', amount: Money.of(1_500_000_000, 'XOF'), rate: 0.09, status: 'en_cours', durationMonths: 24, repayment: 'in_fine' },
+    { id: 'fin-p2', tenantId: T, operationId: 'op-palmiers', source: 'fonds_propres', amount: Money.of(600_000_000, 'XOF'), rate: 0, status: 'accorde', durationMonths: null, repayment: 'in_fine' },
   ];
   const drawdowns: Drawdown[] = [
     { id: 'dw-p1', tenantId: T, financingId: 'fin-p1', amount: Money.of(600_000_000, 'XOF'), condition: 0.2, status: 'debloque', date: '2026-03-01' },
@@ -510,10 +526,10 @@ export function createMockDb(): MockDb {
 
   // Achats & logistique (M10) — Palmiers : bons de commande d'approvisionnement.
   const purchaseOrders: PurchaseOrder[] = [
-    { id: 'po-p1', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-014', supplier: 'Ciments d\u2019Afrique', item: 'Ciment CPJ 42.5', quantity: 1200, unit: 'sacs', amount: 42_000_000, status: 'receptionne' },
-    { id: 'po-p2', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-021', supplier: 'Acier CI', item: 'Fer \u00e0 b\u00e9ton HA12', quantity: 18, unit: 't', amount: 27_000_000, status: 'livre' },
-    { id: 'po-p3', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-028', supplier: 'Menuiserie Alu Plus', item: 'Ch\u00e2ssis aluminium', quantity: 96, unit: 'u', amount: 33_000_000, status: 'commande' },
-    { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
+    { id: 'po-p1', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-014', supplierId: 'sup-1', supplier: 'Ciments d\u2019Afrique', item: 'Ciment CPJ 42.5', quantity: 1200, unit: 'sacs', amount: 42_000_000, status: 'receptionne' },
+    { id: 'po-p2', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-021', supplierId: null, supplier: 'Acier CI', item: 'Fer \u00e0 b\u00e9ton HA12', quantity: 18, unit: 't', amount: 27_000_000, status: 'livre' },
+    { id: 'po-p3', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-028', supplierId: null, supplier: 'Menuiserie Alu Plus', item: 'Ch\u00e2ssis aluminium', quantity: 96, unit: 'u', amount: 33_000_000, status: 'commande' },
+    { id: 'po-p4', tenantId: T, operationId: 'op-palmiers', reference: 'BC-2026-031', supplierId: null, supplier: 'Sanitaire Pro', item: 'Kits sanitaires', quantity: 96, unit: 'u', amount: 15_000_000, status: 'brouillon' },
   ];
 
   // Réception & GPA (M19) — Palmiers : réserves de pré-réception (1 majeure ouverte).
@@ -656,8 +672,13 @@ export function createMockDb(): MockDb {
   ];
 
   const hsseIncidents: HsseIncident[] = [
-    { id: 'hs-1', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-003', kind: 'accident', severity: 'grave', occurredAt: '2026-08-28', location: 'R+2 aile B', description: 'Chute de plain-pied, arrêt 3 jours.', correctiveAction: 'Balisage renforcé, causerie sécurité.', status: 'en_analyse' },
-    { id: 'hs-2', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-004', kind: 'presqu_accident', severity: 'mineure', occurredAt: '2026-09-02', location: 'Zone grue', description: 'Charge balancée à proximité d’un ouvrier.', correctiveAction: null, status: 'declare' },
+    { id: 'hs-1', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-003', kind: 'accident', severity: 'grave', occurredAt: '2026-08-28', location: 'R+2 aile B', description: 'Chute de plain-pied, arrêt 3 jours.', correctiveAction: 'Balisage renforcé, causerie sécurité.', status: 'en_analyse', daysLost: 3 },
+    { id: 'hs-2', tenantId: T, operationId: 'op-palmiers', reference: 'HSSE-2026-004', kind: 'presqu_accident', severity: 'mineure', occurredAt: '2026-09-02', location: 'Zone grue', description: 'Charge balancée à proximité d’un ouvrier.', correctiveAction: null, status: 'declare', daysLost: 0 },
+  ];
+  // Visites HSSE — chaque visite déclare les heures travaillées de la période (dénominateur TF/TG).
+  const hsseInspections: HsseInspection[] = [
+    { id: 'hi-1', tenantId: T, operationId: 'op-palmiers', date: '2026-07-31', title: 'Visite HSE mensuelle — juillet', score: 86, hoursWorked: 92_000, observations: 'EPI conformes, signalétique à compléter.' },
+    { id: 'hi-2', tenantId: T, operationId: 'op-palmiers', date: '2026-08-31', title: 'Visite HSE mensuelle — août', score: 72, hoursWorked: 96_000, observations: 'Garde-corps manquants au R+3.' },
   ];
 
   const disputes: Dispute[] = [
@@ -691,6 +712,29 @@ export function createMockDb(): MockDb {
     { id: 'bpu-2', tenantId: T, contractId: 'ct-p1', code: '01.02', label: 'Acier HA (façonné, posé)', unit: 'kg', unitPrice: 1_250 },
     { id: 'bpu-3', tenantId: T, contractId: 'ct-p1', code: '02.01', label: 'Maçonnerie agglos creux 15', unit: 'm2', unitPrice: 8_500 },
     { id: 'bpu-4', tenantId: T, contractId: 'ct-p1', code: '03.01', label: 'Enduit ciment tramé', unit: 'm2', unitPrice: 4_200 },
+  ];
+  // Opportunités foncières (M2 amont) — pipeline de l'espace, avant création d'opération.
+  const landOpportunities: LandOpportunity[] = [
+    { id: 'lo-1', tenantId: T, reference: 'OPP-2026-001', name: 'Parcelle Cocody Angré', propertyType: 'terrain_nu', countryCode: 'CI', city: 'Abidjan', totalSurface: 2400, buildableSurface: 5800, priceAsked: 520_000_000, estimatedValue: 690_000_000, status: 'negociation', decision: 'pending', probability: 0.65, discoveryDate: '2026-02-14', decisionDeadline: '2026-10-31', notes: 'Zone UB — COS favorable.', operationId: null },
+    { id: 'lo-2', tenantId: T, reference: 'OPP-2026-002', name: 'Friche industrielle Yopougon', propertyType: 'friche', countryCode: 'CI', city: 'Abidjan', totalSurface: 8600, buildableSurface: 9200, priceAsked: 410_000_000, estimatedValue: 430_000_000, status: 'etude', decision: 'pending', probability: 0.3, discoveryDate: '2026-04-02', decisionDeadline: '2026-11-15', notes: 'Dépollution à chiffrer.', operationId: null },
+    { id: 'lo-3', tenantId: T, reference: 'OPP-2025-014', name: 'Terrain Almadies', propertyType: 'terrain_viabilise', countryCode: 'SN', city: 'Dakar', totalSurface: 1800, buildableSurface: 4300, priceAsked: 780_000_000, estimatedValue: 760_000_000, status: 'abandonnee', decision: 'no_go', probability: 0, discoveryDate: '2025-11-20', decisionDeadline: null, notes: 'Charge foncière hors marché.', operationId: null },
+  ];
+  // Référentiel fournisseurs (M9) — niveau espace, réutilisé d'une opération à l'autre.
+  const suppliers: Supplier[] = [
+    { id: 'sup-1', tenantId: T, name: 'Ciments d’Afrique', category: 'fournitures', contact: 'K. Traoré', email: 'ventes@cimaf.ci', taxId: 'CI-RCCM-114277', status: 'actif' },
+    { id: 'sup-2', tenantId: T, name: 'Sogefi BTP', category: 'travaux', contact: 'A. Bamba', email: 'contact@sogefi.ci', taxId: null, status: 'actif' },
+    { id: 'sup-3', tenantId: T, name: 'Loca-Engins CI', category: 'services', contact: null, email: null, taxId: null, status: 'en_referencement' },
+  ];
+  // Réceptions (M10) — le cumul des parts reçues sert le rapprochement M4.
+  const deliveries: Delivery[] = [
+    { id: 'dl-1', tenantId: T, operationId: 'op-palmiers', purchaseOrderId: 'po-p1', date: '2026-05-25', receivedRate: 0.5, conform: true, notes: '200 t livrées.' },
+    { id: 'dl-2', tenantId: T, operationId: 'op-palmiers', purchaseOrderId: 'po-p1', date: '2026-06-08', receivedRate: 0.25, conform: false, notes: 'Sacs éventrés — 12 t rebutées.' },
+  ];
+  // Non-conformités (M18 qualité) — écarts au référentiel, distincts des réserves de réception.
+  const nonConformities: NonConformity[] = [
+    { id: 'nc-1', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-004', label: 'Enrobage insuffisant poteaux P12-P14', source: 'chantier', severity: 'majeure', location: 'R+1 aile A', correctiveAction: 'Reprise par mortier de réparation structurel.', owner: 'BTP Ivoire SA', detectedAt: '2026-05-22', dueDate: '2026-06-30', closedAt: null, status: 'en_traitement' },
+    { id: 'nc-2', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-005', label: 'Absence de PV d’essai béton — coulage du 14/04', source: 'audit', severity: 'critique', location: null, correctiveAction: null, owner: 'MOE', detectedAt: '2026-04-18', dueDate: '2026-05-15', closedAt: null, status: 'ouverte' },
+    { id: 'nc-3', tenantId: T, operationId: 'op-palmiers', reference: 'NC-2026-003', label: 'Lot carrelage non conforme à l’échantillon', source: 'fournisseur', severity: 'mineure', location: null, correctiveAction: 'Remplacement intégral du lot livré.', owner: 'Achats', detectedAt: '2026-03-08', dueDate: '2026-04-01', closedAt: '2026-03-29', status: 'soldee' },
   ];
   const alertRules: AlertRule[] = [
     { id: 'ar-1', tenantId: T, metric: 'depassement_budget_pct', threshold: 5, severity: 'critical' },
@@ -750,7 +794,7 @@ export function createMockDb(): MockDb {
     },
   ];
 
-  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems };
+  return { operations, program, ctx, bilan, cashflows, stakeholders, contracts, decomptes, tasks, tenders, authorizations, insurances, dueDiligence, landParcels, titleDocuments, financings, drawdowns, units, sales, receipts, reportSnapshots, raciAssignments, decisions, studies, offers, purchaseOrders, reserves, guarantees, risks, auditLog, siteReports, changeOrders, documents, rfis, connections, library, handover, members, notifications, approvals, priceRevisions, memberGrants, integrationEndpoints, outbox, hsseIncidents, hsseInspections, disputes, claims, doeDocuments, handoverAssets, baselines, legalEntities, actionItems, serviceOrders, eiesItems, shipments, budgetLines, evaluationCriteria, offerScores, pgesActions, alertRules, bpuItems, landOpportunities, nonConformities, suppliers, deliveries };
 }
 
 // ── Helpers d'isolation (équivalent RLS en mémoire) ──────────────────────────
@@ -1321,6 +1365,7 @@ export function createFinancingRepo(db: MockDb, session: Session, deps: Deps): F
       const f: Financing = {
         id: id(), tenantId: session.tenantId, operationId: opId,
         source: input.source, amount: input.amount, rate: input.rate, status: 'negocie',
+        durationMonths: input.durationMonths ?? null, repayment: input.repayment ?? 'in_fine',
       };
       db.financings.push(f);
       return { ...f };
@@ -1645,7 +1690,7 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
         reference: input.reference.trim(), kind: input.kind, severity: input.severity,
         occurredAt: input.occurredAt, location: input.location ?? null,
         description: input.description.trim(), correctiveAction: input.correctiveAction ?? null,
-        status: 'declare',
+        status: 'declare', daysLost: Math.max(0, Math.round(input.daysLost ?? 0)),
       };
       db.hsseIncidents.push(i);
       return { ...i };
@@ -1658,6 +1703,22 @@ export function createHsseRepo(db: MockDb, session: Session, deps: Deps): HsseRe
     },
     async remove(iid) {
       db.hsseIncidents = db.hsseIncidents.filter((x) => x.id !== iid);
+    },
+    async inspections(opId) {
+      return mine(db.hsseInspections).filter((i) => i.operationId === opId).map((i) => ({ ...i }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    },
+    async addInspection(opId, input: HsseInspectionInput) {
+      const i: HsseInspection = {
+        id: id(), tenantId: session.tenantId, operationId: opId, date: input.date, title: input.title.trim(),
+        score: Math.min(100, Math.max(0, Math.round(input.score))),
+        hoursWorked: Math.max(0, Math.round(input.hoursWorked ?? 0)), observations: input.observations ?? null,
+      };
+      db.hsseInspections.push(i);
+      return { ...i };
+    },
+    async removeInspection(iid) {
+      db.hsseInspections = db.hsseInspections.filter((x) => !(x.id === iid && x.tenantId === session.tenantId));
     },
   };
 }
@@ -2413,7 +2474,7 @@ export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): 
     async add(opId, input: PurchaseOrderInput) {
       const o: PurchaseOrder = {
         id: id(), tenantId: session.tenantId, operationId: opId,
-        reference: input.reference.trim(), supplier: input.supplier.trim(), item: input.item.trim(),
+        reference: input.reference.trim(), supplierId: input.supplierId ?? null, supplier: input.supplier.trim(), item: input.item.trim(),
         quantity: input.quantity, unit: input.unit.trim(), amount: input.amount, status: 'brouillon',
       };
       db.purchaseOrders.push(o);
@@ -2429,6 +2490,24 @@ export function createPurchasingRepo(db: MockDb, session: Session, deps: Deps): 
     async remove(oid) {
       const i = db.purchaseOrders.findIndex((x) => x.id === oid && x.tenantId === session.tenantId);
       if (i >= 0) db.purchaseOrders.splice(i, 1);
+    },
+    async deliveries(opId) {
+      return db.deliveries
+        .filter((d) => d.operationId === opId && d.tenantId === session.tenantId)
+        .map((d) => ({ ...d }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    },
+    async addDelivery(opId, input: DeliveryInput) {
+      const d: Delivery = {
+        id: id(), tenantId: session.tenantId, operationId: opId, purchaseOrderId: input.purchaseOrderId,
+        date: input.date, receivedRate: Math.min(1, Math.max(0, input.receivedRate)),
+        conform: input.conform ?? true, notes: input.notes?.trim() || null,
+      };
+      db.deliveries.push(d);
+      return { ...d };
+    },
+    async removeDelivery(did) {
+      db.deliveries = db.deliveries.filter((x) => !(x.id === did && x.tenantId === session.tenantId));
     },
   };
 }
@@ -2528,6 +2607,110 @@ export function createTendersRepo(db: MockDb, session: Session, deps: Deps): Ten
     },
     async remove(tid) {
       db.tenders = db.tenders.filter((td) => !(td.id === tid && td.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createLandOpportunitiesRepo(db: MockDb, session: Session, deps: Deps): LandOpportunitiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = () => db.landOpportunities.filter((o) => o.tenantId === session.tenantId);
+  return {
+    async list() {
+      return mine().map((o) => ({ ...o })).sort((a, b) => b.discoveryDate.localeCompare(a.discoveryDate));
+    },
+    async add(input: LandOpportunityInput) {
+      const o: LandOpportunity = {
+        id: id(), tenantId: session.tenantId, reference: input.reference.trim(), name: input.name.trim(),
+        propertyType: input.propertyType, countryCode: input.countryCode, city: input.city ?? null,
+        totalSurface: input.totalSurface ?? 0, buildableSurface: input.buildableSurface ?? 0,
+        priceAsked: input.priceAsked ?? 0, estimatedValue: input.estimatedValue ?? 0,
+        status: 'prospection', decision: 'pending', probability: input.probability ?? 0.5,
+        discoveryDate: new Date().toISOString().slice(0, 10), decisionDeadline: input.decisionDeadline ?? null,
+        notes: input.notes ?? null, operationId: null,
+      };
+      db.landOpportunities.push(o);
+      return { ...o };
+    },
+    async update(oid, patch: LandOpportunityPatch) {
+      const o = db.landOpportunities.find((x) => x.id === oid && x.tenantId === session.tenantId);
+      if (!o) throw new Error('opportunity_not_found');
+      if (patch.operationId !== undefined && o.operationId !== null) throw new Error('already_converted');
+      Object.assign(o, patch);
+      return { ...o };
+    },
+    async remove(oid) {
+      db.landOpportunities = db.landOpportunities.filter((x) => !(x.id === oid && x.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createNonConformitiesRepo(db: MockDb, session: Session, deps: Deps): NonConformitiesRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = <T extends { tenantId: string }>(rows: T[]) => rows.filter((r) => r.tenantId === session.tenantId);
+  return {
+    async list(opId) {
+      return mine(db.nonConformities).filter((n) => n.operationId === opId).map((n) => ({ ...n }));
+    },
+    async add(opId, input: NonConformityInput) {
+      const n: NonConformity = {
+        id: id(), tenantId: session.tenantId, operationId: opId, reference: input.reference.trim(),
+        label: input.label.trim(), source: input.source, severity: input.severity,
+        location: input.location?.trim() || null, correctiveAction: input.correctiveAction?.trim() || null,
+        owner: input.owner?.trim() || null, detectedAt: input.detectedAt, dueDate: input.dueDate ?? null,
+        closedAt: null, status: 'ouverte',
+      };
+      db.nonConformities.push(n);
+      return { ...n };
+    },
+    async update(nid, patch: NonConformityPatch) {
+      const n = db.nonConformities.find((x) => x.id === nid && x.tenantId === session.tenantId);
+      if (!n) throw new Error('nc_not_found');
+      if (patch.correctiveAction !== undefined) n.correctiveAction = patch.correctiveAction?.trim() || null;
+      if (patch.owner !== undefined) n.owner = patch.owner?.trim() || null;
+      if (patch.dueDate !== undefined) n.dueDate = patch.dueDate;
+      if (patch.status !== undefined && patch.status !== n.status) {
+        const d = evaluateNcTransition(n.status, patch.status, { correctiveAction: n.correctiveAction });
+        if (!d.ok) throw new Error(`nc_${d.code}`);
+        n.status = d.to;
+        n.closedAt = d.to === 'soldee' ? new Date().toISOString().slice(0, 10) : null;
+      }
+      return { ...n };
+    },
+    async remove(nid) {
+      db.nonConformities = db.nonConformities.filter((x) => !(x.id === nid && x.tenantId === session.tenantId));
+    },
+  };
+}
+
+export function createSuppliersRepo(db: MockDb, session: Session, deps: Deps): SuppliersRepo {
+  const id = deps.id ?? (() => crypto.randomUUID());
+  const mine = () => db.suppliers.filter((s) => s.tenantId === session.tenantId);
+  return {
+    async list() {
+      return mine().map((s) => ({ ...s })).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    },
+    async add(input: SupplierInput) {
+      const s: Supplier = {
+        id: id(), tenantId: session.tenantId, name: input.name.trim(), category: input.category,
+        contact: input.contact?.trim() || null, email: input.email?.trim() || null,
+        taxId: input.taxId?.trim() || null, status: 'en_referencement',
+      };
+      db.suppliers.push(s);
+      return { ...s };
+    },
+    async update(sid, patch: SupplierPatch) {
+      const s = db.suppliers.find((x) => x.id === sid && x.tenantId === session.tenantId);
+      if (!s) throw new Error('supplier_not_found');
+      if (patch.status !== undefined && patch.status !== s.status && !canTransitionSupplier(s.status, patch.status)) {
+        throw new Error('supplier_transition_invalid');
+      }
+      Object.assign(s, patch);
+      return { ...s };
+    },
+    async remove(sid) {
+      // Un fournisseur cité par un bon de commande n'est pas supprimé : il est écarté.
+      if (db.purchaseOrders.some((o) => o.supplierId === sid)) throw new Error('supplier_in_use');
+      db.suppliers = db.suppliers.filter((x) => !(x.id === sid && x.tenantId === session.tenantId));
     },
   };
 }

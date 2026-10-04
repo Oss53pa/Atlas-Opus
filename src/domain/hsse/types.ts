@@ -34,6 +34,8 @@ export interface HsseIncident {
   /** Mesure corrective / action immédiate (ou null tant que non instruite). */
   correctiveAction: string | null;
   status: HsseStatus;
+  /** Journées d'arrêt de travail (0 = sans arrêt). Numérateur du taux de gravité. */
+  daysLost: number;
 }
 
 export interface HsseIncidentInput {
@@ -44,4 +46,33 @@ export interface HsseIncidentInput {
   location?: string | null;
   description: string;
   correctiveAction?: string | null;
+  daysLost?: number;
+}
+
+/**
+ * Visite / inspection de sécurité (spec M19 §6 « HSSE : incidents, inspections,
+ * taux de fréquence » ; transposé d'Advancity). Chaque visite déclare les heures
+ * travaillées sur la période écoulée : c'est le dénominateur des taux.
+ * Table : ao_hsse_inspections (opération-scopée).
+ */
+export interface HsseInspection {
+  id: string;
+  tenantId: string;
+  operationId: string;
+  /** Date de la visite (ISO date). */
+  date: string;
+  title: string;
+  /** Score de conformité 0..100. */
+  score: number;
+  /** Heures travaillées déclarées pour la période couverte par la visite. */
+  hoursWorked: number;
+  observations: string | null;
+}
+
+export interface HsseInspectionInput {
+  date: string;
+  title: string;
+  score: number;
+  hoursWorked?: number;
+  observations?: string | null;
 }

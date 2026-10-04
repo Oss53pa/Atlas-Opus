@@ -91,3 +91,64 @@ export function recettesEncaissees(receipts: Pick<Receipt, 'amount' | 'status'>[
     currency,
   );
 }
+
+// ── Relevé acquéreur (portail) ──────────────────────────────────────────────
+export type StageCallStatus = 'appele' | 'appelable' | 'a_venir';
+
+export interface BuyerStage {
+  key: string;
+  pct: number;
+  /** Montant cumulé autorisé à ce stade. */
+  cumul: Money;
+  /** Incrément par rapport au stade précédent (ce qui est appelé au stade). */
+  increment: Money;
+  status: StageCallStatus;
+}
+
+export interface BuyerStatement {
+  stages: BuyerStage[];
+  /** Total déjà appelable au vu de l'avancement validé. */
+  appele: Money;
+  /** Total encaissé (receipts « settled »). */
+  encaisse: Money;
+  /** Appelé − encaissé : ce que l'acquéreur reste devoir à ce jour. */
+  reste: Money;
+  /** Prix − encaissé : solde contractuel restant sur toute la durée. */
+  soldeContractuel: Money;
+}
+
+/**
+ * Relevé destiné à l'acquéreur : où en sont les appels de fonds de SA vente,
+ * au regard de l'avancement validé du chantier (RG-M6-04), et ce qu'il a déjà
+ * réglé (RG-M6-02). Un stade est « appelé » dès que l'avancement l'autorise ;
+ * le dernier stade autorisé marque la limite de ce qui peut être réclamé.
+ */
+export function buyerStatement(
+  prixVente: Money,
+  schedule: ScheduleStage[],
+  receipts: Pick<Receipt, 'amount' | 'status'>[],
+  avancementValide: number,
+): BuyerStatement {
+  const currency = prixVente.currency;
+  const echeancier = buildVefaSchedule(prixVente, schedule);
+  const stages: BuyerStage[] = echeancier.map((e) => ({
+    key: e.key,
+    pct: e.cumulPct,
+    cumul: e.cumul,
+    increment: e.increment,
+    status: appelDeFondsAutorise(avancementValide, e.cumulPct) ? 'appele' : 'a_venir',
+  }));
+  // Le premier stade non atteint devient « appelable » dès que le chantier y arrive.
+  const next = stages.find((s) => s.status === 'a_venir');
+  if (next && appelDeFondsAutorise(avancementValide, next.pct)) next.status = 'appelable';
+
+  const appele = sumMoney(stages.filter((s) => s.status === 'appele').map((s) => s.increment), currency);
+  const encaisse = recettesEncaissees(receipts, currency);
+  return {
+    stages,
+    appele,
+    encaisse,
+    reste: appele.subtract(encaisse),
+    soldeContractuel: prixVente.subtract(encaisse),
+  };
+}

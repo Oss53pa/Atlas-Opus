@@ -8,7 +8,7 @@ import {
   drawdownStatusLabel,
   DRAWDOWN_STATUS_TONE,
 } from './labels';
-import { useData, useOperation, useFinancings, useDrawdowns } from '../../app/providers';
+import { useBilan, useData, useOperation, useFinancings, useDrawdowns } from '../../app/providers';
 import { useOffline } from '../../app/offline';
 import { useNav } from '../../app/router';
 import { t, locale, type MessageKey } from '../../i18n';
@@ -22,6 +22,12 @@ import {
   canTransitionFinancing,
   evaluateDrawdown,
   interetsIntercalairesJours,
+  echeanceMensuelle,
+  coutCredit,
+  planFinancement,
+  serviceDetteMensuel,
+  REPAYMENT_MODES,
+  type RepaymentMode,
   type Financing,
   type FinancingSource,
   type FinancingStatus,
@@ -50,9 +56,12 @@ export function FinancingScreen({ id }: { id: string }) {
   const canEdit = can(session.role, 'financing.edit') && !readOnly;
 
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<{ source: FinancingSource; amountText: string; rateText: string }>({
-    source: 'credit_promoteur', amountText: '', rateText: '',
-  });
+  const emptyDraft = { source: 'credit_promoteur' as FinancingSource, amountText: '', rateText: '', durationText: '', repayment: 'in_fine' as RepaymentMode };
+  const [draft, setDraft] = useState(emptyDraft);
+  const { data: bilan } = useBilan(id);
+  // Besoin de financement = coût total prévisionnel du bilan (M4).
+  const plan = planFinancement(bilan ? bilan.summary.coutTotal : Money.zero(currency), rows);
+  const service = serviceDetteMensuel(rows, currency);
 
   let total = Money.zero(currency);
   for (const f of rows) total = total.add(f.amount);
@@ -60,9 +69,10 @@ export function FinancingScreen({ id }: { id: string }) {
   async function add() {
     const amount = Money.of(Number(draft.amountText.replace(/[^\d]/g, '')) || 0, currency);
     const rate = (Number(draft.rateText.replace(/[^\d.]/g, '')) || 0) / 100;
-    const rec = await financing.add(id, { source: draft.source, amount, rate });
+    const durationMonths = Number(draft.durationText) || null;
+    const rec = await financing.add(id, { source: draft.source, amount, rate, durationMonths, repayment: draft.repayment });
     setRows((r) => [...r, rec]);
-    setDraft({ source: 'credit_promoteur', amountText: '', rateText: '' });
+    setDraft(emptyDraft);
     setAdding(false);
     toast.push(t('financing.added'), 'success');
   }
@@ -114,12 +124,37 @@ export function FinancingScreen({ id }: { id: string }) {
             </Select>
             <Field id="fin-amount" label={t('financing.field.amount')} inputMode="numeric" value={draft.amountText} onChange={(e) => setDraft((d) => ({ ...d, amountText: e.target.value.replace(/[^\d]/g, '') }))} placeholder="0" />
             <Field id="fin-rate" label={t('financing.field.rate')} inputMode="decimal" value={draft.rateText} onChange={(e) => setDraft((d) => ({ ...d, rateText: e.target.value.replace(/[^\d.]/g, '') }))} placeholder="9" />
+            <Select id="fin-repay" label={t('financing.field.repayment')} value={draft.repayment} onChange={(e) => setDraft((d) => ({ ...d, repayment: e.target.value as RepaymentMode }))}>
+              {REPAYMENT_MODES.map((m) => <option key={m} value={m}>{t(`financing.repayment.${m}` as MessageKey)}</option>)}
+            </Select>
+            <Field id="fin-duration" label={t('financing.field.duration')} inputMode="numeric" value={draft.durationText} onChange={(e) => setDraft((d) => ({ ...d, durationText: e.target.value.replace(/[^\d]/g, '') }))} placeholder="24" />
           </div>
           <div className="mt-4 flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>{t('common.cancel')}</Button>
             <Button variant="primary" size="sm" onClick={add}>{t('common.add')}</Button>
           </div>
         </Card>
+      )}
+
+      {bilan && !plan.besoin.isZero() && (
+        <Panel title={t('financing.plan.title')} meta="M4 → M5">
+          <KpiRow
+            items={[
+              { label: t('financing.plan.besoin'), value: <MoneyView amount={plan.besoin.toMajorNumber()} currency={currency} /> },
+              { label: t('financing.plan.ressources'), value: <MoneyView amount={plan.ressources.toMajorNumber()} currency={currency} />, sub: t('financing.plan.levier', { pct: formatPercent(plan.levier, locale, 0) }) },
+              { label: t('financing.plan.couverture'), value: formatPercent(plan.couverture, locale, 0), accent: plan.couverture < 1 },
+              { label: t('financing.plan.service'), value: <MoneyView amount={service.toMajorNumber()} currency={currency} /> },
+            ]}
+          />
+          {plan.ecart.isNegative() && (
+            <div className="mt-3">
+              <Banner tone="warning">
+                {t('financing.plan.gap')} <MoneyView amount={plan.ecart.negate().toMajorNumber()} currency={currency} />
+                {!plan.enNegociation.isZero() && <> · {t('financing.plan.pending')} <MoneyView amount={plan.enNegociation.toMajorNumber()} currency={currency} /></>}
+              </Banner>
+            </div>
+          )}
+        </Panel>
       )}
 
       {loading ? (
@@ -157,6 +192,8 @@ function FinancingCard({
   const [addingDraw, setAddingDraw] = useState(false);
   const [drawDraft, setDrawDraft] = useState<{ amountText: string; conditionText: string }>({ amountText: '', conditionText: '' });
 
+  const echeance = echeanceMensuelle(f);
+  const cout = coutCredit(f);
   let released = Money.zero(currency);
   let interest = Money.zero(currency);
   for (const d of rows) {
@@ -235,6 +272,8 @@ function FinancingCard({
         items={[
           { label: t('financing.kpi.released'), value: <MoneyView amount={released.toMajorNumber()} currency={currency} /> },
           { label: t('financing.kpi.interest'), value: <MoneyView amount={interest.toMajorNumber()} currency={currency} /> },
+          ...(echeance ? [{ label: t('financing.kpi.echeance', { mode: t(`financing.repayment.${f.repayment}` as MessageKey) }), value: <MoneyView amount={echeance.toMajorNumber()} currency={currency} /> }] : []),
+          ...(cout ? [{ label: t('financing.kpi.coutCredit', { n: f.durationMonths ?? 0 }), value: <MoneyView amount={cout.toMajorNumber()} currency={currency} /> }] : []),
         ]}
       />
 

@@ -34,7 +34,7 @@ import { doGate, honorairesFromStakeholders } from '../../domain/m7/rules';
 import { fraisFinanciersFromDrawdowns } from '../../domain/m5/financing';
 import { recettesEncaissees } from '../../domain/m6/commercialisation';
 import type { ReportSnapshot, ReportInput, ReportType, ReportData } from '../../domain/m21/reporting';
-import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus } from '../../domain/m5/types';
+import type { Financing, FinancingInput, FinancingStatus, FinancingSource, Drawdown, DrawdownInput, DrawdownStatus, RepaymentMode } from '../../domain/m5/types';
 import type { Unit, UnitInput, UnitStatus, Sale, SaleInput, SaleStatus, SaleKind, ScheduleStage, Receipt, ReceiptInput, ReceiptMethod, ReceiptStatus } from '../../domain/m6/types';
 import type { Insurance, InsuranceInput, InsuranceType, RaciAssignment, RaciInput, Raci, Decision, DecisionInput, DecisionKind } from '../../domain/m7/types';
 import { canAssignAccountable } from '../../domain/m7/validation';
@@ -57,9 +57,9 @@ import type { Contract, ContractInput, Decompte, DecompteInput, DecompteStatus }
 import { decompteNet } from '../../domain/payments/decompte';
 import type { Task, TaskInput, TaskPatch } from '../../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../../domain/m8/types';
-import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo } from '../repo';
+import type { StakeholdersRepo, ComplianceRepo, FinancingRepo, CommercialisationRepo, ReportingRepo, PaymentsRepo, PlanningRepo, TendersRepo, GovernanceRepo, StudiesRepo, OffersRepo, PurchasingRepo, ReceptionRepo, RevisionsRepo, GuaranteesRepo, RisksRepo, AuditRepo, SiteReportsRepo, ChangeOrdersRepo, ChangeOrderPatch, DocumentsRepo, RfisRepo, ConnectionsRepo, LibraryRepo, HandoverRepo, AdminRepo, MembershipRepo, IntegrationsRepo, HsseRepo, DisputesRepo, ClaimsRepo, DoeRepo, HandoverAssetsRepo, BaselinesRepo, LegalEntitiesRepo, ActionItemsRepo, ServiceOrdersRepo, EiesItemsRepo, ShipmentsRepo, BudgetLinesRepo, EvaluationCriteriaRepo, OfferScoresRepo, PgesActionsRepo, AlertRulesRepo, BpuItemsRepo, LandOpportunitiesRepo, NonConformitiesRepo, NonConformityPatch, SuppliersRepo } from '../repo';
 import type { IntegrationEndpoint, IntegrationSystem, OutboxMessage, CircuitState, DeliveryStatus } from '../../domain/f5/types';
-import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus } from '../../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseKind, HsseSeverity, HsseStatus, HsseInspection, HsseInspectionInput } from '../../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput, DoeCategory } from '../../domain/doe/types';
@@ -74,6 +74,12 @@ import type { BudgetLine, BudgetLineInput } from '../../domain/budgetLine/types'
 import type { EvaluationCriterion, EvaluationCriterionInput, CriterionType } from '../../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../../domain/pgesAction/types';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch, PropertyType, OpportunityStatus, Decision as OpportunityDecision } from '../../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput, NcSource, NcSeverity, NcStatus } from '../../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch, SupplierCategory, SupplierStatus } from '../../domain/supplier/types';
+import { canTransitionSupplier } from '../../domain/supplier/supplier';
+import type { Delivery, DeliveryInput } from '../../domain/m10/types';
+import { evaluateNcTransition } from '../../domain/nonConformity/nonConformity';
 import type { AlertRule, AlertRuleInput, AlertSeverity } from '../../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../../domain/bpuItem/types';
 import type { PriceRevision, PriceRevisionInput } from '../../domain/m8/revision';
@@ -958,6 +964,7 @@ export function createSupabaseComplianceRepo(client: SupabaseClient, session: Se
 interface FinancingRow {
   id: string; tenant_id: string; operation_id: string;
   source: string; amount: number | string; rate: number | string; status: string;
+  duration_months: number | null; repayment: string | null;
 }
 interface DrawdownRow {
   id: string; tenant_id: string; financing_id: string;
@@ -968,6 +975,7 @@ function toFinancing(r: FinancingRow, currency: string): Financing {
     id: r.id, tenantId: r.tenant_id, operationId: r.operation_id,
     source: r.source as FinancingSource, amount: Money.of(Number(r.amount), currency),
     rate: Number(r.rate), status: r.status as FinancingStatus,
+    durationMonths: r.duration_months ?? null, repayment: (r.repayment as RepaymentMode | null) ?? 'in_fine',
   };
 }
 function toDrawdown(r: DrawdownRow, currency: string): Drawdown {
@@ -1002,6 +1010,7 @@ export function createSupabaseFinancingRepo(client: SupabaseClient, session: Ses
         await client.from(FIN).insert({
           tenant_id: session.tenantId, operation_id: opId,
           source: input.source, amount: input.amount.toMajorNumber(), rate: input.rate, status: 'negocie',
+          duration_months: input.durationMonths ?? null, repayment: input.repayment ?? 'in_fine',
         }).select('*').single(),
       ) as FinancingRow;
       return toFinancing(row, currency);
@@ -1489,12 +1498,24 @@ export function createSupabaseIntegrationsRepo(client: SupabaseClient, session: 
 interface HsseRow {
   id: string; tenant_id: string; operation_id: string; reference: string; kind: string; severity: string;
   occurred_at: string; location: string | null; description: string; corrective_action: string | null; status: string;
+  days_lost: number | null;
+}
+interface HsseInspectionRow {
+  id: string; tenant_id: string; operation_id: string; date: string; title: string;
+  score: number; hours_worked: number | string; observations: string | null;
+}
+function toHsseInspection(r: HsseInspectionRow): HsseInspection {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, date: r.date, title: r.title,
+    score: Number(r.score), hoursWorked: Number(r.hours_worked), observations: r.observations,
+  };
 }
 function toHsse(r: HsseRow): HsseIncident {
   return {
     id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference,
     kind: r.kind as HsseKind, severity: r.severity as HsseSeverity, occurredAt: r.occurred_at,
     location: r.location, description: r.description, correctiveAction: r.corrective_action, status: r.status as HsseStatus,
+    daysLost: r.days_lost ?? 0,
   };
 }
 export function createSupabaseHsseRepo(client: SupabaseClient, session: Session): HsseRepo {
@@ -1509,6 +1530,7 @@ export function createSupabaseHsseRepo(client: SupabaseClient, session: Session)
         tenant_id: session.tenantId, operation_id: opId, reference: input.reference.trim(), kind: input.kind,
         severity: input.severity, occurred_at: input.occurredAt, location: input.location ?? null,
         description: input.description.trim(), corrective_action: input.correctiveAction ?? null,
+        days_lost: Math.max(0, Math.round(input.daysLost ?? 0)),
       }).select('*').single()) as HsseRow;
       return toHsse(row);
     },
@@ -1518,6 +1540,22 @@ export function createSupabaseHsseRepo(client: SupabaseClient, session: Session)
     },
     async remove(id) {
       const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async inspections(opId) {
+      const rows = unwrap(await client.from('ao_hsse_inspections').select('*').eq('operation_id', opId).order('date', { ascending: false })) as HsseInspectionRow[];
+      return rows.map(toHsseInspection);
+    },
+    async addInspection(opId, input: HsseInspectionInput) {
+      const row = unwrap(await client.from('ao_hsse_inspections').insert({
+        tenant_id: session.tenantId, operation_id: opId, date: input.date, title: input.title.trim(),
+        score: Math.min(100, Math.max(0, Math.round(input.score))),
+        hours_worked: Math.max(0, Math.round(input.hoursWorked ?? 0)), observations: input.observations ?? null,
+      }).select('*').single()) as HsseInspectionRow;
+      return toHsseInspection(row);
+    },
+    async removeInspection(id) {
+      const { error } = await client.from('ao_hsse_inspections').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
@@ -2401,12 +2439,12 @@ export function createSupabaseReceptionRepo(client: SupabaseClient, session: Ses
 
 // ── Achats & logistique (M10) ────────────────────────────────────────────────
 interface PurchaseOrderRow {
-  id: string; tenant_id: string; operation_id: string; reference: string; supplier: string;
+  id: string; tenant_id: string; operation_id: string; reference: string; supplier: string; supplier_id: string | null;
   item: string; quantity: number | string; unit: string; amount: number | string; status: string;
 }
 function toPurchaseOrder(r: PurchaseOrderRow): PurchaseOrder {
   return {
-    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, supplier: r.supplier,
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, supplier: r.supplier, supplierId: r.supplier_id ?? null,
     item: r.item, quantity: Number(r.quantity), unit: r.unit, amount: Number(r.amount), status: r.status as PurchaseStatus,
   };
 }
@@ -2432,6 +2470,22 @@ export function createSupabasePurchasingRepo(client: SupabaseClient, session: Se
     },
     async remove(id) {
       const { error } = await client.from(PO).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    async deliveries(opId) {
+      const rows = unwrap(await client.from('ao_deliveries').select('*').eq('operation_id', opId).order('date', { ascending: false })) as DeliveryRow[];
+      return rows.map(toDelivery);
+    },
+    async addDelivery(opId, input: DeliveryInput) {
+      const row = unwrap(await client.from('ao_deliveries').insert({
+        tenant_id: session.tenantId, operation_id: opId, purchase_order_id: input.purchaseOrderId,
+        date: input.date, received_rate: Math.min(1, Math.max(0, input.receivedRate)),
+        conform: input.conform ?? true, notes: input.notes?.trim() || null,
+      }).select('*').single()) as DeliveryRow;
+      return toDelivery(row);
+    },
+    async removeDelivery(id) {
+      const { error } = await client.from('ao_deliveries').delete().eq('id', id);
       if (error) throw new Error(error.message);
     },
   };
@@ -2556,6 +2610,183 @@ export function createSupabaseRevisionsRepo(client: SupabaseClient, session: Ses
         }).select('*').single(),
       ) as PriceRevisionRow;
       return toRevision(row);
+    },
+  };
+}
+
+// ── M2 (amont) — opportunités foncières ─────────────────────────────────────
+interface LandOpportunityRow {
+  id: string; tenant_id: string; reference: string; name: string; property_type: string; country_code: string;
+  city: string | null; total_surface: number | string; buildable_surface: number | string;
+  price_asked: number | string; estimated_value: number | string; status: string; decision: string;
+  probability: number | string; discovery_date: string; decision_deadline: string | null; notes: string | null;
+  operation_id: string | null;
+}
+function toLandOpportunity(r: LandOpportunityRow): LandOpportunity {
+  return {
+    id: r.id, tenantId: r.tenant_id, reference: r.reference, name: r.name,
+    propertyType: r.property_type as PropertyType, countryCode: r.country_code, city: r.city,
+    totalSurface: Number(r.total_surface), buildableSurface: Number(r.buildable_surface),
+    priceAsked: Number(r.price_asked), estimatedValue: Number(r.estimated_value),
+    status: r.status as OpportunityStatus, decision: r.decision as OpportunityDecision, probability: Number(r.probability),
+    discoveryDate: r.discovery_date, decisionDeadline: r.decision_deadline, notes: r.notes, operationId: r.operation_id,
+  };
+}
+export function createSupabaseLandOpportunitiesRepo(client: SupabaseClient, session: Session): LandOpportunitiesRepo {
+  const TB = 'ao_land_opportunities';
+  return {
+    async list() {
+      const rows = unwrap(await client.from(TB).select('*').order('discovery_date', { ascending: false })) as LandOpportunityRow[];
+      return rows.map(toLandOpportunity);
+    },
+    async add(input: LandOpportunityInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, reference: input.reference.trim(), name: input.name.trim(),
+        property_type: input.propertyType, country_code: input.countryCode, city: input.city ?? null,
+        total_surface: input.totalSurface ?? 0, buildable_surface: input.buildableSurface ?? 0,
+        price_asked: input.priceAsked ?? 0, estimated_value: input.estimatedValue ?? 0,
+        probability: input.probability ?? 0.5, decision_deadline: input.decisionDeadline ?? null, notes: input.notes ?? null,
+      }).select('*').single()) as LandOpportunityRow;
+      return toLandOpportunity(row);
+    },
+    async update(id, patch: LandOpportunityPatch) {
+      const upd: Record<string, unknown> = {};
+      if (patch.status !== undefined) upd.status = patch.status;
+      if (patch.decision !== undefined) upd.decision = patch.decision;
+      if (patch.probability !== undefined) upd.probability = patch.probability;
+      if (patch.priceAsked !== undefined) upd.price_asked = patch.priceAsked;
+      if (patch.estimatedValue !== undefined) upd.estimated_value = patch.estimatedValue;
+      if (patch.notes !== undefined) upd.notes = patch.notes;
+      let q = client.from(TB).update(upd).eq('id', id);
+      if (patch.operationId !== undefined) {
+        upd.operation_id = patch.operationId;
+        // Conversion unique : on ne lie que si aucune opération n'est déjà liée.
+        q = client.from(TB).update(upd).eq('id', id).is('operation_id', null);
+      }
+      const row = unwrap(await q.select('*').single()) as LandOpportunityRow;
+      return toLandOpportunity(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M18 (qualité) — non-conformités ─────────────────────────────────────────
+interface NonConformityRow {
+  id: string; tenant_id: string; operation_id: string; reference: string; label: string;
+  source: string; severity: string; location: string | null; corrective_action: string | null;
+  owner: string | null; detected_at: string; due_date: string | null; closed_at: string | null; status: string;
+}
+function toNonConformity(r: NonConformityRow): NonConformity {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, reference: r.reference, label: r.label,
+    source: r.source as NcSource, severity: r.severity as NcSeverity, location: r.location,
+    correctiveAction: r.corrective_action, owner: r.owner, detectedAt: r.detected_at,
+    dueDate: r.due_date, closedAt: r.closed_at, status: r.status as NcStatus,
+  };
+}
+export function createSupabaseNonConformitiesRepo(client: SupabaseClient, session: Session): NonConformitiesRepo {
+  const TB = 'ao_non_conformities';
+  return {
+    async list(opId) {
+      const rows = unwrap(await client.from(TB).select('*').eq('operation_id', opId).order('detected_at', { ascending: false })) as NonConformityRow[];
+      return rows.map(toNonConformity);
+    },
+    async add(opId, input: NonConformityInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, operation_id: opId, reference: input.reference.trim(), label: input.label.trim(),
+        source: input.source, severity: input.severity, location: input.location?.trim() || null,
+        corrective_action: input.correctiveAction?.trim() || null, owner: input.owner?.trim() || null,
+        detected_at: input.detectedAt, due_date: input.dueDate ?? null,
+      }).select('*').single()) as NonConformityRow;
+      return toNonConformity(row);
+    },
+    async update(id, patch: NonConformityPatch) {
+      const current = toNonConformity(unwrap(await client.from(TB).select('*').eq('id', id).single()) as NonConformityRow);
+      const corrective = patch.correctiveAction !== undefined
+        ? (patch.correctiveAction?.trim() || null)
+        : current.correctiveAction;
+      const upd: Record<string, unknown> = {};
+      if (patch.correctiveAction !== undefined) upd.corrective_action = corrective;
+      if (patch.owner !== undefined) upd.owner = patch.owner?.trim() || null;
+      if (patch.dueDate !== undefined) upd.due_date = patch.dueDate;
+      if (patch.status !== undefined && patch.status !== current.status) {
+        // RG-NC-02 revérifiée côté données : pas de solde sans action corrective.
+        const d = evaluateNcTransition(current.status, patch.status, { correctiveAction: corrective });
+        if (!d.ok) throw new Error(`nc_${d.code}`);
+        upd.status = d.to;
+        upd.closed_at = d.to === 'soldee' ? new Date().toISOString().slice(0, 10) : null;
+      }
+      const row = unwrap(await client.from(TB).update(upd).eq('id', id).select('*').single()) as NonConformityRow;
+      return toNonConformity(row);
+    },
+    async remove(id) {
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+// ── M10 — réceptions des bons de commande ───────────────────────────────────
+interface DeliveryRow {
+  id: string; tenant_id: string; operation_id: string; purchase_order_id: string;
+  date: string; received_rate: number | string; conform: boolean; notes: string | null;
+}
+function toDelivery(r: DeliveryRow): Delivery {
+  return {
+    id: r.id, tenantId: r.tenant_id, operationId: r.operation_id, purchaseOrderId: r.purchase_order_id,
+    date: r.date, receivedRate: Number(r.received_rate), conform: r.conform, notes: r.notes,
+  };
+}
+
+// ── M9 — référentiel fournisseurs ───────────────────────────────────────────
+interface SupplierRow {
+  id: string; tenant_id: string; name: string; category: string;
+  contact: string | null; email: string | null; tax_id: string | null; status: string;
+}
+function toSupplier(r: SupplierRow): Supplier {
+  return {
+    id: r.id, tenantId: r.tenant_id, name: r.name, category: r.category as SupplierCategory,
+    contact: r.contact, email: r.email, taxId: r.tax_id, status: r.status as SupplierStatus,
+  };
+}
+export function createSupabaseSuppliersRepo(client: SupabaseClient, session: Session): SuppliersRepo {
+  const TB = 'ao_suppliers';
+  return {
+    async list() {
+      const rows = unwrap(await client.from(TB).select('*').order('name')) as SupplierRow[];
+      return rows.map(toSupplier);
+    },
+    async add(input: SupplierInput) {
+      const row = unwrap(await client.from(TB).insert({
+        tenant_id: session.tenantId, name: input.name.trim(), category: input.category,
+        contact: input.contact?.trim() || null, email: input.email?.trim() || null, tax_id: input.taxId?.trim() || null,
+      }).select('*').single()) as SupplierRow;
+      return toSupplier(row);
+    },
+    async update(id, patch: SupplierPatch) {
+      if (patch.status !== undefined) {
+        const current = toSupplier(unwrap(await client.from(TB).select('*').eq('id', id).single()) as SupplierRow);
+        if (patch.status !== current.status && !canTransitionSupplier(current.status, patch.status)) {
+          throw new Error('supplier_transition_invalid');
+        }
+      }
+      const upd: Record<string, unknown> = {};
+      if (patch.name !== undefined) upd.name = patch.name.trim();
+      if (patch.category !== undefined) upd.category = patch.category;
+      if (patch.contact !== undefined) upd.contact = patch.contact?.trim() || null;
+      if (patch.email !== undefined) upd.email = patch.email?.trim() || null;
+      if (patch.taxId !== undefined) upd.tax_id = patch.taxId?.trim() || null;
+      if (patch.status !== undefined) upd.status = patch.status;
+      const row = unwrap(await client.from(TB).update(upd).eq('id', id).select('*').single()) as SupplierRow;
+      return toSupplier(row);
+    },
+    async remove(id) {
+      // La contrainte ON DELETE RESTRICT protège les fournisseurs déjà commandés.
+      const { error } = await client.from(TB).delete().eq('id', id);
+      if (error) throw new Error(error.message);
     },
   };
 }

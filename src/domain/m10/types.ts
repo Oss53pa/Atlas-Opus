@@ -13,6 +13,8 @@ export interface PurchaseOrder {
   tenantId: string;
   operationId: string;
   reference: string;
+  /** Fournisseur référencé (M9). null = saisie libre historique via `supplier`. */
+  supplierId: string | null;
   supplier: string;
   item: string;
   quantity: number;
@@ -24,9 +26,36 @@ export interface PurchaseOrder {
 
 export interface PurchaseOrderInput {
   reference: string;
+  supplierId?: string | null;
   supplier: string;
   item: string;
   quantity: number;
   unit: string;
   amount: number;
+}
+
+/**
+ * Réception (totale ou partielle) d'un bon de commande. Plusieurs réceptions
+ * peuvent se succéder sur un même bon : la part reçue se cumule.
+ * Table : ao_deliveries (opération-scopée).
+ */
+export interface Delivery {
+  id: string;
+  tenantId: string;
+  operationId: string;
+  purchaseOrderId: string;
+  date: string;
+  /** Part réceptionnée lors de cette livraison (0..1). */
+  receivedRate: number;
+  /** Conforme à la commande (qualité, quantité) — alimente la note fournisseur. */
+  conform: boolean;
+  notes: string | null;
+}
+
+export interface DeliveryInput {
+  purchaseOrderId: string;
+  date: string;
+  receivedRate: number;
+  conform?: boolean;
+  notes?: string | null;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Money } from '../money/Money';
-import { nextPurchaseStatus, canTransitionPurchase, isCommitted, committedTotal, receivedCount } from './purchasing';
+import { nextPurchaseStatus, canTransitionPurchase, isCommitted, committedTotal, receivedCount, receptionRate, isFullyReceived, montantReceptionne } from './purchasing';
 import type { PurchaseOrder } from './types';
 
 const XOF = 'XOF';
@@ -31,5 +31,29 @@ describe('M10 — engagements & réceptions', () => {
   });
   it('receivedCount compte les réceptionnés', () => {
     expect(receivedCount([po('receptionne'), po('livre'), po('receptionne')])).toBe(2);
+  });
+});
+
+describe('M10 — réceptions', () => {
+  const dl = (purchaseOrderId: string, receivedRate: number) => ({ purchaseOrderId, receivedRate });
+
+  it('cumule les réceptions partielles et plafonne à 100 %', () => {
+    expect(receptionRate('bc-1', [dl('bc-1', 0.4), dl('bc-1', 0.4)])).toBeCloseTo(0.8, 6);
+    expect(receptionRate('bc-1', [dl('bc-1', 0.8), dl('bc-1', 0.5)])).toBe(1);
+    expect(receptionRate('bc-1', [dl('bc-2', 1)])).toBe(0);
+  });
+
+  it('déclare servi un bon dont le cumul atteint 100 %', () => {
+    expect(isFullyReceived('bc-1', [dl('bc-1', 0.5)])).toBe(false);
+    expect(isFullyReceived('bc-1', [dl('bc-1', 0.5), dl('bc-1', 0.5)])).toBe(true);
+  });
+
+  it('ne valorise que le reçu des bons engagés', () => {
+    const orders = [
+      { id: 'bc-1', amount: 1_000_000, status: 'commande' as const },
+      { id: 'bc-2', amount: 2_000_000, status: 'brouillon' as const },
+    ];
+    const deliveries = [dl('bc-1', 0.5), dl('bc-2', 1)];
+    expect(montantReceptionne(orders, deliveries, 'XOF').toMajorString()).toBe('500000.00');
   });
 });

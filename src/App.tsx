@@ -75,6 +75,11 @@ import { AlertesScreen } from './features/m1/AlertesScreen';
 import { NotificationsScreen } from './features/m1/NotificationsScreen';
 import { SyncQueueScreen } from './features/m1/SyncQueueScreen';
 import { ApprovalsScreen } from './features/m1/ApprovalsScreen';
+import { ScenariosScreen } from './features/m1/ScenariosScreen';
+import { QualiteScreen } from './features/m1/QualiteScreen';
+import { PortailScreen } from './features/m1/PortailScreen';
+import { FournisseursScreen } from './features/m1/FournisseursScreen';
+import { FoncierScreen } from './features/m1/FoncierScreen';
 import { t } from './i18n';
 
 function RouteView() {
@@ -118,6 +123,8 @@ function RouteView() {
       return <EiesScreen id={route.id} />;
     case 'shipments':
       return <ShipmentsScreen id={route.id} />;
+    case 'scenarios':
+      return <ScenariosScreen id={route.id} />;
     case 'budget':
       return <BudgetScreen id={route.id} />;
     case 'criteres':
@@ -200,6 +207,14 @@ function RouteView() {
       return <CopiloteScreen id={route.id} />;
     case 'etats':
       return <EtatsScreen />;
+    case 'nc':
+      return <QualiteScreen id={route.id} />;
+    case 'portail':
+      return <PortailScreen id={route.id} />;
+    case 'fournisseurs':
+      return <FournisseursScreen />;
+    case 'foncier':
+      return <FoncierScreen />;
     case 'workspaces':
       return <WorkspacesScreen />;
     case 'invitation':

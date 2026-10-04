@@ -63,7 +63,7 @@ import type { Task, TaskInput, TaskPatch } from '../domain/m12/types';
 import type { Tender, TenderInput, TenderStatus } from '../domain/m8/types';
 import type { Study, StudyInput, StudyStatus } from '../domain/m3/types';
 import type { Offer, OfferInput, OfferStatus } from '../domain/m9/types';
-import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus } from '../domain/m10/types';
+import type { PurchaseOrder, PurchaseOrderInput, PurchaseStatus, Delivery, DeliveryInput } from '../domain/m10/types';
 import type { Reserve, ReserveInput, ReserveStatus } from '../domain/m19/types';
 import type { Guarantee, GuaranteeInput, GuaranteeStatus } from '../domain/m17/types';
 import type { Risk, RiskInput, RiskStatus } from '../domain/m20/types';
@@ -77,7 +77,7 @@ import type { LibraryDoc, LibraryDocInput, LibraryStatus } from '../domain/m22/t
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant, MemberGrantInput, MemberInviteInput } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
-import type { HsseIncident, HsseIncidentInput, HsseStatus } from '../domain/hsse/types';
+import type { HsseIncident, HsseIncidentInput, HsseStatus, HsseInspection, HsseInspectionInput } from '../domain/hsse/types';
 import type { Dispute, DisputeInput, DisputeStatus } from '../domain/litige/types';
 import type { Claim, ClaimInput, ClaimStatus } from '../domain/claim/types';
 import type { DoeDocument, DoeDocumentInput } from '../domain/doe/types';
@@ -92,6 +92,9 @@ import type { BudgetLine, BudgetLineInput } from '../domain/budgetLine/types';
 import type { EvaluationCriterion, EvaluationCriterionInput } from '../domain/evaluationCriterion/types';
 import type { OfferScore, OfferScoreInput } from '../domain/offerScore/types';
 import type { PgesAction, PgesActionInput, PgesStatus } from '../domain/pgesAction/types';
+import type { LandOpportunity, LandOpportunityInput, LandOpportunityPatch } from '../domain/landOpportunity/types';
+import type { NonConformity, NonConformityInput, NcStatus } from '../domain/nonConformity/types';
+import type { Supplier, SupplierInput, SupplierPatch } from '../domain/supplier/types';
 import type { AlertRule, AlertRuleInput } from '../domain/alertRule/types';
 import type { BpuItem, BpuItemInput } from '../domain/bpuItem/types';
 import type { NotificationUpsert } from '../domain/f4/echeances';
@@ -321,6 +324,10 @@ export interface HsseRepo {
   add(operationId: string, input: HsseIncidentInput): Promise<HsseIncident>;
   setStatus(id: string, status: HsseStatus): Promise<HsseIncident>;
   remove(id: string): Promise<void>;
+  /** Visites de sécurité — portent les heures travaillées (dénominateur TF/TG). */
+  inspections(operationId: string): Promise<HsseInspection[]>;
+  addInspection(operationId: string, input: HsseInspectionInput): Promise<HsseInspection>;
+  removeInspection(id: string): Promise<void>;
 }
 
 /** M19 (litiges) — registre des litiges & contentieux d'une opération. */
@@ -436,6 +443,14 @@ export interface PgesActionsRepo {
 }
 
 /** M21 (cockpit) — règles d'alerte configurables (tenant-scopées). */
+/** M2 (amont) — pipeline d'opportunités foncières (niveau espace, avant l'opération). */
+export interface LandOpportunitiesRepo {
+  list(): Promise<LandOpportunity[]>;
+  add(input: LandOpportunityInput): Promise<LandOpportunity>;
+  update(id: string, patch: LandOpportunityPatch): Promise<LandOpportunity>;
+  remove(id: string): Promise<void>;
+}
+
 export interface AlertRulesRepo {
   list(): Promise<AlertRule[]>;
   add(input: AlertRuleInput): Promise<AlertRule>;
@@ -527,6 +542,34 @@ export interface PurchasingRepo {
   list(operationId: string): Promise<PurchaseOrder[]>;
   add(operationId: string, input: PurchaseOrderInput): Promise<PurchaseOrder>;
   setStatus(id: string, status: PurchaseStatus): Promise<PurchaseOrder>;
+  remove(id: string): Promise<void>;
+  /** Réceptions (totales ou partielles) des bons de commande de l'opération. */
+  deliveries(operationId: string): Promise<Delivery[]>;
+  addDelivery(operationId: string, input: DeliveryInput): Promise<Delivery>;
+  removeDelivery(id: string): Promise<void>;
+}
+
+/** M9 — référentiel fournisseurs (niveau espace, réutilisable entre opérations). */
+export interface SuppliersRepo {
+  list(): Promise<Supplier[]>;
+  add(input: SupplierInput): Promise<Supplier>;
+  update(id: string, patch: SupplierPatch): Promise<Supplier>;
+  remove(id: string): Promise<void>;
+}
+
+/** M18 (qualité) — registre des non-conformités d'une opération. */
+export interface NonConformityPatch {
+  status?: NcStatus;
+  correctiveAction?: string | null;
+  owner?: string | null;
+  dueDate?: string | null;
+}
+
+export interface NonConformitiesRepo {
+  list(operationId: string): Promise<NonConformity[]>;
+  add(operationId: string, input: NonConformityInput): Promise<NonConformity>;
+  /** Le solde exige une action corrective (RG-NC-02) : patch + statut en une étape. */
+  update(id: string, patch: NonConformityPatch): Promise<NonConformity>;
   remove(id: string): Promise<void>;
 }
 

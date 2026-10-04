@@ -7,7 +7,7 @@ import type { HsseIncident } from './types';
 const inc = (over: Partial<HsseIncident> = {}): HsseIncident => ({
   id: 'i1', tenantId: 't', operationId: 'op', reference: 'HSSE-1', kind: 'accident',
   severity: 'mineure', occurredAt: '2026-09-01', location: null, description: 'x',
-  correctiveAction: null, status: 'declare', ...over,
+  correctiveAction: null, status: 'declare', daysLost: 0, ...over,
 });
 
 describe('HSSE — ouverture & comptages', () => {

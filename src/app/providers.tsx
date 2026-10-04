@@ -47,6 +47,9 @@ import {
   createOfferScoresRepo,
   createPgesActionsRepo,
   createAlertRulesRepo,
+  createLandOpportunitiesRepo,
+  createNonConformitiesRepo,
+  createSuppliersRepo,
   createBpuItemsRepo,
 } from '../data/mock';
 import type {
@@ -100,6 +103,9 @@ import type {
   OfferScoresRepo,
   PgesActionsRepo,
   AlertRulesRepo,
+  LandOpportunitiesRepo,
+  NonConformitiesRepo,
+  SuppliersRepo,
   BpuItemsRepo,
 } from '../data/repo';
 import type { Stakeholder } from '../domain/m2/types';
@@ -130,7 +136,7 @@ import type { LibraryDoc } from '../domain/m22/types';
 import type { HandoverFile } from '../domain/handover/types';
 import type { Member, NotificationItem, ApprovalTask, MemberGrant } from '../domain/admin/types';
 import type { IntegrationEndpoint, OutboxMessage } from '../domain/f5/types';
-import type { HsseIncident } from '../domain/hsse/types';
+import type { HsseIncident, HsseInspection } from '../domain/hsse/types';
 import type { Dispute } from '../domain/litige/types';
 import type { Claim } from '../domain/claim/types';
 import type { DoeDocument } from '../domain/doe/types';
@@ -146,6 +152,10 @@ import type { EvaluationCriterion } from '../domain/evaluationCriterion/types';
 import type { OfferScore } from '../domain/offerScore/types';
 import type { PgesAction } from '../domain/pgesAction/types';
 import type { AlertRule } from '../domain/alertRule/types';
+import type { LandOpportunity } from '../domain/landOpportunity/types';
+import type { NonConformity } from '../domain/nonConformity/types';
+import type { Supplier } from '../domain/supplier/types';
+import type { Delivery } from '../domain/m10/types';
 import type { BpuItem } from '../domain/bpuItem/types';
 import { createTelemetry } from '../lib/telemetry';
 import { COUNTRIES, type CountryConfig } from '../domain/country';
@@ -201,6 +211,9 @@ import {
   createSupabaseOfferScoresRepo,
   createSupabasePgesActionsRepo,
   createSupabaseAlertRulesRepo,
+  createSupabaseLandOpportunitiesRepo,
+  createSupabaseNonConformitiesRepo,
+  createSupabaseSuppliersRepo,
   createSupabaseBpuItemsRepo,
 } from '../data/supabase/adapter';
 import { useAuth } from './auth';
@@ -255,6 +268,9 @@ interface DataApi {
   offerScores: OfferScoresRepo;
   pgesActions: PgesActionsRepo;
   alertRules: AlertRulesRepo;
+  landOpportunities: LandOpportunitiesRepo;
+  nonConformities: NonConformitiesRepo;
+  suppliers: SuppliersRepo;
   bpuItems: BpuItemsRepo;
   session: Session;
   countries: CountryConfig[];
@@ -320,6 +336,9 @@ function buildMockApi(): DataApi {
     offerScores: createOfferScoresRepo(db, session, { telemetry }),
     pgesActions: createPgesActionsRepo(db, session, { telemetry }),
     alertRules: createAlertRulesRepo(db, session, { telemetry }),
+    landOpportunities: createLandOpportunitiesRepo(db, session, { telemetry }),
+    nonConformities: createNonConformitiesRepo(db, session, { telemetry }),
+    suppliers: createSuppliersRepo(db, session, { telemetry }),
     bpuItems: createBpuItemsRepo(db, session, { telemetry }),
     session,
     countries: COUNTRIES,
@@ -433,6 +452,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
           offerScores: createSupabaseOfferScoresRepo(supabase, session),
           pgesActions: createSupabasePgesActionsRepo(supabase, session),
           alertRules: createSupabaseAlertRulesRepo(supabase, session),
+          landOpportunities: createSupabaseLandOpportunitiesRepo(supabase, session),
+          nonConformities: createSupabaseNonConformitiesRepo(supabase, session),
+          suppliers: createSupabaseSuppliersRepo(supabase, session),
           bpuItems: createSupabaseBpuItemsRepo(supabase, session),
           session,
           countries: COUNTRIES,
@@ -688,6 +710,11 @@ export function useHsseIncidents(operationId: string): AsyncState<HsseIncident[]
   return useAsync(() => hsse.list(operationId), [hsse, operationId]);
 }
 
+export function useHsseInspections(operationId: string): AsyncState<HsseInspection[]> {
+  const { hsse } = useData();
+  return useAsync(() => hsse.inspections(operationId), [hsse, operationId]);
+}
+
 export function useDisputes(operationId: string): AsyncState<Dispute[]> {
   const { disputes } = useData();
   return useAsync(() => disputes.list(operationId), [disputes, operationId]);
@@ -756,6 +783,26 @@ export function useOfferScores(operationId: string): AsyncState<OfferScore[]> {
 export function useAlertRules(): AsyncState<AlertRule[]> {
   const { alertRules } = useData();
   return useAsync(() => alertRules.list(), [alertRules]);
+}
+
+export function useLandOpportunities(): AsyncState<LandOpportunity[]> {
+  const { landOpportunities } = useData();
+  return useAsync(() => landOpportunities.list(), [landOpportunities]);
+}
+
+export function useNonConformities(operationId: string): AsyncState<NonConformity[]> {
+  const { nonConformities } = useData();
+  return useAsync(() => nonConformities.list(operationId), [nonConformities, operationId]);
+}
+
+export function useSuppliers(): AsyncState<Supplier[]> {
+  const { suppliers } = useData();
+  return useAsync(() => suppliers.list(), [suppliers]);
+}
+
+export function useDeliveries(operationId: string): AsyncState<Delivery[]> {
+  const { purchasing } = useData();
+  return useAsync(() => purchasing.deliveries(operationId), [purchasing, operationId]);
 }
 
 export function useBpuItems(contractId: string): AsyncState<BpuItem[]> {

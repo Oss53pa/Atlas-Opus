@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Plus, Menu, X, LogOut, ChevronRight, Search, Users } from 'lucide-react';
+import { Plus, Menu, X, LogOut, ChevronRight, Users } from 'lucide-react';
 import { Brand, Button } from '../../ui';
 import { useNav, type Route } from '../../app/router';
 import { useAuth } from '../../app/auth';
@@ -8,12 +8,13 @@ import { t, locale, type MessageKey } from '../../i18n';
 import { formatPercent } from '../../lib/format';
 import { phaseLabel } from './labels';
 import { OfflineBanner } from './OfflineBanner';
+import { GlobalSearch } from './GlobalSearch';
 import type { Role } from '../../domain/m1/types';
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(' ');
 
 /** Route names portant un id d'opération. */
-type OpRouteName = Exclude<Route['name'], 'dashboard' | 'portfolio' | 'create'>;
+type OpRouteName = Exclude<Route['name'], 'dashboard' | 'portfolio' | 'create' | 'foncier'>;
 
 interface ModuleDef {
   code: string;
@@ -45,8 +46,10 @@ const FAMILIES: FamilyDef[] = [
     modules: [
       { code: 'M4', labelKey: 'mod.m4', route: 'bilan' },
       { code: 'BUD', labelKey: 'mod.budget', route: 'budget' },
+      { code: 'SCN', labelKey: 'mod.scenarios', route: 'scenarios' },
       { code: 'M5', labelKey: 'mod.m5', route: 'financing' },
       { code: 'M6', labelKey: 'mod.m6', route: 'commercialisation' },
+      { code: 'ACQ', labelKey: 'mod.portail', route: 'portail' },
       { code: 'M16', labelKey: 'mod.m16', route: 'payments' },
       { code: 'M17', labelKey: 'mod.m17', route: 'cautions' },
     ],
@@ -84,6 +87,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'M15', labelKey: 'mod.m15', route: 'modifications' },
       { code: 'M18', labelKey: 'mod.m18', route: 'raccordements' },
       { code: 'M19', labelKey: 'mod.m19', route: 'reception' },
+      { code: 'NC', labelKey: 'mod.nc', route: 'nc' },
     ],
   },
   {
@@ -141,17 +145,6 @@ function TenantContextCard() {
   );
 }
 
-function SearchField({ operation }: { operation: boolean }) {
-  return (
-    <div className="ax-search" aria-hidden="true">
-      <Search size={14} className="text-ink-3" />
-      <span className="flex-1 truncate text-[13px] text-ink-3">
-        {t(operation ? 'shell.search.operation' : 'shell.search.tenant')}
-      </span>
-      <span className="mono text-[11px] text-ink-3">{t('shell.search.hint')}</span>
-    </div>
-  );
-}
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { route, navigate } = useNav();
@@ -167,7 +160,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
     <nav className="flex h-full flex-col">
       {/* Carte de contexte */}
       {opId ? <OperationContextCard opId={opId} /> : <TenantContextCard />}
-      <SearchField operation={!!opId} />
+      <GlobalSearch operationId={opId} />
 
       {/* Pilotage — toujours visible */}
       <div className="ax-nav-group">{t('nav.group.pilotage')}</div>
@@ -176,6 +169,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       </button>
       <button className={cx('ax-nav-item', route.name === 'portfolio' && 'is-active')} aria-current={route.name === 'portfolio' ? 'page' : undefined} onClick={() => go({ name: 'portfolio' })}>
         {t('nav.portfolio')}
+      </button>
+      <button className={cx('ax-nav-item', route.name === 'foncier' && 'is-active')} aria-current={route.name === 'foncier' ? 'page' : undefined} onClick={() => go({ name: 'foncier' })}>
+        {t('nav.foncier')}
       </button>
 
       {/* Contexte opération — familles de modules (handoff) */}
@@ -229,6 +225,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         { name: 'approbations', labelKey: 'appro.title' },
         { name: 'notifications', labelKey: 'notif.title' },
         { name: 'syncQueue', labelKey: 'sync.nav' },
+        { name: 'fournisseurs', labelKey: 'supplier.title' },
         { name: 'membres', labelKey: 'membres.title' },
         { name: 'integrations', labelKey: 'f5.title' },
         { name: 'alertes', labelKey: 'alert.title' },
