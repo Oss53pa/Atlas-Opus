@@ -49,6 +49,7 @@ const FAMILIES: FamilyDef[] = [
       { code: 'SCN', labelKey: 'mod.scenarios', route: 'scenarios' },
       { code: 'M5', labelKey: 'mod.m5', route: 'financing' },
       { code: 'M6', labelKey: 'mod.m6', route: 'commercialisation' },
+      { code: 'ACQ', labelKey: 'mod.portail', route: 'portail' },
       { code: 'M16', labelKey: 'mod.m16', route: 'payments' },
       { code: 'M17', labelKey: 'mod.m17', route: 'cautions' },
     ],
