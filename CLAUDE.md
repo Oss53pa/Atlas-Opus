@@ -73,3 +73,12 @@ montant_revise = montant_base * (a0 + a1*I1/I1_0 + a2*I2/I2_0 + ...)   # formule
 | V1 | M5, M6, M8(privé), M9, M10, M11, M16, M21, M22, M23 |
 | V2 | M3, M8(public), M17, M18, M19, M20 |
 **Gate de merge :** RLS testée (tenant + operation_scope + rôle) · calculs Money.ts verts · machines à états gardées · responsive 360→1920 · a11y AA · audit rejouable · aucun texte en dur · contrat d'intégration respecté (idempotence, panne tierce gérée).
+
+## Règles de travail et de déploiement
+
+Ces règles s'appliquent à toute session de travail sur ce dépôt, humaine ou assistée par Claude.
+
+1. Travailler en local et regrouper les modifications. Ne pas pousser à chaque petite modification, on pousse un lot cohérent, une seule fois.
+2. Ne pousser sur la branche de production, `main`, qu'un lot terminé, testé et validé par Oss53pa.
+3. Ne jamais créer de branche qui déclenche un déploiement Vercel sans l'accord explicite d'Oss53pa. Le vercel.json ne déploie que la branche de production et saute le build quand rien n'a changé dans l'application. Ne pas modifier ces réglages sans cet accord.
+4. Les tests, le lint et le contrôle de types ne font pas partie du build Vercel. Ils se lancent en local, avant de pousser le lot.
