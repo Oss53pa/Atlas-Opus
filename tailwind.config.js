@@ -32,7 +32,6 @@ export default {
         info: 'var(--ax-info)',
       },
       fontFamily: {
-        brand: 'var(--ax-font-brand)',
         sans: 'var(--ax-font-sans)',
         mono: 'var(--ax-font-mono)',
       },

@@ -305,7 +305,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Menu size={18} />
         </Button>
         <button type="button" onClick={() => navigate({ name: 'dashboard' })} className="flex items-center md:hidden" aria-label={t('app.name')}>
-          <Brand size={20} />
+          <Brand height={28} decorative />
         </button>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="primary" size="sm" onClick={() => navigate({ name: 'create' })}>
@@ -319,7 +319,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Sidebar (desktop) 250 px */}
         <aside className="sticky top-16 hidden h-[calc(100vh-64px)] w-[250px] shrink-0 flex-col border-r bg-bg p-3 md:flex"
           style={{ borderColor: 'var(--ax-border)' }}>
-          <div className="mb-2 px-2 pt-1"><Brand size={21} /></div>
+          <div className="mb-2 px-2 pt-1"><Brand height={30} /></div>
           <NavLinks />
         </aside>
 
@@ -338,7 +338,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="absolute inset-0" style={{ background: 'var(--ax-overlay)' }} onClick={() => setDrawer(false)} aria-hidden="true" />
           <aside role="dialog" aria-modal="true" aria-label={t('common.menu')} className="absolute left-0 top-0 flex h-full w-[270px] flex-col overflow-auto bg-bg p-3" style={{ borderRight: '1px solid var(--ax-border)' }}>
             <div className="mb-2 flex items-center justify-between px-2">
-              <Brand size={21} />
+              <Brand height={30} />
               <Button variant="ghost" size="sm" icon aria-label={t('common.close')} onClick={() => setDrawer(false)}>
                 <X size={16} />
               </Button>

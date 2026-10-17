@@ -1,5 +1,6 @@
 export { Aurora } from './Aurora';
 export { Brand } from './Brand';
+export { AtlasLogoHorizontal, AtlasLogoVertical, type AtlasLogoProps } from './AtlasLogo';
 export { Button } from './Button';
 export { Badge } from './Badge';
 export { Banner } from './Banner';

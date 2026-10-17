@@ -26,7 +26,7 @@ export function WorkspacesScreen() {
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-16 items-center gap-3 border-b px-4 sm:px-8" style={{ borderColor: 'var(--ax-border)' }}>
-        <Brand size={20} />
+        <Brand height={28} />
         <div className="ml-auto flex min-w-0 items-center gap-3 sm:gap-4">
           <span className="mono hidden truncate text-[12px] text-ink-3 sm:block">{email}</span>
           <button className="shrink-0 whitespace-nowrap text-[13px]" style={{ color: 'var(--ax-accent)' }} onClick={() => void signOut()}>{t('auth.signout')}</button>

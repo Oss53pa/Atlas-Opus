@@ -1,20 +1,25 @@
-import { t } from '../i18n';
+import { AtlasLogoHorizontal, AtlasLogoVertical } from './AtlasLogo';
 
 /**
- * Logotype Atlas Opus (handoff) — carré plein accent + wordmark « Grand Hotel ».
- * Grand Hotel est réservé au nom d'app (réf CLAUDE.md §4).
+ * Marque de l'application — logo officiel Atlas Studio (cf. AtlasLogo).
+ * La déclinaison dépend de l'emplacement : `horizontal` dans les bandeaux et
+ * la barre latérale (le défaut), `vertical` dans les blocs centrés (connexion).
  */
-export function Brand({ size = 21 }: { size?: number }) {
-  const square = Math.round(size * 0.95);
-  return (
-    <span className="inline-flex items-center gap-2 leading-none">
-      <span
-        aria-hidden="true"
-        style={{ width: square, height: square, background: 'var(--ax-accent)', flex: 'none' }}
-      />
-      <span className="ax-brand" style={{ fontSize: size, color: 'var(--ax-text)' }}>
-        {t('app.name')}
-      </span>
-    </span>
+export function Brand({
+  height,
+  orientation = 'horizontal',
+  decorative = false,
+}: {
+  /** Hauteur du logo en px ; défaut adapté à la déclinaison. */
+  height?: number;
+  orientation?: 'horizontal' | 'vertical';
+  /** true quand le parent porte déjà le nom accessible (bouton, lien). */
+  decorative?: boolean;
+}) {
+  const label = decorative ? null : undefined;
+  return orientation === 'vertical' ? (
+    <AtlasLogoVertical height={height ?? 84} label={label} />
+  ) : (
+    <AtlasLogoHorizontal height={height ?? 30} label={label} />
   );
 }

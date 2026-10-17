@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-20 -50 434 434" role="img" aria-label="Atlas Studio">
+  <!-- Pictogramme Atlas Studio (Brand Book) — encre sur onglet clair, crème sur
+       onglet sombre. Tracés identiques à src/ui/AtlasLogo.tsx. -->
+  <style>
+    path { fill: #2A2722; }
+    @media (prefers-color-scheme: dark) { path { fill: #F4F1EA; } }
+  </style>
+  <path d="M0 283L360 0V143L299 101V73L0 333Z"/>
+  <path d="M127 334V245L182 197V334Z"/>
+  <path d="M236 334V181L299 123L394 200V334H334V215L299 177L285 193V334Z"/>
+</svg>

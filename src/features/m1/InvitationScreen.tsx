@@ -26,7 +26,7 @@ export function InvitationScreen() {
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-16 items-center px-4 sm:px-8" style={{ borderBottom: '1px solid var(--ax-border)' }}>
-        <Brand size={20} />
+        <Brand height={28} />
       </header>
 
       <main className="mx-auto w-full max-w-[560px] px-4 py-16">

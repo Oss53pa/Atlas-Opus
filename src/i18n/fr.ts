@@ -5,6 +5,7 @@
 export const fr = {
   // ── Marque / shell ──────────────────────────────────────────────────────
   'app.name': 'Atlas Opus',
+  'brand.studio': 'Atlas Studio',
   'app.tagline': 'Maîtrise d’ouvrage',
   'nav.portfolio': 'Portefeuille',
   'nav.cockpit': 'Cockpit',

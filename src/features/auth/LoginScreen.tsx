@@ -24,7 +24,7 @@ export function LoginScreen() {
     <div className="flex min-h-[80vh] items-center justify-center px-4">
       <Card tone="strong" className="w-full max-w-[400px]">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <Brand size={34} />
+          <Brand orientation="vertical" />
           <p className="text-[13px] text-ink-2">{t('auth.login.subtitle')}</p>
         </div>
         <form className="flex flex-col gap-4" onSubmit={submit}>

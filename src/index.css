@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&family=Exo+2:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -202,7 +202,6 @@
   /* Divers */
   .ax-divider { height: 1px; background: var(--ax-border); border: 0; }
   .mono { font-family: var(--ax-font-mono); font-variant-numeric: tabular-nums; }
-  .ax-brand { font-family: var(--ax-font-brand); font-weight: 400; line-height: 1; }
 
   /* Aurora neutralisée (direction plate) — conservée inerte pour compat. */
   .ax-aurora-layer, .ax-blob { display: none !important; }

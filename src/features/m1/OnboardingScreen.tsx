@@ -29,7 +29,7 @@ export function OnboardingScreen() {
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <header className="flex h-16 items-center px-4 sm:px-8" style={{ borderBottom: '1px solid var(--ax-border)' }}>
-        <Brand size={20} />
+        <Brand height={28} />
         <span className="mono ml-auto text-[12px] text-ink-3">{t('onb.progress', { n: active, total: 3 })}</span>
       </header>
 

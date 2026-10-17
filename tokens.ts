@@ -120,10 +120,10 @@ export const effect = {
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Typographie — Grand Hotel (wordmark), Exo 2 (UI), JetBrains Mono (nombres)
+// 3. Typographie — Exo 2 (UI), JetBrains Mono (nombres). Le wordmark n'est plus
+// une police : c'est le logo Atlas Studio (src/ui/AtlasLogo.tsx).
 // ─────────────────────────────────────────────────────────────────────────────
 export const font = {
-  brand: "'Grand Hotel', ui-serif, cursive",
   sans: "'Exo 2', system-ui, -apple-system, 'Segoe UI', sans-serif",
   mono: "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace",
 } as const;
@@ -222,7 +222,6 @@ export const cssVars: Record<string, string> = {
   '--ax-shadow-sm': effect.shadowSm,
   '--ax-shadow-lg': effect.shadowLg,
   '--ax-ring': effect.ring,
-  '--ax-font-brand': font.brand,
   '--ax-font-sans': font.sans,
   '--ax-font-mono': font.mono,
   '--ax-radius-sm': radius.sm,
